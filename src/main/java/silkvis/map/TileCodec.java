@@ -139,7 +139,8 @@ public final class TileCodec {
      * Identity is stored as display form ({@code profile|dimension|mode@y}) because the
      * profile id itself is derived from that string by {@link MapIdentity}.
      */
-    private static MapIdentity parseIdentity(String displayKey, MapMode mode, int sliceY) {
+    private static MapIdentity parseIdentity(String displayKey, MapMode mode, int sliceY)
+            throws IOException {
         String[] parts = displayKey.split("\\|", 3);
         if (parts.length < 2) {
             throw new IOException("malformed identity");
