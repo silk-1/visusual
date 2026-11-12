@@ -1,0 +1,11 @@
+{
+  "baseline_commit": "0c2d7e6de7f30b4f1b9a6b51b746d4cab68c8ba5",
+  "platform": "Linux x86_64",
+  "python": "3.12.14",
+  "java": "openjdk version \"21.0.13\" 2026-10-20\nOpenJDK Runtime Environment (build 21.0.13+9-1-deb13u2-Debian)\nOpenJDK 64-Bit Server VM (build 21.0.13+9-1-deb13u2-Debian, mixed mode, sharing)",
+  "javac": null,
+  "pwsh": null,
+  "powershell": null,
+  "cmd.exe": null,
+  "checks_run_on_user_pc": false
+}

@@ -1,0 +1,40 @@
+$ git rev-parse HEAD
+exit=0
+e87b2084089a898844aafe4eeeb86ecdbfca73cb
+
+$ git ls-files src/main/java/silkvis/config
+exit=0
+src/main/java/silkvis/config/ConfigCodec.java
+src/main/java/silkvis/config/ConfigException.java
+src/main/java/silkvis/config/ConfigPaths.java
+src/main/java/silkvis/config/Debouncer.java
+src/main/java/silkvis/config/GlobalConfig.java
+src/main/java/silkvis/config/JsonConfigFile.java
+src/main/java/silkvis/config/LoadOutcome.java
+src/main/java/silkvis/config/MediaConfig.java
+src/main/java/silkvis/config/ProfileIdentity.java
+src/main/java/silkvis/config/UiConfig.java
+src/main/java/silkvis/config/Validators.java
+src/main/java/silkvis/config/VisualPreset.java
+src/main/java/silkvis/config/json/JsonArray.java
+src/main/java/silkvis/config/json/JsonException.java
+src/main/java/silkvis/config/json/JsonObject.java
+src/main/java/silkvis/config/json/JsonParser.java
+src/main/java/silkvis/config/json/JsonString.java
+src/main/java/silkvis/config/json/JsonValue.java
+
+$ git check-ignore -v --no-index src/main/java/silkvis/config/ConfigPaths.java
+exit=1
+
+$ rg -n ServerInfo|OptionalLimit src/main/java/silkvis/client/SilkVisClient.java src/test/java/silkvis/verify/CoreChecks.java src/main/java/silkvis/core/OptionalLimit.java
+exit=0
+src/main/java/silkvis/core/OptionalLimit.java:7:public record OptionalLimit(boolean enabled, long value) {
+src/main/java/silkvis/core/OptionalLimit.java:8:    public OptionalLimit {
+src/main/java/silkvis/core/OptionalLimit.java:14:    public static OptionalLimit disabled(long fallback) {
+src/main/java/silkvis/core/OptionalLimit.java:15:        return new OptionalLimit(false, fallback);
+src/test/java/silkvis/verify/CoreChecks.java:8:import silkvis.core.OptionalLimit;
+src/test/java/silkvis/verify/CoreChecks.java:92:            expectThrows(IllegalArgumentException.class, () -> new OptionalLimit(true, -1), "negative limit");
+src/test/java/silkvis/verify/CoreChecks.java:93:            OptionalLimit enabled = new OptionalLimit(true, 10_000);
+src/test/java/silkvis/verify/CoreChecks.java:95:            OptionalLimit disabled = OptionalLimit.disabled(64);
+src/main/java/silkvis/client/SilkVisClient.java:13:import net.minecraft.client.network.ServerInfo;
+src/main/java/silkvis/client/SilkVisClient.java:98:        ServerInfo server = client.getCurrentServerEntry();

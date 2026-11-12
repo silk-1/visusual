@@ -1,0 +1,92 @@
+$ git rev-parse HEAD
+exit=0
+0c2d7e6de7f30b4f1b9a6b51b746d4cab68c8ba5
+
+$ git ls-files src/main/java/silkvis/config
+exit=0
+
+$ rg -n ^import silkvis\.config src/main/java src/test/java
+exit=0
+src/main/java/silkvis/destinations/Destination.java:3:import silkvis.config.ConfigException;
+src/main/java/silkvis/destinations/Destination.java:4:import silkvis.config.Validators;
+src/main/java/silkvis/destinations/Destination.java:5:import silkvis.config.json.JsonObject;
+src/main/java/silkvis/destinations/Destination.java:6:import silkvis.config.json.JsonValue;
+src/main/java/silkvis/client/SilkVisScreen.java:10:import silkvis.config.GlobalConfig;
+src/main/java/silkvis/client/SilkVisScreen.java:11:import silkvis.config.VisualPreset;
+src/test/java/silkvis/verify/MapChecks.java:18:import silkvis.config.ProfileIdentity;
+src/main/java/silkvis/destinations/DestinationTarget.java:3:import silkvis.config.ConfigException;
+src/main/java/silkvis/destinations/DestinationTarget.java:4:import silkvis.config.Validators;
+src/main/java/silkvis/destinations/DestinationTarget.java:5:import silkvis.config.json.JsonObject;
+src/main/java/silkvis/destinations/DestinationTarget.java:6:import silkvis.config.json.JsonValue;
+src/main/java/silkvis/client/SilkVisClient.java:16:import silkvis.config.ProfileIdentity;
+src/main/java/silkvis/destinations/DestinationsConfig.java:3:import silkvis.config.ConfigCodec;
+src/main/java/silkvis/destinations/DestinationsConfig.java:4:import silkvis.config.ConfigException;
+src/main/java/silkvis/destinations/DestinationsConfig.java:5:import silkvis.config.Validators;
+src/main/java/silkvis/destinations/DestinationsConfig.java:6:import silkvis.config.json.JsonArray;
+src/main/java/silkvis/destinations/DestinationsConfig.java:7:import silkvis.config.json.JsonObject;
+src/main/java/silkvis/destinations/DestinationsConfig.java:8:import silkvis.config.json.JsonValue;
+src/main/java/silkvis/client/SilkVisRuntime.java:4:import silkvis.config.ConfigException;
+src/main/java/silkvis/client/SilkVisRuntime.java:5:import silkvis.config.ConfigPaths;
+src/main/java/silkvis/client/SilkVisRuntime.java:6:import silkvis.config.Debouncer;
+src/main/java/silkvis/client/SilkVisRuntime.java:7:import silkvis.config.GlobalConfig;
+src/main/java/silkvis/client/SilkVisRuntime.java:8:import silkvis.config.JsonConfigFile;
+src/main/java/silkvis/client/SilkVisRuntime.java:9:import silkvis.config.LoadOutcome;
+src/main/java/silkvis/client/SilkVisRuntime.java:10:import silkvis.config.ProfileIdentity;
+src/main/java/silkvis/client/SilkVisRuntime.java:11:import silkvis.config.UiConfig;
+src/test/java/silkvis/verify/DestinationChecks.java:3:import silkvis.config.ConfigException;
+src/test/java/silkvis/verify/DestinationChecks.java:4:import silkvis.config.json.JsonObject;
+src/test/java/silkvis/verify/DestinationChecks.java:5:import silkvis.config.json.JsonValue;
+src/main/java/silkvis/media/IpcCodec.java:3:import silkvis.config.json.JsonException;
+src/main/java/silkvis/media/IpcCodec.java:4:import silkvis.config.json.JsonObject;
+src/main/java/silkvis/media/IpcCodec.java:5:import silkvis.config.json.JsonValue;
+src/main/java/silkvis/map/MapIdentity.java:3:import silkvis.config.ConfigPaths;
+src/main/java/silkvis/media/IpcEnvelope.java:3:import silkvis.config.json.JsonObject;
+src/main/java/silkvis/map/MapSettings.java:3:import silkvis.config.ConfigException;
+src/main/java/silkvis/map/MapSettings.java:4:import silkvis.config.Validators;
+src/main/java/silkvis/map/MapSettings.java:5:import silkvis.config.json.JsonObject;
+src/main/java/silkvis/map/MapSettings.java:6:import silkvis.config.json.JsonValue;
+src/main/java/silkvis/visual/VisualSettings.java:3:import silkvis.config.ConfigException;
+src/main/java/silkvis/visual/VisualSettings.java:4:import silkvis.config.Validators;
+src/main/java/silkvis/visual/VisualSettings.java:5:import silkvis.config.json.JsonObject;
+src/main/java/silkvis/visual/VisualSettings.java:6:import silkvis.config.json.JsonValue;
+src/test/java/silkvis/verify/CoreChecks.java:3:import silkvis.config.ConfigException;
+src/test/java/silkvis/verify/CoreChecks.java:4:import silkvis.config.Debouncer;
+src/test/java/silkvis/verify/CoreChecks.java:5:import silkvis.config.GlobalConfig;
+src/test/java/silkvis/verify/CoreChecks.java:6:import silkvis.config.JsonConfigFile;
+src/test/java/silkvis/verify/CoreChecks.java:7:import silkvis.config.LoadOutcome;
+src/test/java/silkvis/verify/CoreChecks.java:8:import silkvis.config.OptionalLimit;
+src/test/java/silkvis/verify/CoreChecks.java:9:import silkvis.config.UiConfig;
+src/test/java/silkvis/verify/CoreChecks.java:10:import silkvis.config.Validators;
+src/test/java/silkvis/verify/CoreChecks.java:11:import silkvis.config.json.JsonException;
+src/test/java/silkvis/verify/CoreChecks.java:12:import silkvis.config.json.JsonObject;
+src/test/java/silkvis/verify/CoreChecks.java:13:import silkvis.config.json.JsonValue;
+src/main/java/silkvis/map/Waypoint.java:3:import silkvis.config.ConfigException;
+src/main/java/silkvis/map/Waypoint.java:4:import silkvis.config.Validators;
+src/main/java/silkvis/map/Waypoint.java:5:import silkvis.config.json.JsonObject;
+src/main/java/silkvis/map/Waypoint.java:6:import silkvis.config.json.JsonValue;
+src/main/java/silkvis/map/MarkerSet.java:3:import silkvis.config.ConfigException;
+src/main/java/silkvis/map/MarkerSet.java:4:import silkvis.config.ConfigCodec;
+src/main/java/silkvis/map/MarkerSet.java:5:import silkvis.config.json.JsonArray;
+src/main/java/silkvis/map/MarkerSet.java:6:import silkvis.config.json.JsonObject;
+src/main/java/silkvis/map/MarkerSet.java:7:import silkvis.config.json.JsonValue;
+src/main/java/silkvis/media/WindowsMediaProvider.java:3:import silkvis.config.json.JsonObject;
+src/main/java/silkvis/media/WindowsMediaProvider.java:4:import silkvis.config.json.JsonValue;
+src/test/java/silkvis/verify/MediaChecks.java:3:import silkvis.config.json.JsonObject;
+src/test/java/silkvis/verify/MediaChecks.java:4:import silkvis.config.json.JsonValue;
+src/main/java/silkvis/ui/hud/HudLayoutConfig.java:3:import silkvis.config.ConfigException;
+src/main/java/silkvis/ui/hud/HudLayoutConfig.java:4:import silkvis.config.json.JsonArray;
+src/main/java/silkvis/ui/hud/HudLayoutConfig.java:5:import silkvis.config.json.JsonObject;
+src/main/java/silkvis/ui/hud/HudLayoutConfig.java:6:import silkvis.config.json.JsonValue;
+
+$ rg -n ServerInfo|OptionalLimit src/main/java/silkvis/client/SilkVisClient.java src/test/java/silkvis/verify/CoreChecks.java src/main/java/silkvis/core/OptionalLimit.java
+exit=0
+src/test/java/silkvis/verify/CoreChecks.java:8:import silkvis.config.OptionalLimit;
+src/test/java/silkvis/verify/CoreChecks.java:92:            expectThrows(IllegalArgumentException.class, () -> new OptionalLimit(true, -1), "negative limit");
+src/test/java/silkvis/verify/CoreChecks.java:93:            OptionalLimit enabled = new OptionalLimit(true, 10_000);
+src/test/java/silkvis/verify/CoreChecks.java:95:            OptionalLimit disabled = OptionalLimit.disabled(64);
+src/main/java/silkvis/client/SilkVisClient.java:13:import net.minecraft.server.network.ServerInfo;
+src/main/java/silkvis/client/SilkVisClient.java:98:        ServerInfo server = client.getCurrentServerEntry();
+src/main/java/silkvis/core/OptionalLimit.java:7:public record OptionalLimit(boolean enabled, long value) {
+src/main/java/silkvis/core/OptionalLimit.java:8:    public OptionalLimit {
+src/main/java/silkvis/core/OptionalLimit.java:14:    public static OptionalLimit disabled(long fallback) {
+src/main/java/silkvis/core/OptionalLimit.java:15:        return new OptionalLimit(false, fallback);

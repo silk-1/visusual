@@ -1,0 +1,5 @@
+{
+  "scripts/verify.ps1": "19aa6a29da84fd30ffd9d33b52b7d842707e92ec96c1e49a7c84ddd1b53fab67",
+  "scripts/verify.py": "f019e235b80d5ac806aaad4ff38f3929162f332e397e479c0e59f2c92623e1df",
+  "scripts/test_verify.py": "4d763443055da17c4752ece7022dbf2c823aefc0f68d7f24c688fbe3a8ddd82e"
+}

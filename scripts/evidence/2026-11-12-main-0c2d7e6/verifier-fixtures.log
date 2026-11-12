@@ -1,0 +1,14 @@
+NOT_RUN powershell: neither pwsh nor powershell is installed
+PASS python/matching: exit=0 expected=0
+PASS python/missing_ru: exit=1 expected=1
+PASS python/missing_en: exit=1 expected=1
+PASS python/case_sensitive: exit=1 expected=1
+PASS python/unicode_main: exit=1 expected=1
+PASS python/unicode_test: exit=1 expected=1
+PASS python/bom_java: exit=1 expected=1
+PASS python/malformed_json: exit=2 expected=2
+PASS python/array_json: exit=2 expected=2
+PASS python/missing_json: exit=2 expected=2
+PASS python/missing_src: exit=2 expected=2
+PASS python/no_java: exit=2 expected=2
+verifier_fixture_checks=12 failed=0

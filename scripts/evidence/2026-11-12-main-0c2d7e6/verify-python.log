@@ -1,0 +1,23 @@
+PASS lang: en_us=118 ru_ru=118 missing_in_ru=0 missing_in_en=0
+  non_ascii: src/main/java/silkvis/client/HudDataCollector.java:80:62 byte=0xC2
+  non_ascii: src/main/java/silkvis/client/HudEditorScreen.java:89:21 byte=0xE2
+  non_ascii: src/main/java/silkvis/client/HudOverlayRenderer.java:132:52 byte=0xE2
+  non_ascii: src/main/java/silkvis/client/HudOverlayRenderer.java:150:28 byte=0xE2
+  non_ascii: src/main/java/silkvis/client/SilkVisScreen.java:107:51 byte=0xC3
+  non_ascii: src/main/java/silkvis/destinations/CommandTextValidator.java:59:88 byte=0xE2
+  non_ascii: src/main/java/silkvis/destinations/Destination.java:9:17 byte=0xD0
+  non_ascii: src/main/java/silkvis/destinations/DestinationsConfig.java:26:42 byte=0xD0
+  non_ascii: src/main/java/silkvis/destinations/DestinationsConfig.java:27:42 byte=0xD0
+  non_ascii: src/main/java/silkvis/destinations/DestinationsConfig.java:28:43 byte=0xD0
+  non_ascii: src/main/java/silkvis/media/MediaSnapshot.java:78:69 byte=0xE2
+  non_ascii: src/test/java/silkvis/verify/DestinationChecks.java:54:37 byte=0xD0
+  non_ascii: src/test/java/silkvis/verify/DestinationChecks.java:94:46 byte=0xD0
+  non_ascii: src/test/java/silkvis/verify/DestinationChecks.java:95:46 byte=0xD0
+  non_ascii: src/test/java/silkvis/verify/DestinationChecks.java:101:54 byte=0xD0
+  non_ascii: src/test/java/silkvis/verify/DestinationChecks.java:112:64 byte=0xD0
+  non_ascii: src/test/java/silkvis/verify/DestinationChecks.java:135:65 byte=0xD0
+  non_ascii: src/test/java/silkvis/verify/DestinationChecks.java:153:64 byte=0xD0
+  non_ascii: src/test/java/silkvis/verify/DestinationChecks.java:164:64 byte=0xD0
+  non_ascii: src/test/java/silkvis/verify/MapChecks.java:153:50 byte=0xD0
+FAIL ascii: java_files=104 non_ascii_files=10
+RESULT FAIL

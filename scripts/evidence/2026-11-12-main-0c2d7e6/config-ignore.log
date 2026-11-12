@@ -1,0 +1,3 @@
+$ git check-ignore -v --no-index src/main/java/silkvis/config/ConfigPaths.java
+exit=0
+.gitignore:15:config/	src/main/java/silkvis/config/ConfigPaths.java
