@@ -1,0 +1,574 @@
+SILKVIS — ТЕХНИЧЕСКОЕ ЗАДАНИЕ v2.0
+Minecraft Java Edition 1.21.10 / Fabric / Java 21
+Дата: 12.11.2026. Язык документа: русский. Формат: UTF-8.
+Назначение: спецификация реализации и приёмки для разработчика.
+Статус: требования к будущей реализации; документ не подтверждает наличие готового кода.
+
+0. НОРМАТИВНЫЕ ПРАВИЛА И ЗАФИКСИРОВАННЫЕ РЕШЕНИЯ
+
+0.1. MUST / MUST NOT — обязательное требование / запрет. SHOULD — рекомендуемое решение, отклонение фиксируется в ADR с техническим обоснованием. MAY — необязательная возможность.
+
+0.2. Приоритет разработки строго последовательный:
+P0 — работоспособный каркас, конфигурация, UI и рендерные адаптеры;
+P1 — законченный визуальный релиз: дизайн-система, HUD, карта, визуальные модули, тема, музыкальный оверлей, проверенная совместимость;
+P2 — автоматизация, навигация, склады, производственные цепочки и выполнение команд в составе задач.
+Работы P2 MUST NOT вытеснять незавершённые обязательные работы P1. В P0/P1 допустимы DTO и extension points для P2, но не рабочие боты и не фиктивные переключатели функций. Вкладка «Автоматизация» до P2 показывает явный статус «Запланировано» без имитации выполнения.
+
+0.3. Утверждённая тема — Graphite / Turquoise, тёмное матовое стекло. RU/EN локализация обязательна. Основная ОС — Windows x64; ядро Java не привязывать к Windows. Собственная карта SilkVis, без форка сторонней карты. Sodium, Iris и потенциальный Baritone — необязательные интеграции.
+
+0.4. Визуал, карта, медиаплеер и ручные пользовательские команды поддерживаются в одиночной и сетевой игре. Предыдущий абсолютный запрет любых серверных сценариев заменён разделением возможностей: автоматизация по умолчанию разрешается только для одиночной сессии; в P2 сетевые задачи требуют явно включённого профиля конкретного сервера. Наличие профиля не предоставляет дополнительных прав серверу или игроку. Поведение без серверного профиля — visual-only + ручные действия пользователя.
+
+0.5. Все автоматизации выключены по умолчанию. Запуск — явное действие. Подтверждение задаётся один раз для конкретного плана, зоны, правил и лимитов. Изменение разрешённой области, разрушительной политики или защищённых ресурсов аннулирует разрешение. Лимиты объёма, дистанции, длительности, количества и бюджета пользователь может отключить по отдельности. Ограничения очередей, памяти и вычислительной нагрузки — технические инварианты, не снимаемые переключателем «без лимита».
+
+0.6. Аварийный режим после обнаружения настроенной опасности MUST отменить задачи и штатно выйти в главное меню. MUST NOT закрывать процесс Minecraft, вызывать System.exit(), повреждать сохранение или автоматически переподключаться. Выход не является гарантией предотвращения смерти.
+
+0.7. Профили «Дом», «База», «Спавн» — пользовательские точки назначения. На сервере пользователь вписывает свои команды; в соло — координаты и измерение. Координаты сами по себе не разрешают телепортацию: без доступной команды используется маршрут. Не реализовывать скрытое изменение позиции через интегрированный сервер или обход разрешений.
+
+0.8. Дополнения вне списка настоящего ТЗ, смена платформы, требование обязательной серверной части, облачный сервис, OAuth, встроенный браузер, новые игровые механики и новые существенные зависимости требуют отдельного согласования. Рутинные внутренние рефакторинги не требуют повторного опроса.
+
+1. ПЛАТФОРМА, BUILD И ПЕРВИЧНЫЙ АУДИТ
+
+BUILD-01. Целевой minecraft_version = 1.21.10, mod id = silkvis, клиентский Fabric JAR. Основной код — Java 21. fabric.mod.json MUST объявлять клиентскую среду и точную проверенную совместимость; не объявлять весь диапазон 1.21.x без тестов. Dedicated server не должен загружать клиентские классы SilkVis.
+
+BUILD-02. До изменения локального репозитория SilkVis изучить исходники, build scripts, текущие mappings, mixins, зависимости, git status и существующие пользовательские изменения. Сохранить рабочие решения. Не создавать новый проект поверх существующего без причины. Удалённая публикация не входит в задачу.
+
+BUILD-03. Зафиксировать версии Gradle Wrapper, Loom, Loader, Fabric API, mappings, JDK toolchain и тестовых библиотек. Не использовать dynamic versions, + или latest.release. Версии определить по реально разрешаемым артефактам для 1.21.10; номера зависимостей в этом ТЗ намеренно не выдуманы. Записать координаты и ссылки в dependency-matrix.md. Выбрать одну систему mappings и не смешивать имена Yarn/Mojang.
+
+BUILD-04. В 1.21.9/1.21.10 менялись рендерные и resource-loader API [S1]. Проверить сигнатуры в закреплённой версии, а не копировать tutorial для другой версии. Отсутствующий Fabric callback заменить минимальным версионированным adapter/mixin после проверки. Не предполагать наличие старых WorldRenderEvents.
+
+BUILD-05. Команды проверки: Windows — gradlew.bat clean build, gradlew.bat test, gradlew.bat runClient; POSIX — соответствующие ./gradlew. Проверить фактическое наличие Gradle tasks. В отчёте перечислить исполненные команды, exit codes и непроверенные сценарии. Компиляция, запуск клиента и ручная игровая приёмка — разные результаты.
+
+BUILD-06. Финальный артефакт — remapped production JAR, проверенный в чистом профиле Fabric 1.21.10. Dev JAR не выдавать за готовый пользовательский мод. При native media helper архив релиза должен включать исходники/инструкцию его сборки и проверяемый манифест бинарника.
+
+2. АРХИТЕКТУРА И КОНТРАКТЫ
+
+Рекомендуемая логическая структура пакетов; multi-project Gradle вводить только при пользе:
+silkvis.client             — lifecycle, Fabric entrypoints, hooks;
+silkvis.core               — module registry, capabilities, services, clock;
+silkvis.config             — DTO, codecs, migrations, atomic persistence;
+silkvis.ui                 — screens, layout, controls, focus, theme tokens;
+silkvis.ui.hud             — widgets, editor, anchors;
+silkvis.render             — version-specific drawing, textures, clipping;
+silkvis.visual             — camera/world visual modules;
+silkvis.map                — sampling, immutable tiles, cache, persistence;
+silkvis.media              — provider API, sessions, snapshots, commands;
+silkvis.media.windows      — Windows bridge lifecycle and IPC;
+silkvis.destinations       — waypoints, world/server profiles;
+silkvis.automation         — P2 scheduler, actions, planner, reservations;
+silkvis.integration        — isolated Sodium/Iris/Baritone adapters;
+silkvis.diagnostics        — timing, bounded logs, diagnostic export.
+
+ARCH-01. Направление зависимостей: UI читает модели сервисов; сервисы не зависят от конкретных экранов. Render adapters не принимают бизнес-решения. Automation публикует read-only snapshot для HUD/карты. Media не зависит от automation. Никакого единого God-class для всех модулей.
+
+ARCH-02. ModuleDescriptor: id, category, displayNameKey, descriptionKey, configSchemaVersion, availability, dependencies, conflicts. Lifecycle: enable(), disable(), close(). Различать enabled, available, running, degraded, failed. Недоступная возможность показывает reasonCode, а не ломает весь мод.
+
+ARCH-03. Клиентский игровой поток владеет Minecraft world/entity/container objects, вводом и игровыми действиями. Рендерные GPU-операции выполняются только через разрешённый поток/фазу выбранной версии. Фоновые workers получают immutable DTO, а не ссылки на изменяемые чанки, мир или сущности. Результаты публикуются через ограниченную очередь, с проверкой generation/session token.
+
+ARCH-04. WorldSessionToken меняется при входе, выходе, смене мира и переходе контекста. Результат фоновой работы с устаревшим token отбрасывается. Отмена обязательна для карты, чтения файлов, загрузки темы и автоматизации. Media service имеет application scope и может работать в главном меню по настройке; выход из мира не обязан выключать внешнюю музыку.
+
+ARCH-05. Фоновые исполнители: bounded CPU pool, отдельный bounded I/O executor и последовательный канал media IPC. Количество потоков/очередей ограничить конфигурацией с разумным верхним пределом. При перегрузке объединять повторные map updates по ключу и отбрасывать устаревшие snapshots, а не накапливать бесконечный backlog.
+
+ARCH-06. Ошибки классифицировать: CONFIG_INVALID, RESOURCE_INVALID, PROVIDER_UNAVAILABLE, CAPABILITY_UNSUPPORTED, TIMEOUT, WORLD_CHANGED, PERMISSION_DENIED, PATH_UNREACHABLE, INVENTORY_DESYNC, INTEGRATION_CONFLICT. Пользователю — локализованное сообщение; диагностике — код и контекст без секретов. Логи ограничить по размеру и частоте повторов.
+
+ARCH-07. Для runtime integrations использовать capability discovery. Не загружать классы отсутствующего Iris/Sodium/Baritone из общих static initializers. ClassNotFoundException/LinkageError адаптера не должны превращаться в падение основного UI. Поддерживаемые версии — явно проверенная матрица.
+
+3. DESIGN SYSTEM И ГЛАВНЫЙ UI
+
+UI-01. Все размеры ниже — logical GUI units после масштабирования Minecraft, не физические пиксели. Input hit testing использует ту же систему координат. Цвета — sRGB; alpha задана отдельно. Ввести ThemeTokens без разбросанных hex-литералов по renderer-классам:
+background = #10141C, alpha 0.92;
+surface = #1B2330, alpha 0.96;
+surfaceHover = #253244;
+border = #FFFFFF, alpha 0.10;
+accent = #59D8C5;
+accentHover = #7AE5D5;
+textPrimary = #EDF2F7;
+textSecondary = #98A6B8;
+success = #68D391;
+warning = #F4C46B;
+error = #F07878.
+Состояния обозначаются текстом/иконкой, а не только цветом. Проверять читабельность на реальном полупрозрачном фоне.
+
+UI-02. Spacing scale = 4, 8, 12, 16, 24. Corner radius: panel/card 8, controls 4. Control height 24–28, минимальная кликабельная область 20x20 GUI units. Typography styles: body, caption, section, title; выбирать размеры по используемому font provider и проверять кириллицу. Первичный вариант — встроенный Minecraft font renderer; при подключении отдельного шрифта обязательны лицензия и fallback glyphs.
+
+UI-03. Главное окно открывается Right Shift, биндинг переназначаемый. Целевой max-size = 960x620, safe margins >= 12. Wide layout при достаточной ширине: navigation 144, module list >= 220, settings >= 260. При scaled width < 700 — navigation + content, settings вместо списка; при < 420 — одна колонка и navigation drawer. Не принуждать пользователя уменьшать GUI scale. Все длинные панели прокручиваются, footer и close остаются доступными.
+
+UI-04. Вкладки P1: «Визуал», «HUD», «Карта», «Музыка», «Тема», «Интеграции», «Настройки». «Автоматизация» — явно обозначенный раздел P2. Поиск по локализованному названию, описанию и стабильному module ID. Избранное, изменённые настройки, сброс модуля, сброс профиля. Переключатели имеют label, description и disabled reason.
+
+UI-05. Компоненты: button, toggle, integer/decimal input, slider с числовым полем, enum selector, searchable list, color+alpha editor, keybind editor, tooltip, toast, modal, scroll panel, file/URL picker. Validation выполняется до commit значения. Invalid ввод не записывается в конфиг. Для перетаскивания слайдера — preview; disk write после debounce/commit, не на каждый mouse move.
+
+UI-06. Input routing: modal > focused field > screen > HUD interaction > game. Esc закрывает верхний слой, Tab/Shift+Tab перемещают focus, Enter/Space активируют control. Keybind capture не исполняет захватываемую команду. Поиск/поля блокируют игровые бинды, но аварийный stop остаётся доступен при активной задаче. Конфликты биндов показываются до сохранения.
+
+UI-07. Анимации: 120–180 ms, easing ease-out, время monotonic; переключатель reduced motion. Не применять motion blur, постоянное свечение, переливающиеся градиенты и визуально шумные эффекты по умолчанию. Tooltip появляется после 350 ms; длинный текст обрезается с раскрытием полного значения.
+
+UI-08. Blur — опциональный effect, выключен в Low preset. Использовать ограниченный общий проход/буфер, не full-screen blur отдельно для каждой карточки. При несовместимости shader pipeline автоматически перейти на матовую непрозрачную панель и показать статус. Blend/scissor/depth state восстанавливать после рисования.
+
+UI-09. RU/EN ресурсы, plural forms по необходимости, формат чисел/времени без хардкода. Проверить русские строки, длинные названия, Unicode и отсутствующие glyphs. Иконки собственного или лицензированного единого набора. Не использовать логотипы музыкальных сервисов как обязательный ресурс; текст источника достаточен.
+
+4. HUD И ЕГО РЕДАКТОР
+
+HUD-01. Обязательные widgets P1: координаты/измерение, FPS и frame time, направление, биом, игровое время, эффекты со временем, броня/прочность, активный инструмент, миникарта, Now Playing. TaskStatus добавляется в P2. Каждый widget имеет независимые enabled, scale, alpha, anchor, offset, zIndex, visibilityPolicy.
+
+HUD-02. Layout сохранять через anchor + logical offsets, а не абсолютные screen pixels. После resize/GUI scale change выполнить reclamp в safe area. Поддержать drag, snap grid 4/8, alignment guides, размер, блокировку позиции, порядок слоёв, reset. Editor показывает тестовые данные с явным режимом preview; demo track не становится «реальным воспроизведением».
+
+HUD-03. Visibility policy учитывает F1, debug overlay, chat, inventory, pause menu и spectator. Default: скрывать декоративный HUD при F1; не перекрывать hotbar, health/food, bossbar и subtitles. Допускается ручное перекрытие в редакторе с предупреждением. Позиции не прыгают при смене длины текста.
+
+HUD-04. Частоты: FPS агрегировать 2 Hz, координаты/направление до 10 Hz, inventory/effects — по изменениям с ограниченным fallback polling. Отрисовка берёт cached view model. Не обращаться к диску, native API и сетевым URL внутри render().
+
+HUD-05. Обычный HUD click-through. Для кнопок музыки и другого взаимодействия выделить настраиваемую клавишу «Взаимодействие с HUD»: захват курсора и обработка кликов только в этом режиме либо в открытом экране. Клик по панели не должен одновременно атаковать/ставить блок в мире. При отпускании/закрытии восстановить cursor capture.
+
+5. ВИЗУАЛЬНЫЕ МОДУЛИ И ПОЛЬЗОВАТЕЛЬСКИЕ РЕСУРСЫ
+
+VIS-01. Камера: пользовательский FOV в допустимом диапазоне, интенсивность view bobbing/hurt camera, масштаб интенсивности разрешённых экранных эффектов. Не изменять speed, reach, hitbox, damage, реальные статусы и server state. Хранить настройки SilkVis отдельно; при disable восстановить эффективное ванильное поведение, а не постоянно переписывать options.txt.
+
+VIS-02. Мир: density/distance fog в корректных пределах, density/cap категорий частиц, визуальная интенсивность дождя/снега, облаков и декоративных overlays. Визуальное скрытие дождя не меняет фактическую погоду. Не включать x-ray/fullbright через стены как побочный результат изменения тумана. Для особых сред и эффектов проверить отдельные render paths.
+
+VIS-03. Информационные индикаторы: настраиваемые категории видимых сущностей, маркеры точек, границы выбранной области. По умолчанию depth-aware, без through-wall режима. Дальность и число labels ограничены; отдалённые labels агрегируются/скрываются. До P2 нет изменяющих мир действий при выборе области.
+
+ASSET-01. Тема поддерживает локальные PNG/JPEG и явный HTTP(S) download. Предпросмотр → Apply → atomic replacement. Исходные пользовательские файлы не изменять. Сохранять локальную копию по content hash; старую GPU texture освобождать после переключения. Ошибка сохраняет последний исправный ресурс.
+
+ASSET-02. Предлагаемые жёсткие resource caps: download <= 16 MiB; decoded image <= 16 megapixels; texture side <= min(4096, фактический GPU limit); redirects <= 3; connect timeout 5 s, total timeout 15 s. Проверять фактический формат, размеры до полного decode и число decoded pixels, а не только расширение/MIME. SVG, исполняемые файлы и animated images в v1 не поддерживаются. HTTP показывать как незашифрованный источник; запрос только по явному действию. Не делать повторную загрузку URL при каждом входе.
+
+ASSET-03. Формат неба v1 — equirectangular panorama 2:1; в preview показывать ориентацию, вращение по yaw и яркость. Технический путь преобразования в renderer-specific texture/cubemap описать в ADR. Сохранить поведение измерений: пользователь включает override отдельно для Overworld/Nether/End. Неподдерживаемая проекция отклоняется с объяснением; произвольную картинку не растягивать молча.
+
+ASSET-04. Текстура тотема — локальная замена отображения minecraft:totem_of_undying на данном клиенте, без изменения item components и механики. SilkVis assets хранятся в собственном namespace; точечный override отображения vanilla item допускается через документированный resource/model adapter. Проверить inventory, hand, dropped item и activation animation; если путь не поддерживается, явно перечислить ограничения до приёмки. Предпочитать resource API, не массовую подмену atlas.
+
+VIS-04. Для каждого модуля: availability vanilla / Sodium / Iris без shader pack / Iris с проверенным pack. Режим AUTO обнаруживает конфликт и отключает только конфликтующий эффект. Не обещать работу custom sky с любым shader pack. При resource reload, resize и повторном входе исключить stale textures и незакрытые render targets.
+
+6. СОБСТВЕННАЯ КАРТА
+
+MAP-01. P1 включает миникарту и полноэкранную карту исследованных клиентом областей. Нельзя синхронно читать все сохранения/чанки, запрашивать неизвестную карту с сервера, вычислять руды по seed или выдавать неизвестные области за исследованные. Источник — загруженные клиентские данные и собственный локальный history cache.
+
+MAP-02. MapIdentity = worldProfileId + dimension registry ID + map format version. Singleplayer profile использует устойчивую локальную идентичность сохранения; multiplayer — отдельный профиль endpoint + пользовательская привязка sub-world при proxy/reset. Порт входит в identity. Одного IP недостаточно для миров за proxy: при неоднозначности пользователь выбирает профиль, данные не объединяются автоматически.
+
+MAP-03. Миникарта: круг/квадрат, north-up/player-up, zoom, размер, alpha, стороны света, player heading, координаты и измерение. Full map: pan/zoom, переход к игроку, поиск маркера, создание/редактирование waypoint, слои. Маркер: UUID, label, dimension, xyz, color, icon/category, visibility. Поддержать отрицательные координаты и большие расстояния без переполнения.
+
+MAP-04. Слои: terrain, player, waypoints, доступные сейчас сущности, защищённые зоны, выбранная область. Future task/path layer подключается через immutable overlay DTO. Исторические tiles и актуальные данные визуально различаются. Entity markers удаляются при выгрузке/потере актуальности; не сохранять координаты моба как живую позицию.
+
+MAP-05. Terrain v1 — top-down surface colors + высота для ограниченного shading. В Nether нужен отдельный алгоритм доступного локального среза/уровня Y, иначе поверхность крыши бесполезна. В UI явно показывать режим Surface / Slice Y и включать режим/уровень в ключ tile. Не обещать полноценную 3D cave map в v1.
+
+MAP-06. Tile unit — 128x128 block columns на базовом масштабе, derived LOD для дальнего zoom. Chunk load/block update помечают dirty subregions. Sample в клиентском потоке малыми порциями; фон получает компактные immutable arrays цветов/высот. Dirty queue coalesces по tile key. Публикация только для текущего world token и revision.
+
+MAP-07. RAM/GPU caches — bounded LRU с раздельными лимитами; terrain cache стартово 64 MiB CPU + 64 MiB GPU, общий map disk cache 512 MiB на профиль с настраиваемой квотой. Квота не удаляет пользовательские маркеры и зоны. Eviction сначала derived/наиболее старые terrain tiles. Отдельные кнопки очистки cache, export/import markers, reset map, с указанием затрагиваемых данных.
+
+MAP-08. Формат tiles версионированный, с header, identity, coordinates, revision и checksum. Запись temp → atomic rename; битый tile удаляется/перестраивается отдельно. Profile index и markers — независимые файлы. Дисковые операции пакетировать; не fsync каждый кадр. На выходе ограниченный flush dirty metadata, оставшаяся cache работа отменяется.
+
+MAP-09. P1 позволяет создать точки «Дом/База/Спавн» и назначить команду; выполнение вручную доступно через явную кнопку. Автопуть и вызов команды планировщиком — только P2. Непостроенный путь не отображать как гарантированно проходимую линию.
+
+7. МУЗЫКАЛЬНЫЙ ОВЕРЛЕЙ / NOW PLAYING — ОБЯЗАТЕЛЬНЫЙ P1
+
+7.1. Модель интеграции
+
+MEDIA-01. SilkVis управляет уже открытым внешним проигрывателем через системную медиасессию; не скачивает музыку, не воспроизводит поток самостоятельно и не требует логина Spotify/Google/SoundCloud. Playback продолжает выполнять исходное приложение/вкладка. Отсутствие проигрывателя — нормальное состояние NO_SESSION.
+
+MEDIA-02. Базовый Windows provider использует Windows.Media.Control / GlobalSystemMediaTransportControlsSessionManager [S3]. API обнаруживает только опубликованные приложениями системные медиасессии. Браузер передаёт metadata/actions через свою media integration; набор данных и команд зависит от сайта и браузера [S7]. Совместимость с брендом сервиса нельзя объявлять без конкретной проверенной комбинации.
+
+MEDIA-03. Целевая первая проверяемая среда — Windows 11 x64, затем Windows 10 x64 с доступным API. API появился в Windows 10 1809 [S3]; это нижняя граница API, а не обещание полного тестирования каждой версии ОС. Non-Windows provider возвращает UNSUPPORTED_PLATFORM и не мешает запуску остальных модулей. Linux MPRIS/macOS provider — extension points, реализация не входит в обязательный P1.
+
+MEDIA-04. Конкретный исходный вариант bridge: небольшой bundled C++/WinRT helper как дочерний процесс Java с stdin/stdout IPC. Это единственный допустимый native-компонент, Java остаётся языком основного мода. Выделенный процесс изолирует отказ native runtime от JVM. До реализации провести spike: запуск из обычного непакетированного desktop-процесса, session enumeration, metadata, pause/next, закрытие. Если существуют проверенные совместимые Java bindings, замена helper на binding возможна после ADR и проверки поставки/лицензии; не добавлять тяжёлую зависимость без необходимости.
+
+MEDIA-05. Helper MUST запускаться без elevation, PowerShell-скриптов, shell command interpolation и установки службы. Запуск через ProcessBuilder с фиксированным путём и списком аргументов. Бинарник поставляется с модом, имеет version/hash manifest и извлекается в versioned локальный каталог; не скачивается скрытно из сети. Проверить архитектуру ОС и SHA-256 перед запуском. Политика extraction permissions и поиск бинарника описываются в build documentation. На машине пользователя не требуется MSVC toolchain.
+
+MEDIA-06. Helper стартует при включении music integration; выключение модуля/закрытие клиента закрывает IPC и helper. При EOF stdin helper завершает работу; watchdog не оставляет orphan process. Shutdown timeout 2 s, после него можно завершить только дочерний helper, никогда не Minecraft/браузер/Spotify. При crash — UI остаётся рабочим, provider ERROR, максимум 3 restart attempts с backoff; повторное включение сбрасывает circuit breaker. Native initialization не блокирует render/client thread.
+
+7.2. Контракты данных
+
+MediaProvider — внутренний интерфейс SilkVis, не имя готового Fabric API:
+  start(listener), listSessions(), selectSession(id), execute(command), close().
+ProviderStatus = DISABLED | STARTING | READY | NO_SESSION | UNSUPPORTED | ERROR.
+SessionSelection = AUTO | PINNED.
+
+MediaSnapshot:
+  providerId, sessionId, sessionGeneration, revision;
+  sourceAppId, sourceDisplayName;
+  title?, artist?, album?, artworkRef?;
+  playbackState = PLAYING | PAUSED | STOPPED | UNKNOWN;
+  positionMs?, startMs?, endMs?, minSeekMs?, maxSeekMs?, playbackRate?;
+  capturedAtMonotonicNanos;
+  capabilities: PLAY, PAUSE, TOGGLE, NEXT, PREVIOUS, SEEK, SHUFFLE, REPEAT;
+  availabilityReason?.
+Null/unknown — отдельное значение, а не ноль или выдуманный title. sessionId существует в пределах provider lifetime; app ID не является уникальным ID вкладки.
+
+MediaCommand:
+  requestId, sessionId, sessionGeneration, expectedRevision?, action, seekPositionMs?.
+MediaCommandResult:
+  requestId, status = ACCEPTED | REJECTED | UNSUPPORTED | TIMEOUT | STALE_SESSION;
+  errorCode?, resultingRevision?.
+ACCEPTED означает принятие запроса источником, не доказательство смены трека. UI подтверждает состояние по последующему snapshot.
+
+MEDIA-07. IPC: versioned UTF-8 NDJSON, один envelope на строку, schemaVersion=1, type, requestId?, payload. Handshake HELLO/READY с protocol version. stdout — только protocol, stderr — bounded diagnostic log. Максимальная строка 2 MiB; metadata strings <= 4096 chars; malformed/oversized payload отклоняется. Artwork helper декодирует/уменьшает отдельно и отдаёт ограниченный PNG <= 512 KiB, <= 512x512; hash используется для cache/dedup. Произвольные пути от provider не открывать. Управляющие строки не исполняются как код.
+
+MEDIA-08. Session discovery и изменения metadata/playback/timeline получать через events, где доступно [S3, S4]. Сериализовать WinRT callbacks на собственном dispatcher helper. Java принимает immutable snapshots. Fallback reconciliation не чаще 1 Hz; промежуточные revisions объединяются. Отписывать events при исчезновении сессии. Не делать WinRT call каждый кадр.
+
+MEDIA-09. AUTO использует current session ОС с удержанием выбора, пока эта сессия валидна; при её исчезновении — доступную playing/current session. PINNED не переключает команды на другую сессию при закрытии выбранной: показывает «Источник недоступен». После перезапуска можно хранить preference по app ID, но пользовательская привязка к конкретной вкладке не гарантируется. Несколько вкладок могут быть представлены браузером одной сессией. UI не обещает список вкладок, если ОС его не даёт.
+
+7.3. Контролы и HUD
+
+MEDIA-10. Обязательные поля: название, исполнитель при наличии, источник, состояние, обложка при наличии. Компактный widget: width 240–320, height 64–80, artwork 48x48, две текстовые строки, controls и progress row. Expanded view: details, source selector, capability status. Если artist отсутствует, строку скрыть; если artwork отсутствует — нейтральная placeholder icon, не чужая обложка.
+
+MEDIA-11. Controls: previous / play-pause / next, seek при поддержке. Дополнительные shuffle/repeat отображать только при доступности. Перед dispatch проверить актуальные capabilities [S5]; false или неизвестное значение делает control disabled с причиной. Нельзя отправлять глобальную media key вместо адресной команды выбранной сессии: это может переключить другой проигрыватель.
+
+MEDIA-12. Для NEXT/PREVIOUS использовать TrySkipNextAsync/TrySkipPreviousAsync; для PLAY/PAUSE — соответствующие методы сессии [S4]. Это запрос источнику. Например, previous может перезапустить текущий трек, а next отсутствовать у одиночного видео; отображать фактическое поведение, не реализовывать собственную выдуманную очередь.
+
+MEDIA-13. Timeline хранить по реальным start/end/position и seek bounds [S6]. Экстраполировать position monotonic clock только при PLAYING и известной скорости, при UNKNOWN rate допустимо 1x с последующей коррекцией и явным отсутствием гарантии точности. Ограничивать отображение валидными границами. Если timeline неизвестен/live — показывать LIVE либо --:-- и запрещать seek. Не показывать 0:00/0:00 как достоверную длительность.
+
+MEDIA-14. На смене сессии/трека сбрасывать старый progress, artwork request и pending commands. Late artwork проверять по generation+revision/hash. Пока seek pending, показывать intent отдельно; после ответа синхронизировать реальную позицию. Таймаут команды стартово 2 s. NEXT/PREVIOUS не повторять автоматически при таймауте из-за риска двойного пропуска; повтор — только новый ввод пользователя.
+
+MEDIA-15. Keybinds переназначаемые и по умолчанию не назначены, чтобы не конфликтовать с игровыми. Они работают при фокусе Minecraft, без глобального OS keyboard hook. HUD-кнопки работают только в interaction mode/экране из HUD-05. Длинный title — ellipsis, полное значение в tooltip; marquee разрешён отдельно и отключается reduced motion.
+
+MEDIA-16. Громкость источника не обещать через базовый GSMTC backend: в обязательный P1 входит transport control, а не per-app audio mixer. Слайдер громкости Minecraft нельзя подписывать громкостью Spotify. Отдельный audio-session mixer возможен позже через собственный capability. Lyrics, поиск по сервисам, playlists, аккаунты, streaming, ads bypass и API scraping не входят в P1.
+
+MEDIA-17. Историю прослушивания не записывать. Artwork cache bounded, стартово 32 MiB RAM, disk cache выключен. Metadata не включать в обычные diagnostics logs; export содержит их только по явному выбору. При отключении integration подписки закрываются. Выход из мира не посылает Pause во внешнее приложение без отдельной пользовательской настройки.
+
+7.4. Матрица совместимости и приёмка музыки
+
+Проверяемые строки:
+  Spotify desktop / Windows 11;
+  Spotify Web / Edge и Chrome;
+  YouTube video и playlist / Edge и Chrome;
+  YouTube Music / Edge или Chrome;
+  SoundCloud single track и playlist / Edge и Chrome;
+  контрольный системный проигрыватель с опубликованной media session.
+Для каждой строки записать дату, OS build, browser/app version, SESSION, TITLE, ARTIST, ARTWORK, PLAY/PAUSE, NEXT, PREVIOUS, TIMELINE, SEEK, MULTI_SESSION. Значения: PASS / UNSUPPORTED_BY_SOURCE / FAIL / NOT_TESTED. Бренд сервиса не равен capability.
+
+Приёмочные сценарии:
+M-01: во время игры виден реальный title, обновление в пределах 1 s после полученного OS event;
+M-02: play/pause/next адресуются выбранной сессии, соседняя сессия не затрагивается;
+M-03: исчезновение вкладки очищает устаревшие поля, Minecraft продолжает работать;
+M-04: unsupported next/seek отключён, state не подделывается;
+M-05: simultaneous Spotify + browser, AUTO и PINNED ведут себя по MEDIA-09;
+M-06: кириллица, длинное название, отсутствие обложки, live stream, pause/resume;
+M-07: helper crash/hang не блокирует кадры, restart ограничен;
+M-08: after disable/exit нет orphan helper и утечки текстур.
+Ограничение источника допустимо только с записью матрицы и корректным UI fallback. Ошибка адаптера не маркируется как «сервис не поддерживается». До выполнения матрицы нельзя писать «совместим со всеми сервисами».
+
+8. КОНФИГУРАЦИЯ, ПРОФИЛИ И БЮДЖЕТЫ
+
+CFG-01. Config format — JSON с явным schemaVersion. Предлагаемое размещение:
+config/silkvis/global.json;
+config/silkvis/profiles/<profile-id>/ui.json;
+config/silkvis/profiles/<profile-id>/destinations.json;
+config/silkvis/profiles/<profile-id>/automation.json (P2);
+silkvis-data/maps/<map-identity>/...;
+silkvis-data/assets/<content-hash>/...;
+silkvis-data/logs/...
+Не писать файлы в произвольные пользовательские каталоги. Имя профиля — display value, не часть необработанного пути.
+
+CFG-02. Разделить global visual preset, layout, world/server destinations, map identity, protected zones и разрешения автоматизации. Импорт visual profile не включает серверную автоматизацию, не запускает команды и не применяет опасные разрешения. Все URL-ресурсы импортируются как неактивные до явной загрузки.
+
+CFG-03. Обновление: validate → serialize temp → atomic move, backup последней исправной версии. При parse/migration error сохранить повреждённый файл и загрузить безопасный config; не затереть исходник молча. Для schemaVersion из будущей версии — read-only/fallback, не разрушительный downgrade. Autosave debounce 500 ms, explicit Apply flushes asynchronously.
+
+CFG-04. Числовые значения проверять на finite/range, IDs на registry format, ресурсы на размер. OptionalLimit<T> хранить как enabled+value; не использовать -1 и отрицательные бюджеты как неявное «бесконечно». Отдельные пользовательские лимиты и hard technical caps.
+
+PERF-01. Все значения ниже — стартовые acceptance budgets для согласованной тестовой машины, а не утверждение о достигнутой скорости. В report зафиксировать CPU/GPU/RAM, разрешение, GUI scale, render distance, FPS cap, Java flags и моды. Сравнивать одинаковую сцену после прогрева минимум 60 s, окно измерения минимум 120 s, три прогона.
+
+PERF-02. Idle HUD+media, без map rebuild/blur: дополнительный client tick CPU p95 <= 0.5 ms, общий render CPU overhead p95 <= 1 ms на контрольной машине. Карта: sampling budget 1 ms/tick, upload budget 1 MiB/frame стартово; превышение budget переносит работу, не пропускает игровой tick. Profiling должен разделять CPU и GPU, а не оценивать только средний FPS.
+
+PERF-03. Цель frame-time regression: <= 10% p95 для базового P1 preset относительно той же сборки без SilkVis; shader/blur режим измеряется отдельно. Если бюджет не достигается, оптимизировать или явно пересогласовать измеренный предел до отметки PASS. Не менять условия benchmark для красивого результата.
+
+PERF-04. Presets: Low (no blur, reduced particles, lower map refresh), Balanced (default), Quality (optional blur/больше деталей). Настройки действуют на SilkVis, а не тайно меняют Minecraft render distance или параметры Sodium. Cache limits и queue limits присутствуют во всех presets.
+
+PERF-05. 30-minute soak + 20 циклов connect/disconnect + 20 theme/resource reload: число worker/helper процессов, активных подписок и GPU resources возвращается к baseline; cache остаётся в заданных пределах. Замерять живые ресурсы, не требовать постоянного RSS JVM после GC.
+
+9. P2: ЯДРО АВТОМАТИЗАЦИИ — ПОСЛЕ ПРИЁМКИ P1
+
+AUTO-01. Поддерживаются только выбранные пользователем задачи, перечисленные в разделе 10. Автосон, разведение животных, стрижка, мёд, молоко, зелья, автоферма опыта и отдельный ремонт зданий в scope не входят. Базовый крафт/переплавка допустимы как явно необходимые подоперации согласованных цепочек снабжения и строительства, без автоматического добавления всех остальных модулей.
+
+AUTO-02. TaskSpec содержит id/type, goal, target, permittedArea, itemFilters, limits, prerequisites, completionPredicate, failurePolicy, cancellationToken, permissionGrant. TaskRuntime хранит state, currentStep, attempts, progress, resourcesReserved, lastObservedWorldRevision. Модели не сериализуют ссылки Minecraft runtime.
+
+AUTO-03. Состояния: IDLE, PLANNING, AWAITING_CONFIRMATION, RUNNING, WAITING, PAUSED_USER, RECOVERING, COMPLETED, FAILED, CANCELLED, EMERGENCY_EXIT. Переходы явные; completed определяется проверенным результатом. Save checkpoint сохраняет цель и прогресс, но после входа задача остаётся PAUSED_USER до запуска и повторной проверки предпосылок.
+
+AUTO-04. Единственный ActionArbiter распределяет exclusive leases: MOVEMENT, LOOK, MAIN_HAND, OFF_HAND, HOTBAR, CONTAINER. Приоритет: emergency/stop > imminent hazard response > defensive combat/food по обстановке > main task. Нельзя одновременно выдать два владельца одного ресурса. Во время cancel освободить leases, клавиши и held actions даже при исключении; учитывать ручной физический ввод, не «отжимать» реально удерживаемую игроком клавишу навсегда.
+
+AUTO-05. Ручное движение/атака/использование предмета ставит задачу на паузу. Движение камеры — настраиваемое условие; default пауза при явном ручном camera input. Отличать собственные синтетические actions от физического ввода. Ввод текста и действия в меню не запускают игровые actions. При потере фокуса default pause; AFK background run — отдельная явная настройка.
+
+AUTO-06. EmergencyStop доступен независимо от UI. Обычный stop — отмена без выхода. EmergencyExit — отмена и штатный disconnect/leave world с переходом в главное меню. Порог health, burning/lava, опасное падение и exhausted stuck recovery настраиваются. Пустой склад/нет руды — обычная ошибка или ожидание, не обязательно emergency. В singleplayer дождаться штатной процедуры сохранения; не принуждать завершение по таймеру. Не скрывать факт, что multiplayer disconnect не гарантирует мгновенное исчезновение персонажа.
+
+AUTO-07. PolicyGuard проверяет операции до постановки и непосредственно перед исполнением. ProtectedRegion задаётся dimension + AABB/polygon, разрешениями BREAK/PLACE/OPEN/TAKE/ATTACK. ProtectedItem — registry ID + component predicates; protected entity — owner/name/UUID rules. Защита приоритетнее отсутствия пользовательских лимитов. Серверный запрет действия не преодолевается повторным спамом.
+
+AUTO-08. PermissionGrant связан с hash нормализованного плана, world/profile identity, зоной, политиками и лимитами. Для повторяющегося цикла один grant покрывает только этот цикл. Внутренний replan внутри того же разрешённого диапазона не требует нового диалога. Выход за область, новая команда или расход защищённого предмета требует нового разрешения. Stop не отменяет уже изменённые блоки; универсальный rollback не обещать.
+
+AUTO-09. RecoveryPolicy: default maxAttempts=3, deadline и backoff на recoverable failure. Пересчитать путь, сменить допустимую точку взаимодействия, повторно прочитать container snapshot. Для расходов/торговли/команд сначала сверить фактический результат, чтобы не выполнить действие дважды. После исчерпания — FAILED; для настроенной аварии — EMERGENCY_EXIT. Нельзя busy-loop или бесконечно пересылать action.
+
+AUTO-10. TaskQueue: порядок, pause/resume/cancel, зависимости, repeat count или repeat while enabled. При недоступной предпосылке — WAITING с причиной и bounded interval, а не полный повтор каждый tick. Цикл работает только пока игровой мир реально исполняется. Если singleplayer paused/клиент закрыт, задачи не выполняются. При следующем входе — без автозапуска.
+
+AUTO-11. Goal planner локальный и детерминированный, без LLM/API ключа: пользователь выбирает goal template, item/schema и quantity. Фразы «собери 10 стаков камня» — пример цели, не обязательный natural-language parser. Для vanilla stone это 640 штук; stack size для другого item берётся из данных предмета. Различать stone/cobblestone и способы silk touch/переплавка. Проверять recipes целевой версии и сервера, неизвестный рецепт выдаёт UNSUPPORTED_RECIPE.
+
+AUTO-12. План строится как dependency DAG с обнаружением циклов, резервированием известных запасов и оценкой дефицита. Не тратить один stack одновременно на две задачи. «Построить дом» требует выбранную схему, а не генерацию здания по тексту. Если нет поддерживаемого источника ресурса/верстака/печи/рецепта, показать блокирующую предпосылку. Не отмечать задачу успешной по числу нажатий.
+
+AUTO-13. Progress report: acquired, consumed, stored, placed/broken, remaining, elapsed, failures. Значения — по подтверждённым delta snapshots; не удваивать добычу при перекладывании в сундук. Отличать gross collected и net target balance. Estimated remaining time показывать только при наличии измерений, с отметкой оценки.
+
+AUTO-14. PathProvider SPI: capabilities, plan(snapshot, goal, policy), tick(), cancel(). Baritone — необязательный адаптер после проверки конкретной сборки/API для 1.21.10 и лицензии. Наличие совместимого артефакта не подтверждено этим документом. Без provider недоступны задачи, которым он необходим; stationary tasks/UI остаются доступны. Если совместимого Baritone нет, встроенный pathfinder — отдельный оценённый этап P2, не скрытый довесок P1.
+
+AUTO-15. Контейнерные действия выполняются через штатную синхронизацию Minecraft: валидные screen handler, slot mapping, revision/sync state. После действия ждать наблюдаемого изменения. Ручное закрытие/смена container отменяет batch. Нельзя считать локальное перемещение stack доказательством server acceptance.
+
+10. КАТАЛОГ УТВЕРЖДЁННЫХ АВТОМАТИЗАЦИЙ
+
+Для каждого модуля обязательны typed config, preconditions, policy checks, cancellation, progress, проверка результата и хотя бы один success + failure acceptance scenario. Приведённые ниже ID стабильны и используются в конфиге/логах. Порядок каталога не является порядком реализации.
+
+A01 ore_mining — автодобыча руды.
+Параметры: block/tag filter, target items/count, зона, допустимый диапазон Y, max travel, tool/enchantment policy. Цели обнаруживать только по доступным данным; скрытая сервером руда считается неизвестной. Различать mined blocks и полученные drops. Проверять требуемый инструмент, жидкости, падающие блоки и protected regions. Прекращать при достигнутом количестве/отсутствии допустимой цели/невосстановимом дефиците инструмента. Acceptance: нужная руда добыта, запрещённый блок рядом не изменён, отказ сервера не вызывает цикл атак.
+
+A02 excavate_area — выкапывание области.
+Параметры: две точки и dimension, exclude filters, порядок обхода, разрешённые supports, fluid policy. До запуска показать bounding box и оценку числа блоков. Не ломать блок под игроком без проверенного безопасного шага; учитывать gravity blocks и обновления соседей. Пропущенные исключения не считаются ошибкой completion. Acceptance: выбранная область очищена за исключением фильтра, за границами нет изменений; обновившаяся обстановка приводит к replan.
+
+A03 tree_farm — рубка и посадка.
+Параметры: назначенная лесная зона, species, sapling reserve, max connected logs, allow large trees. Проверять logs/leaves/основание и разрешённую область; не считать всякую цепь брёвен деревом. Алгоритм распознавания имеет предел и отказ при неоднозначности рядом с постройкой. Повторная посадка после проверки грунта, свободного места и наличия саженца. Acceptance: цикл рубка→подбор→посадка завершён, соседняя деревянная постройка не затронута.
+
+A04 crop_farm — зрелые культуры и посев.
+Registry-aware обработка supported crop types с таблицей maturity/replant item. Зарезервировать посадочный материал до выгрузки. Не ломать незрелые культуры, не прыгать на farmland. Для неподдерживаемого modded crop нужен adapter. Acceptance: зрелое собрано и пересеяно, незрелое осталось, отсутствие семян явно останавливает или переводит на другой разрешённый участок.
+
+A05 cane_bamboo — тростник и бамбук.
+Параметры: farm region, min retained height>=1, harvest threshold. Проверять основание каждого стебля, не сносить нижний блок. Bamboo sapling и grown bamboo обрабатывать раздельно. Acceptance: основание сохранено, культурная зона вне разрешения не тронута.
+
+A06 fishing — авторыбалка.
+Состояния: equip→cast→wait valid bobber→detect bite→reel→confirm catch→inventory check. Использовать доступное событие/состояние поплавка целевой версии; не заменять всё фиксированным таймером. Настроить retries, прочность, свободные слоты и фильтр улова. Не выбрасывать «мусор» автоматически без отдельной discard policy. Acceptance: реальные поклёвки обработаны; потерянный поплавок/нет воды/полный inventory не создают бесконечные забросы.
+
+A07 combat — бой с выбранными мобами.
+Параметры: allowlist сущностей, radius, target priority, cooldown policy, weapon selection. Проверять фактическую reach/line of sight/attack readiness; не подменять attack speed, reach и server authority. Players исключены из scope. Pets/named protected mobs исключены. Acceptance: атаки только по разрешённым мобам; исчезновение цели освобождает look/hand leases.
+
+A08 defense — оборона во время задачи.
+Запуск по наблюдаемой угрозе/полученному урону, ограниченный combat subtask. Текущую работу приостановить, после окончания заново проверить позицию, инструмент и container. При превышении аварийного порога — exit, а не бесконечный бой. Acceptance: добыча не продолжает ломать блок во время защиты; защищённые питомцы не становятся целью.
+
+A09 auto_eat — автоеда.
+Параметры: hunger threshold, preferred foods, protected/rare foods, adverse-effects denylist. Выбор предмета по доступным food components и политике, удержание use до подтверждения consumption. Не путать hunger со здоровьем. Сохранить/восстановить hotbar slot если ручной ввод не изменил контекст. Acceptance: количество еды и hunger изменились, редкий предмет не потрачен.
+
+A10 tool_select — выбор инструмента.
+Определять пригодность, mining speed, harvest requirement, durability и enchantment preference для конкретного target block. Сравнивать stack components, не только registry ID. При отсутствии подходящего — отказ/снабжение, без бесконечного переключения слотов. Acceptance: используется подходящий имеющийся инструмент; Silk Touch/Fortune policy соблюдена.
+
+A11 tool_guard — защита от поломки.
+Порог absolute remaining durability и/или percent; эффективный минимум вычисляется явно. По достижении запретить новые действия этим предметом, попробовать replacement или pause. Не обещать абсолютное отсутствие поломки при уже принятом игровом действии. Acceptance: следующая операция не использует предмет ниже порога; indestructible/non-damageable items обрабатываются корректно.
+
+A12 equipment — смена экипировки.
+Оценка по назначению слота, защите, зачарованиям и прочности; исключение protected slots/items, проверка ограничений снятия. Старый предмет остаётся в inventory, не выбрасывается. Недостаток места → pause. Acceptance: после подтверждённой смены inventory согласован, предметы не потеряны, ручное вмешательство прекращает swap.
+
+A13 inventory_sort — сортировка.
+Deterministic ordering и merge с учётом stack components; locked slots/hotbar сохраняются. Sort plan рассчитывается до выполнения, исполняется последовательно с подтверждением. Не управляет открытым пользователем неизвестным GUI. Acceptance: повторная сортировка идемпотентна, locked slots неизменны, desync прекращает batch.
+
+A14 unload — выгрузка ресурсов.
+Триггер: заданный порог заполнения/невозможность принять target drop. Сохранить food/tool/seed reserves; выбрать разрешённый склад, дойти или вызвать разрешённый destination action, открыть container, переложить, сверить, вернуться при допустимости. Full/unreachable storage → резервный назначенный container или pause. Acceptance: ресурсы выгружены, резервы сохранены, недоступный склад не вызывает потерю предметов.
+
+A15 storage — система хранения и снабжения.
+StorageNode: world/dimension/position, container type, categories, access policy, lastObservedAt, contentsRevision. Содержимое известно только после законного наблюдения; «неизвестно» не считать нулём. Зарезервированные ресурсы отделены от доступных. Обновлять после открытия/изменения; chest removed/replaced инвалидирует запись. Назначаются также furnace/workbench/farm nodes для цепочек. Restock обеспечивает выбранные food/tool/torch/seed thresholds. Acceptance: устаревший учёт не вызывает двойного расхода, категории и запрет сундука соблюдены.
+
+A16 trading — автоторговля.
+Выбор жителя и конкретного trade offer по наблюдаемым данным, max unit price, total budget, count, protected items. Перед каждой покупкой перепроверить цену, inputs, stock и output capacity. Budget может быть отключён пользователем; protected resources остаются защищены. Offer changed/out of stock → pause/replan в разрешённых рамках. Acceptance: списания и полученный результат совпадают, рост цены сверх разрешения останавливает операцию.
+
+A17 schematic_build — строительство по схеме.
+Внутренний versioned schema: dimensions, palette registry IDs+block properties, sparse block positions, origin. Поддержать rotation 0/90/180/270, optional mirror, preview ghost, material manifest. Для stairs/slabs/doors/beds и зависимых блоков нужен orientation-aware placement order. v1 не исполняет NBT command blocks и не воспроизводит inventory contents. Неподдерживаемые states отклонить до запуска. Existing blocks: keep matching, skip protected, replace только при явной политике. Acceptance: результат сравнен по supported block states, missed positions перечислены, нет ложного «100%».
+
+A18 road_build — дороги, лестницы и мосты.
+Параметры: start/end, width, palette, max grade, stair policy, bridge supports, max span/height, allowed terrain edits. Preview показывает реальную область размещения/сноса, а не только центральную линию. Материалы и supports включить в смету. Acceptance: проходимый участок соответствует профилю, protected region обойдена либо задача отклонена; опасный пролёт не строится без допустимого плана.
+
+A19 navigate — движение к координатам.
+Проверять dimension, reachability, collision, опасные среды, break/place policy. Destination includes arrival tolerance, а не точное равенство double координат. Replan при препятствии; stuck detection по фактическому progress, не только elapsed time. Перемещение между измерениями требует известного разрешённого перехода/команды, самостоятельное строительство порталов не входит в scope. Acceptance: reached определяется дистанцией/измерением; недостижимая цель заканчивается ограниченным recovery.
+
+A20 explore — исследование.
+Параметры: region/radius, coverage goal, excluded zones, reserves, return condition. Frontier выбирается по реально известным tiles, traversed areas помечаются. Не сканировать всю карту в одном tick и не обещать поиск структур, которые клиент не обнаружил. Контролировать запас на возврат. Acceptance: покрытие увеличивается, повторное посещение не завышает процент, лимит/return condition завершает цикл.
+
+A21 pickup — подбор предметов.
+Фильтры item/components, radius, priority, inventory capacity, hazard policy. Достижение позиции drop не является успехом: проверять disappearance плюс inventory delta, учитывая возможность подбора другим игроком. Acceptance: разрешённый item подобран, запрещённый оставлен, drop за опасным препятствием пропущен с причиной.
+
+A22 emergency_exit — аварийный выход.
+Общий механизм AUTO-06; не только отдельная задача в очереди. Работает при любом active automation state. На событии сначала прекратить actions, затем штатно выйти; сохранить reason и последний checkpoint без блокирования выхода тяжёлым I/O. Лава рядом с путём не равна попаданию в лаву: условия задаются конкретными проверками. Acceptance: synthetic test hazard вызывает выход в главное меню, повторный вход не возобновляет задачу автоматически, процесс игры остаётся жив.
+
+11. ТОЧКИ НАЗНАЧЕНИЯ И ПОЛЬЗОВАТЕЛЬСКИЕ КОМАНДЫ
+
+DEST-01. Предустановленные редактируемые slots: home, base, spawn. Названия локализованы; значения команд пусты. Подсказки /home, /spawn, /warp base — примеры, не автоматически исполняемые defaults. Допускаются пользовательские slots. Профили изолированы по миру/серверу.
+
+DEST-02. DestinationTarget — tagged union:
+COORDINATES: dimensionId, x/y/z, arrivalRadius, travelMode=WALK;
+SERVER_COMMAND: commandText, warmupSeconds, cooldownSeconds, timeoutSeconds, stationaryRequired, expectedPosition?, confirmationPolicy.
+Опциональный command-based /tp для соло хранится как явно настроенное действие, а не автоматически выводится из COORDINATES. Если чит-команда недоступна, сообщить PERMISSION_DENIED и предложить WALK, но не выдавать права/не менять режим игры.
+
+DEST-03. Пример DTO конфигурации, не готовый Fabric API:
+{
+  "schemaVersion": 1,
+  "profileId": "example-server-profile",
+  "destinations": [
+    {
+      "id": "base",
+      "label": "База",
+      "target": {
+        "type": "SERVER_COMMAND",
+        "commandText": "/home base",
+        "warmupSeconds": 5,
+        "cooldownSeconds": 30,
+        "timeoutSeconds": 15,
+        "stationaryRequired": true,
+        "confirmationPolicy": "OBSERVED_POSITION",
+        "expectedPosition": {
+          "dimensionId": "minecraft:overworld",
+          "x": 120.5, "y": 64.0, "z": -80.5, "radius": 4.0
+        }
+      }
+    }
+  ]
+}
+Соло-пример target:
+{
+  "type": "COORDINATES",
+  "dimensionId": "minecraft:overworld",
+  "x": 120.5, "y": 64.0, "z": -80.5,
+  "arrivalRadius": 2.0,
+  "travelMode": "WALK"
+}
+
+DEST-04. CommandText — одна команда, без CR/LF/NUL и цепочек. Нормализовать один ведущий slash для выбранного client network API. Нельзя передавать строку в shell, интерпретировать как JavaScript или добавлять произвольные placeholders. Проверка/preview не отправляет команду. Кнопка «Выполнить» — явное действие с показом точной команды. Импорт профиля никогда не выполняет команды.
+
+DEST-05. Execution states: READY→SENT→WAITING→VERIFIED / REJECTED / TIMED_OUT / UNCONFIRMED. После отправки выдержать warmup, не двигаться при stationaryRequired, учитывать cancellation by damage/movement. cooldown хранится per-profile/per-action. Не считать отсутствие сообщения об ошибке успехом.
+
+DEST-06. Verification: при известной точке — наблюдаемая dimension+позиция в tolerance; при неизвестной — пользовательское подтверждение или явно настроенный серверный adapter подтверждения. Сообщение в чате может быть вспомогательным сигналом, но не универсальным доказательством. Голый position jump подтверждает перемещение, но не обязательно попадание на нужную базу. Для последующего складского действия всё равно проверить container/location preconditions.
+
+DEST-07. При no permission/unknown command/cooldown отказе прекратить цепочку и показать причину. Default retries=0 для команды с неоднозначным результатом, чтобы не повторить платную телепортацию. Нельзя автоматически перебирать /home, /homes, /warp и прочие команды. Пользователь сам задаёт работающий вариант.
+
+DEST-08. При серверной игре module profile не предполагает admin/OP. Клиент не меняет серверную позицию, не делает packet teleport и не обходит ограничения плагина. При соло без cheats координаты дают marker/navigation; фактический teleport требует доступной команды или отдельно согласованной серверной механики.
+
+12. ПЛАН РЕАЛИЗАЦИИ И RELEASE GATES
+
+V0 — аудит и воспроизводимый каркас.
+Deliverables: dependency matrix, Wrapper, client entrypoint, config bootstrap, RU/EN, открываемый экран, build/run log. Проверить наличие точек расширения рендера 1.21.10 и feasibility media bridge. Gate: реальная сборка, запуск, сохранение настроек, корректный выход. Никакой автоматизации.
+
+V1 — дизайн-система и HUD.
+Deliverables: ThemeTokens, responsive layout, все базовые controls, input/focus routing, HUD widgets/editor, profile persistence. Gate: корректный ввод и layout на 1280x720/1920x1080/2560x1440, несколько GUI scales включая маленькую scaled area, RU/EN, F1, chat, reload. Скриншоты реального клиента фиксируются как evidence, не подменяются нарисованным макетом.
+
+V2 — музыкальный оверлей.
+Deliverables: provider contract, Windows helper/bridge, session selector, real metadata, supported transport controls, HUD integration, capability matrix. Gate: M-01…M-08; нет фиктивного title или кнопок с пустыми обработчиками. Сервисные ограничения перечислены по фактическим результатам.
+
+V3 — карта и точки.
+Deliverables: bounded sampling/cache, сохранённые tiles, minimap/fullscreen map, markers/layers, profile isolation, manual destination commands. Gate: разные миры/серверы/измерения, отрицательные координаты, stale updates, corrupted tile, cache quota; не исполняется команда при редактировании/импорте.
+
+V4 — визуальные эффекты и пользовательская тема.
+Deliverables: поддерживаемые camera/world modules, custom sky/totem, resource validation/cache, per-module fallbacks. Gate: vanilla/Sodium/Iris matrix, resource reload, invalid/oversized image, отсутствие render-state leakage. Несовместимые shader effects имеют понятный ограниченный статус.
+
+V5 — стабилизация и выпуск P1.
+Deliverables: production JAR, инструкция установки, известные ограничения, screenshots, performance report, dependency/license inventory, media compatibility report. Gate: чистый Fabric profile + выбранная пользовательская сборка, idle/soak проверки, отсутствие критических дефектов и orphan процессов. Обязательные P1 функции нельзя отметить выполненными только по наличию UI.
+
+ЖЁСТКИЙ GATE: переход к P2 разрешён после выполненного V5 и отчёта о визуальном релизе. Неподдерживаемость внешнего источника может быть документированным ограничением, но отсутствующий музыкальный backend/карта/HUD не считается таким ограничением.
+
+A0 — scheduler/action arbiter/stop/policies и тестовый action backend.
+A1 — tool selection/guard, food, equipment, pickup, inventory, базовая navigation.
+A2 — добыча/выкапывание/лес/культуры/тростник/рыбалка.
+A3 — storage/unload/restock и command destinations внутри задач.
+A4 — combat/defense/trading.
+A5 — schema building/roads/exploration, goal planner и циклы.
+A6 — комплексная приёмка P2 на копии мира и на явно включённом тестовом серверном профиле.
+Каждый этап P2 выпускается отдельно с проверенными task types; registry не выдаёт запланированные типы за READY.
+
+13. ТЕСТИРОВАНИЕ И КРИТЕРИИ ПРИЁМКИ
+
+TEST-01. Unit tests: config validation/migrations; anchors/layout clamp; source selection/capabilities; timeline interpolation; IPC parsing; tile identity/eviction; registry filters; state machine transitions; policy precedence; plan cycle detection; resource reservation; command verification. Использовать fake clock для deadlines, а не реальные sleeps.
+
+TEST-02. Integration tests: malformed config и atomic write recovery; provider lifecycle/crash; cache corruption и смена world token; resource reload; отсутствующие optional mods; inventory desync; cancellation в середине container batch; команда с unknown outcome. Mock provider допустим для тестов, но не заменяет реальную media acceptance.
+
+TEST-03. Ручная P1 матрица:
+  чистый Fabric;
+  Fabric + Sodium;
+  Fabric + Sodium + Iris без pack;
+  тот же набор + минимум один конкретно записанный shader pack;
+  обычный мир / Nether / End;
+  singleplayer / multiplayer / disconnect / повторное подключение;
+  windowed/fullscreen, resize, несколько GUI scales;
+  RU/EN, длинные строки, high-DPI;
+  музыка отсутствует / одна сессия / две / источник закрыт;
+  нет сети при локальной теме, ошибочный URL и отмена загрузки.
+Версии каждого mod/browser/pack зафиксировать. Не распространять PASS одного shader pack на все остальные.
+
+TEST-04. Обязательные негативные сценарии P2:
+  заполненный inventory и полный storage;
+  инструмент ниже порога, нет replacement/еды/семян;
+  protected block на пути, неизвестный recipe/schema block;
+  сервер отказал действию, container изменён другим игроком;
+  потеря пути, stuck recovery exhausted, world unload;
+  ручной ввод, закрытый экран контейнера, изменившаяся цена trade;
+  command denied/timeout/cooldown и поздняя телепортация;
+  emergency во время break/place/eat/container interaction;
+  stop при отключённых пользовательских лимитах.
+
+TEST-05. Глобальные invariants:
+I1: максимум один владелец каждого action resource;
+I2: stale world/media generation не публикуется;
+I3: disable/stop отменяет все принадлежащие модулю pending actions;
+I4: выключенный модуль не продолжает background polling без явной общей зависимости;
+I5: неизвестное состояние не считается успехом;
+I6: нет сетевых запросов, кроме явной загрузки ресурса и обычных игровых действий;
+I7: очередь/кэш/число процессов ограничены;
+I8: импорт/загрузка конфига не запускают задачу и не отправляют команду;
+I9: protected policy имеет приоритет над выключенными operational limits;
+I10: в P1 не запускаются automation tasks.
+
+TEST-06. Для каждого требования матрица requirement-id → implementation file → test/evidence → status. Статусы: IMPLEMENTED_TESTED, IMPLEMENTED_NOT_TESTED, PLANNED, BLOCKED, UNSUPPORTED. Список статусов сохраняется вместе с релизом. Нельзя объявлять мод готовым по одному успешному Gradle build.
+
+14. ПРАВИЛА РАБОТЫ РАЗРАБОТЧИКА / КОДИНГ-АГЕНТА
+
+DEV-01. Сначала прочитать репозиторий и это ТЗ. Перед этапом назвать конкретный scope, зависимости и acceptance checks. Затем реализовать функциональный вертикальный срез и выполнить доступные проверки. Не начинать все модули одновременно и не генерировать десятки пустых классов вместо работающей возможности.
+
+DEV-02. Сохранять существующие изменения пользователя. Миграции и breaking config changes описывать заранее. Не менять целевую версию Minecraft и не добавлять серверный мод «для удобства». Отсутствующий API проверять по исходникам/документации закреплённой версии; псевдокод этого ТЗ не является готовой сигнатурой Fabric.
+
+DEV-03. Для каждого mixin документировать target/version, причину отсутствия подходящего публичного hook и условия отключения. Не применять тотальные overwrite, если достаточно узкой инъекции. Не скрывать критический failure через пустой catch. Не пытаться исправить несовместимость исключением всех проверок.
+
+DEV-04. Каждая внешняя зависимость имеет purpose, version, license, size impact, target compatibility и fallback. Не копировать Baritone/карты/клиенты целиком. Native helper и bundled assets включаются в license inventory. Отдельная лицензия/доступность не считается проверенной по одному названию библиотеки.
+
+DEV-05. Отчёт этапа содержит: реализованные requirement IDs, изменённые подсистемы, реальные команды проверок и результаты, подтверждённые ограничения, следующий этап. Если нет Windows/GUI/сети, явно указать, какие acceptance cases не выполнены. Не писать «работает с YouTube», если проверен только mock.
+
+DEV-06. До финального релиза удалить debug/demo data из production flows. Demo fixtures остаются только в preview/tests с маркировкой. Исключить секреты, персональные server commands и локальные пути из публичного примера конфига. Публикация/загрузка репозитория удалённо — отдельное действие владельца.
+
+15. СООТВЕТСТВИЕ РЕШЕНИЯМ ВЛАДЕЛЬЦА И ГРАНИЦЫ ОБЪЁМА
+
+Утверждённое решение → обязательный раздел:
+  Визуал прежде автоматизации → 0.2, 12 / V0–V5 gate;
+  Графит + бирюза → 3;
+  HUD и собственная карта → 4, 6;
+  YouTube/Spotify/SoundCloud overlay → 7;
+  Команды «Дом/База/Спавн» без admin → 11;
+  Координаты для соло → 0.7, 11;
+  Только выбранные автоматизации → 10 / A01–A22;
+  Цели, склады, очереди → 9, A14–A15;
+  Разрешение один раз, отключаемые лимиты → 0.5, AUTO-07…08;
+  Защищённые зоны/предметы → AUTO-07;
+  Ограниченный recovery → AUTO-09;
+  Аварийный выход в главное меню → AUTO-06, A22;
+  Предпросмотр, объяснения, отчёт, ручная пауза → 3–4, AUTO-05/13.
+
+Не входит в текущий scope: встроенный web browser/player, собственная музыкальная библиотека/streaming, обязательные аккаунты, cloud sync, телеметрия, изменение серверных разрешений, PvP-бот, античит-обходы, server-side packet exploits, автономная работа при закрытом Minecraft, все невыбранные функции из первоначального списка 40.
+
+Технические неизвестные, которые обязан закрыть V0/spike, не выдавая их за готовые функции:
+  точные версии совместимых зависимостей и сигнатуры render hooks;
+  работоспособность unpackaged Windows media bridge в целевой поставке;
+  фактические capabilities конкретных браузеров/сервисов;
+  сочетание custom sky/totem с выбранными ресурсами и shader packs;
+  наличие совместимого Baritone artifact для будущего P2;
+  поддерживаемые import форматы сторонних схем (внутренний формат обязателен, чужие — отдельно).
+
+16. ИСТОЧНИКИ И ТЕХНИЧЕСКАЯ ВЕРИФИКАЦИЯ
+
+Проверены 12.11.2026. Источники подтверждают платформенные API/ограничения, но не являются доказательством работоспособности ещё не написанного SilkVis. Числовые budgets, UI tokens, IPC и архитектура выше — проектные требования настоящего ТЗ.
+
+[S1] Fabric — Fabric for Minecraft 1.21.9 & 1.21.10.
+https://fabricmc.net/2025/09/23/1219.html
+Использование: необходимость проверки изменённых rendering/resource-loader hooks и mappings. Указанные в статье версии — исторические рекомендации на дату статьи, не автоматически выбранные зависимости проекта.
+
+[S2] Mojang — Minecraft Java Edition 1.21.10.
+https://www.minecraft.net/en-us/article/minecraft-java-edition-1-21-10
+Использование: целевая версия Java Edition и её release notes.
+
+[S3] Microsoft — GlobalSystemMediaTransportControlsSessionManager.
+https://learn.microsoft.com/en-us/uwp/api/windows.media.control.globalsystemmediatransportcontrolssessionmanager?view=winrt-26100
+Использование: обнаружение системных sessions, current session, events и доступность Windows API.
+
+[S4] Microsoft — GlobalSystemMediaTransportControlsSession.
+https://learn.microsoft.com/en-us/uwp/api/windows.media.control.globalsystemmediatransportcontrolssession?view=winrt-26100
+Использование: metadata/playback events и адресные Try* transport commands.
+
+[S5] Microsoft — GlobalSystemMediaTransportControlsSessionPlaybackControls.
+https://learn.microsoft.com/en-us/uwp/api/windows.media.control.globalsystemmediatransportcontrolssessionplaybackcontrols?view=winrt-26100
+Использование: runtime capability flags для play/pause/next/previous/seek/repeat/shuffle.
+
+[S6] Microsoft — GlobalSystemMediaTransportControlsSessionTimelineProperties.
+https://learn.microsoft.com/en-us/uwp/api/windows.media.control.globalsystemmediatransportcontrolssessiontimelineproperties?view=winrt-26100
+Использование: position/start/end и seek range, отличия отображаемого времени от доступного диапазона перемотки.
+
+[S7] MDN — Media Session API.
+https://developer.mozilla.org/en-US/docs/Web/API/Media_Session_API
+Использование: передача web metadata/actions браузеру и зависимость системной интеграции от реализации браузера/сайта.
+
+КОНЕЦ ТЕХНИЧЕСКОГО ЗАДАНИЯ.
