@@ -22,9 +22,11 @@ dependencies {
 }
 
 java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(21)
-    }
+    // Loom 1.19.x itself requires a Java 25 JVM (the official Fabric 1.21.10 template
+    // builds on JDK 25), but the mod must stay a Java 21 artifact for players.
+    // So: no toolchain pin - Gradle runs on JDK 25, bytecode is released at 21.
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
     withSourcesJar()
 }
 

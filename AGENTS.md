@@ -56,6 +56,7 @@ Java 21, без серверной части. Полное ТЗ — файл `p
 | Сборка | **ни разу не проходила** — это блокер №1 |
 | Запуск клиента | не выполнялся |
 | Gradle Wrapper | закоммичен (`gradlew`, `gradlew.bat`, `gradle-wrapper.jar`), Gradle `9.8.2` |
+| JVM для сборки | **JDK 25** (Loom 1.19.x); мод собирается в байткод Java 21 |
 
 Закреплённые версии (`gradle.properties`):
 
@@ -75,7 +76,7 @@ loom_version=1.19.4
 функциональность не пишем.
 
 ```bat
-:: нужен только JDK 21, Gradle ставить НЕ надо (wrapper в репозитории)
+:: нужен JDK 25 (требование Loom 1.19.x), Gradle ставить НЕ надо (wrapper в репозитории)
 java -version
 gradlew.bat clean build
 gradlew.bat selfCheck
@@ -88,6 +89,8 @@ gradlew.bat runClient
 2. Классификация:
    - `Could not resolve net.fabricmc:fabric-loom:...` → проблема в `gradle.properties`
      (`loom_version`) или в `pluginManagement.repositories` (`settings.gradle`).
+   - `Dependency requires at least JVM runtime version 25` → Gradle запущен на старом
+     JDK. Нужен JDK 25 (см. `docs/build.md`), версию Loom не меняй.
    - `Unsupported class file major version` / `requires Gradle X` → несовместимость
      Loom/Gradle: меняй только `distributionUrl` в
      `gradle/wrapper/gradle-wrapper.properties` (8.14.x → 9.8.2), Loom не трогай.

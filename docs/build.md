@@ -2,7 +2,11 @@
 
 ## Требования
 
-- JDK 21 (`JAVA_HOME` на JDK 21, не 17/8).
+- **JDK 25** (`JAVA_HOME` на JDK 25). Это требование самого Loom 1.19.x: сборка падает
+  с `Dependency requires at least JVM runtime version 25`, если Gradle запущен на JDK 21.
+  При этом мод по-прежнему собирается в байткод Java 21 (`options.release = 21`) и
+  работает на Java 21 у игроков — ровно та же схема, что в официальном шаблоне Fabric
+  для 1.21.10 (`.github/workflows/build.yml`, `java-version: '25'`).
 - Доступ к `maven.fabricmc.net`, `repo1.maven.org` и `libraries.minecraft.net`.
 - Windows x64 — основная ОС для приёмки клиента; ядро Java от ОС не зависит.
 
@@ -13,7 +17,7 @@ Wrapper **закоммичен целиком**: `gradlew`, `gradlew.bat`, `grad
 `gradle/wrapper/gradle-wrapper.properties` с `distributionUrl` на Gradle **9.8.2**.
 
 Поэтому **локальный Gradle устанавливать не нужно**: `gradlew.bat` сам скачает
-дистрибутив при первом запуске. Нужен только JDK 21.
+дистрибутив при первом запуске. Нужен только JDK 25.
 
 Если скачивание дистрибутива блокируется сетью — это единственное место, где нужна
 ручная правка: заменить `distributionUrl` на локальный zip или на 8.14.x/9.x,

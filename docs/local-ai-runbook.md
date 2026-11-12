@@ -48,17 +48,28 @@ Test-Path "src\main\java\silkvis\config\GlobalConfig.java"
 java -version
 ```
 
-- Если вывод содержит `21.` — всё хорошо, переходи к Шагу 3.
-- Если `java` не найден или версия 8/11/17 — переходи к Шагу 2.
+- Если вывод содержит `25.` — всё хорошо, переходи к Шагу 3.
+- Если `java` не найден или версия 8/11/17/21 — переходи к Шагу 2.
+  (JDK 21 не подходит: сам Gradle-плагин Loom 1.19.4 требует JVM 25. Ошибка выглядит так:
+  `Dependency requires at least JVM runtime version 25`.)
 
 ## Шаг 2. Установи JDK 21 (один раз)
 
 ```powershell
-winget install EclipseAdoptium.Temurin.21.JDK
+winget install EclipseAdoptium.Temurin.25.JDK
 ```
 
 После установки **закрой PowerShell и открой заново** (иначе JAVA_HOME не подхватится),
-затем снова `java -version` — должно быть `21.x`.
+затем снова `java -version` — должно быть `25.x`.
+
+Если всё ещё показывает 21 — укажи JDK 25 явно для этой сборки:
+
+```powershell
+$env:JAVA_HOME = (Get-ChildItem "C:\Program Files\Eclipse Adoptium" -Directory |
+    Where-Object Name -like "jdk-25*" | Select-Object -First 1).FullName
+$env:Path = "$env:JAVA_HOME\bin;$env:Path"
+java -version
+```
 
 ## Шаг 3. Перейди в папку проекта
 
