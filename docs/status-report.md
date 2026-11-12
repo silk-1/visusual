@@ -29,7 +29,7 @@ V0 (каркас, конфиг, UI-адаптеры) + вертикальные 
 | `java -version` | `java: command not found` — JDK в среде отсутствует |
 | `curl https://maven.fabricmc.net/` | `000` (соединение недоступно), Maven Central — тоже `000` |
 | попытка скачать Temurin 21 с GitHub releases | редирект на `release-assets.githubusercontent.com` заблокирован |
-| `node parse.js src` (java-parser 2.x, ANTLR-грамматика Java) | `parsed_ok=127 syntax_errors=0 total=127` — синтаксис всех 127 `.java` корректен |
+| `node parse.js src` (java-parser 2.x, ANTLR-грамматика Java) | `parsed_ok=104 syntax_errors=0 total=104` — синтаксис всех 104 `.java` корректен |
 | сверка lang-ключей `en_us.json` ↔ `ru_ru.json` | расхождений нет (0 missing / 0 extra) |
 | сверка используемых в коде ключей с lang | отсутствующих литеральных ключей нет (совпали только префиксы для конкатенации) |
 | поиск hex-цветов в `render/` и `client/` | только `0xFF000000` (упаковка альфы) в сэмплере; UI-цвета берутся из токенов |
@@ -62,3 +62,38 @@ V0 (каркас, конфиг, UI-адаптеры) + вертикальные 
 I1 (один владелец действия — арбитр P2, здесь проверяется отсутствие запуска задач),
 I2 (stale generation), I3 (disable отменяет), I5 (unknown ≠ success), I7 (bounded
 очереди/кэши), I8 (импорт/загрузка не запускают команд), I10 (в P1 нет задач).
+
+
+---
+
+## Раунд 2 — снятие версионных неизвестностей (2026-11-12)
+
+Цель: убрать главный риск «не соберётся из-за выдуманных версий/сигнатур», не имея JDK.
+
+### Выполненные проверки
+
+| Проверка | Результат |
+|---|---|
+| `GET meta.fabricmc.net/v2/versions/yarn/1.21.10` | существует `1.21.10+build.3` (старшая) |
+| `GET meta.fabricmc.net/v2/versions/loader/1.21.10` | `fabric-loader:0.20.1` помечен `stable: true` |
+| `GET maven.fabricmc.net/.../fabric-loom/1.19.4/fabric-loom-1.19.4.pom` | POM получен, версия существует |
+| `GET maven.fabricmc.net/.../fabric-api/maven-metadata.xml` | последняя сборка под 1.21.10 — `0.116.18+1.21.10` |
+| `FabricMC/yarn@1.21.10` (tar via codeload) | сигнатуры `DrawContext`, `Screen`, `Click`, `KeyInput`, `CharInput`, `KeyBinding`, `WorldView`, `MapColor`, `ItemStack` и др. сверены |
+| `FabricMC/fabric@1.21.10` (tar via codeload) | подтверждены `HudElementRegistry`/`HudElement`/`VanillaHudElements`, `KeyBindingHelper`, `ClientPlayConnectionEvents.JOIN` |
+
+### Исправлено по итогам сверки
+
+1. `render/HudHook.java` переписан на реальный API 1.21.10
+   (`HudElementRegistry.attachElementAfter(VanillaHudElements.MISC_OVERLAYS, ...)`);
+   прежние `HudLayerRegistrationCallback`/`IdentifiedLayer` в этой версии отсутствуют.
+2. `client/SilkVisScreen.java`, `client/HudEditorScreen.java`: новая модель ввода
+   (`Click`, `KeyInput`, `CharInput`) вместо `(double,double,int)`/`(int,int,int)`/`(char,int)`.
+3. `client/ClientTileSampler.java`: `MapColor` импортируется из `net.minecraft.block`.
+4. `client/SilkVisClient.java`: `KeyBinding.Category.create(Identifier.of(...))` вместо
+   строковой категории (обязательно с 1.21.10).
+5. `gradle.properties` / `fabric.mod.json`: реальные версии вместо placeholder'ов.
+
+### Что по-прежнему не подтверждено
+
+Компиляция (`javac`), разрешение зависимостей Gradle, запуск клиента, скриншоты,
+матрица MEDIA-*, GPU-путь карты, PERF-бюджеты. Ни один пункт не помечен как проверенный.

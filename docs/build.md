@@ -8,21 +8,32 @@
 
 ## Wrapper
 
-Бинарный `gradle-wrapper.jar` в репозиторий не добавлен (бинарные артефакты в этой
-среде не генерируются). Один раз на машине с Gradle:
+Wrapper **закоммичен целиком**: `gradlew`, `gradlew.bat`, `gradle/wrapper/gradle-wrapper.jar`
+(взят из официального шаблона `FabricMC/fabric-example-mod@1.21.10`) и
+`gradle/wrapper/gradle-wrapper.properties` с `distributionUrl` на Gradle **9.8.2**.
 
-```bash
-gradle wrapper --gradle-version 9.0.0
-```
+Поэтому **локальный Gradle устанавливать не нужно**: `gradlew.bat` сам скачает
+дистрибутив при первом запуске. Нужен только JDK 21.
 
-`gradle/wrapper/gradle-wrapper.properties` уже содержит закреплённый
-`distributionUrl` и `validateDistributionUrl=true`.
+Если скачивание дистрибутива блокируется сетью — это единственное место, где нужна
+ручная правка: заменить `distributionUrl` на локальный zip или на 8.14.x/9.x,
+совместимый с Loom.
 
 ## Версии
 
-Все версии — в `gradle.properties`. Перед первой сборкой заменить
-`loom_version=1.11-FABRIC_UNVERIFIED` на реально существующую версию Loom для 1.21.10
-и убедиться, что `yarn_mappings`, `loader_version`, `fabric_api_version` разрешаются.
+Все версии — в `gradle.properties`, placeholder'ов больше нет:
+
+```properties
+minecraft_version=1.21.10
+yarn_mappings=1.21.10+build.3
+loader_version=0.20.1
+fabric_api_version=0.138.4+1.21.10
+loom_version=1.19.4
+```
+
+`1.19.4`, `0.20.1` и `0.138.4+1.21.10` — те же версии, что использует официальный
+шаблон Fabric для 1.21.10 (`FabricMC/fabric-example-mod@1.21.10`); для Loom
+подтверждены и метаданные, и POM, и gradle-plugin-marker `fabric-loom:1.19.4`.
 См. `docs/dependency-matrix.md`.
 
 ## Команды

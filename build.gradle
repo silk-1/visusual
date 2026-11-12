@@ -21,16 +21,6 @@ dependencies {
     modImplementation "net.fabricmc.fabric-api:fabric-api:${fabric_api_version}"
 }
 
-loom {
-    // Client-only mod: no main/ server source set is produced (BUILD-01).
-    runs {
-        client {
-            client()
-            ideConfigGenerated = true
-        }
-    }
-}
-
 java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(21)

@@ -2,7 +2,9 @@ package silkvis.client;
 
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.input.KeyInput;
 import net.minecraft.text.Text;
 import silkvis.render.VanillaPainter;
 import silkvis.ui.Color;
@@ -123,7 +125,10 @@ public final class HudEditorScreen extends Screen {
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+    public boolean mouseClicked(Click click, boolean doubled) {
+        double mouseX = click.x();
+        double mouseY = click.y();
+        int button = click.button();
         for (ButtonWidget widget : buttons) {
             if (widget.mouseClicked(mouseX, mouseY, button)) {
                 return true;
@@ -152,13 +157,15 @@ public final class HudEditorScreen extends Screen {
             dragOffsetY = (int) mouseY - box.y();
             return true;
         }
-        return super.mouseClicked(mouseX, mouseY, button);
+        return super.mouseClicked(click, doubled);
     }
 
     @Override
-    public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
+    public boolean mouseDragged(Click click, double offsetX, double offsetY) {
+        double mouseX = click.x();
+        double mouseY = click.y();
         if (dragging == null) {
-            return super.mouseDragged(mouseX, mouseY, button, deltaX, deltaY);
+            return super.mouseDragged(click, offsetX, offsetY);
         }
         Rect screen = new Rect(0, 0, width, height);
         Rect safe = HudLayoutEngine.safeArea(screen);
@@ -171,14 +178,17 @@ public final class HudEditorScreen extends Screen {
     }
 
     @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+    public boolean mouseReleased(Click click) {
+        double mouseX = click.x();
+        double mouseY = click.y();
+        int button = click.button();
         for (ButtonWidget widget : buttons) {
             if (widget.mouseReleased(mouseX, mouseY, button)) {
                 return true;
             }
         }
         if (dragging == null) {
-            return super.mouseReleased(mouseX, mouseY, button);
+            return super.mouseReleased(click);
         }
         HudWidgetConfig cfg = layout.get(dragging);
         Rect box = boxes.get(dragging);
@@ -214,12 +224,12 @@ public final class HudEditorScreen extends Screen {
     }
 
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        if (keyCode == Keys.ESCAPE) {
+    public boolean keyPressed(KeyInput input) {
+        if (input.key() == Keys.ESCAPE) {
             close();
             return true;
         }
-        return super.keyPressed(keyCode, scanCode, modifiers);
+        return super.keyPressed(input);
     }
 
     @Override
