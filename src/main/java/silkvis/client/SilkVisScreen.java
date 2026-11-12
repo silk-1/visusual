@@ -128,7 +128,7 @@ public final class SilkVisScreen extends Screen {
     private void rebuildSettings() {
         settingsWidgets.clear();
         ModuleCategory category = runtime.screenModel().selectedCategory();
-        Rect area = layout.settings().inset(8);
+        Rect area = layout.settings().inset(8, 8);
         int y = area.y() + 22;
         int width = Math.max(80, area.width() - 8);
 

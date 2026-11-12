@@ -14,6 +14,8 @@ public interface TileSampler {
 
     /** Thrown when sampling is impossible; the scheduler backs off instead of spinning. */
     final class SamplingException extends Exception {
+        private static final long serialVersionUID = 1L;
+
         public SamplingException(String message) {
             super(message);
         }

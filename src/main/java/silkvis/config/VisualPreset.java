@@ -4,5 +4,10 @@ package silkvis.config;
 public enum VisualPreset {
     LOW,
     BALANCED,
-    QUALITY
+    QUALITY;
+
+    /** Stable lowercase id used in lang keys ({@code silkvis.preset.&lt;id&gt;}). */
+    public String id() {
+        return name().toLowerCase(java.util.Locale.ROOT);
+    }
 }

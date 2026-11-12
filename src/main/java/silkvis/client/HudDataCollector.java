@@ -59,10 +59,10 @@ public final class HudDataCollector {
             BlockPos pos = player.getBlockPos();
             lines.put(HudWidgetId.COORDINATES, List.of(
                     "XYZ " + pos.getX() + " " + pos.getY() + " " + pos.getZ(),
-                    dimensionName(player.getWorld().getRegistryKey())));
+                    dimensionName(player.getEntityWorld().getRegistryKey())));
             lines.put(HudWidgetId.DIRECTION, List.of(direction(player.getYaw())));
             lines.put(HudWidgetId.BIOME, List.of(biomeName(player)));
-            lines.put(HudWidgetId.WORLD_TIME, List.of(worldTime(player.getWorld())));
+            lines.put(HudWidgetId.WORLD_TIME, List.of(worldTime(player.getEntityWorld())));
         }
         lines.put(HudWidgetId.FPS, List.of(fps.fps() + " FPS  " + String.format(Locale.ROOT, "%.1f ms", fps.frameTimeMs())));
         if (fallbackLimiter.tryAcquire()) {
@@ -86,7 +86,7 @@ public final class HudDataCollector {
     }
 
     private static String biomeName(ClientPlayerEntity player) {
-        var entry = player.getWorld().getBiome(player.getBlockPos());
+        var entry = player.getEntityWorld().getBiome(player.getBlockPos());
         return entry.getKey().map(k -> k.getValue().getPath().replace('_', ' ')).orElse("unknown");
     }
 

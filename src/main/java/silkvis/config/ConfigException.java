@@ -7,6 +7,8 @@ import silkvis.core.ErrorCode;
  * log and the diagnostics export show; user-facing text lives in lang files.
  */
 public final class ConfigException extends Exception {
+    private static final long serialVersionUID = 1L;
+
     private final String fieldPath;
 
     public ConfigException(String fieldPath, String message) {
