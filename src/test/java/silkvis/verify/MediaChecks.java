@@ -194,7 +194,9 @@ final class MediaChecks {
 
         check("artwork cache is bounded and validates png signature", () -> {
             ArtworkCache cache = new ArtworkCache(1000);
-            byte[] png = new byte[]{(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A};
+            byte[] png = new byte[200];
+            byte[] signature = {(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A};
+            System.arraycopy(signature, 0, png, 0, signature.length);
             assertTrue(ArtworkCache.looksLikePng(png), "png signature");
             assertTrue(!ArtworkCache.looksLikePng(new byte[]{1, 2, 3}), "non-png rejected");
             for (int i = 0; i < 10; i++) {

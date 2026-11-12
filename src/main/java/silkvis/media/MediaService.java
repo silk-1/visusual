@@ -207,7 +207,16 @@ public final class MediaService implements MediaProviderListener, AutoCloseable 
         if (selection == SessionSelection.PINNED) {
             boolean matchesApp = pinnedAppId.isEmpty() || pinnedAppId.equals(snapshot.sourceAppId());
             boolean matchesSession = pinnedSessionId == null || pinnedSessionId.equals(snapshot.sessionId());
-            if (!matchesApp || !matchesSession) {
+            if (!matchesApp) {
+                return;
+            }
+            if (!matchesSession) {
+                // The pinned session is gone (app restarted): keep the pin, drop stale data,
+                // and let the UI show "source unavailable" instead of another session's track.
+                current = null;
+                artworkHash = "";
+                artworkRequested = false;
+                seekIntentMs = null;
                 return;
             }
             if (pinnedSessionId == null) {

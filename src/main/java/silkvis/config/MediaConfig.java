@@ -45,11 +45,10 @@ public record MediaConfig(
                 throw ConfigException.of("media.selection", "unknown value");
             }
         }
-        String pinned = o.has("pinnedAppId")
-                ? Validators.plainText("media.pinnedAppId", o.get("pinnedAppId").string(), 64)
-                : d.pinnedAppId();
-        if (pinned.isEmpty()) {
-            pinned = "";
+        String pinned = o.has("pinnedAppId") ? o.get("pinnedAppId").string() : d.pinnedAppId();
+        pinned = pinned == null ? "" : pinned.trim();
+        if (!pinned.isEmpty()) {
+            Validators.plainText("media.pinnedAppId", pinned, 64);
         }
         boolean hudWidget = o.has("hudWidgetEnabled") ? o.get("hudWidgetEnabled").bool() : d.hudWidgetEnabled();
         boolean pauseOnExit = o.has("pauseSourceOnWorldExit")

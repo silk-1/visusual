@@ -35,7 +35,7 @@ final class UiChecks {
             assertEquals(8, theme.radiusPanel(), "panel radius");
             assertEquals(4, theme.radiusControl(), "control radius");
             assertEquals(0, theme.motionDuration(true), "reduced motion disables animation");
-            assertEquals(1.0f, theme.background().alpha(), 0.001, "opaque fallback");
+            assertEquals(1.0f, theme.opaqueFallback().background().alpha(), 0.001, "opaque fallback");
         });
 
         check("wide layout keeps navigation, list and settings columns", () -> {
@@ -66,7 +66,7 @@ final class UiChecks {
             Rect box = HudLayoutEngine.resolve(screen, safe, cfg, 100, 20);
             assertTrue(box.right() <= safe.right(), "clamped horizontally");
             assertTrue(box.bottom() <= safe.bottom(), "clamped vertically");
-            assertEquals(6, HudLayoutEngine.snap(7, 4), "snap to grid");
+            assertEquals(8, HudLayoutEngine.snap(7, 4), "snap to grid");
             assertEquals(8, HudLayoutEngine.snap(9, 8), "snap to 8");
         });
 
