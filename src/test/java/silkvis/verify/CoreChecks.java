@@ -5,7 +5,7 @@ import silkvis.config.Debouncer;
 import silkvis.config.GlobalConfig;
 import silkvis.config.JsonConfigFile;
 import silkvis.config.LoadOutcome;
-import silkvis.config.OptionalLimit;
+import silkvis.core.OptionalLimit;
 import silkvis.config.UiConfig;
 import silkvis.config.Validators;
 import silkvis.config.json.JsonException;

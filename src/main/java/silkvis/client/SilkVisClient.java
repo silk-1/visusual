@@ -10,7 +10,7 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.util.InputUtil;
 import net.minecraft.server.integrated.IntegratedServer;
-import net.minecraft.server.network.ServerInfo;
+import net.minecraft.client.network.ServerInfo;
 import net.minecraft.util.Identifier;
 import org.lwjgl.glfw.GLFW;
 import silkvis.config.ProfileIdentity;
