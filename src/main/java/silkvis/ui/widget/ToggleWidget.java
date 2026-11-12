@@ -5,8 +5,6 @@ import silkvis.ui.Painter;
 import silkvis.ui.Rect;
 import silkvis.ui.ThemeTokens;
 
-import java.util.function.BooleanConsumer;
-
 /** Toggle with label, description and a disabled reason (UI-04). */
 public final class ToggleWidget extends Widget {
     private final String label;

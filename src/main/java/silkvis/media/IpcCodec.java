@@ -89,6 +89,8 @@ public final class IpcCodec {
 
     /** Protocol violation; callers degrade the provider instead of crashing the client. */
     public static final class IpcException extends Exception {
+        private static final long serialVersionUID = 1L;
+
         public IpcException(String message) {
             super(message);
         }

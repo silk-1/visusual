@@ -97,7 +97,7 @@ public final class SilkVisClient implements ClientModInitializer {
         ProfileIdentity identity;
         ServerInfo server = client.getCurrentServerEntry();
         if (server != null && server.address != null && !server.address.isBlank()) {
-            identity = ProfileIdentity.multiplayer(server.address, server.port);
+            identity = ProfileIdentity.multiplayer(server.address);
         } else {
             identity = ProfileIdentity.singleplayer(saveName(client));
         }
