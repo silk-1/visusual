@@ -1,9 +1,13 @@
 # Матрица требований (TEST-06)
 
 Статусы: `IMPLEMENTED_TESTED` · `IMPLEMENTED_NOT_TESTED` · `PLANNED` · `BLOCKED` ·
-`UNSUPPORTED`. В этой среде **нет JDK и нет Fabric Maven**, поэтому ни одна строка не
-может быть `IMPLEMENTED_TESTED`: единственная выполненная проверка — синтаксический
-разбор всех `.java` (104/104 без ошибок) и сверка lang-ключей.
+`UNSUPPORTED`.
+
+Отсчёт ведётся от реальных прогонов. На 2026-11-12 выполнено: `gradlew clean build`
+→ `BUILD SUCCESSFUL`, `selfCheck` → `passed=60 failed=0`, синтаксис 122/122,
+паритет lang-ключей. Строка получает `IMPLEMENTED_TESTED`, только если за ней стоит
+такой прогон; всё, что требует запущенного клиента (рендер, GPU-путь карты, медиа
+на Windows), остаётся `IMPLEMENTED_NOT_TESTED` или `BLOCKED`.
 
 | Requirement | Реализация | Evidence | Статус |
 |---|---|---|---|
@@ -12,12 +16,12 @@
 | 0.4/0.7 визуал доступен в соло и сети, координаты ≠ телепорт | `destinations/DestinationTarget.java`, `DestinationExecutor` | `DestinationChecks` (walk_only) | IMPLEMENTED_NOT_TESTED |
 | 0.5 все автоматизации выключены | `AutomationCatalog.canStart` всегда false | `MiscChecks` | IMPLEMENTED_NOT_TESTED |
 | 0.6 аварийный выход не убивает процесс | P2, только DTO/каталог | — | PLANNED |
-| BUILD-01 1.21.10, client JAR, Java 21 | `fabric.mod.json`, `build.gradle`, `gradle.properties` | статический обзор | IMPLEMENTED_NOT_TESTED |
+| BUILD-01 1.21.10, client JAR, Java 21 | `fabric.mod.json`, `build.gradle`, `gradle.properties` | `gradlew clean build` → `BUILD SUCCESSFUL` | IMPLEMENTED_TESTED (jar не инспектировался) |
 | BUILD-02 аудит репозитория | см. `docs/status-report.md` (репозиторий содержал только `LICENSE`, `README.md`, `promt`) | git log | IMPLEMENTED_TESTED |
-| BUILD-03 pinned версии, одна система mappings | `gradle.properties`, ADR-0001, `dependency-matrix.md` | — | BLOCKED (Loom placeholder) |
-| BUILD-04 проверка render API 1.21.10 | `render/HudHook.java`, `render/VanillaPainter.java`, ADR-0002 | — | BLOCKED (нет исходников версии) |
+| BUILD-03 pinned версии, одна система mappings | `gradle.properties`, ADR-0001, `dependency-matrix.md` | Loom `1.19.4` разрешён и запущен | IMPLEMENTED_TESTED |
+| BUILD-04 проверка render API 1.21.10 | `render/HudHook.java`, `render/VanillaPainter.java`, ADR-0002 | `javac` против 1.21.10 скомпилировал вызовы | IMPLEMENTED_TESTED (компиляция, не рендер) |
 | BUILD-05 команды проверок | `docs/build.md`, `docs/status-report.md` | фактические прогоны в отчёте | IMPLEMENTED_TESTED (отчёт) |
-| BUILD-06 production JAR | `jar`/`sourcesJar` задачи | — | PLANNED |
+| BUILD-06 production JAR | `jar`/`sourcesJar` задачи | `build/libs` заполняется задачей `build` | IMPLEMENTED_TESTED (запуск в игре — нет) |
 | ARCH-01 направление зависимостей | `ui` → модели; `render` без бизнес-логики; `MediaService` без UI | архитектурный обзор | IMPLEMENTED_NOT_TESTED |
 | ARCH-02 ModuleDescriptor/lifecycle/reason | `core/ModuleRegistry.java`, `ModuleDescriptor.java` | `MiscChecks` | IMPLEMENTED_NOT_TESTED |
 | ARCH-03 клиентский поток владеет миром | `client/ClientTileSampler.java`, `MapService.tick()` | — | IMPLEMENTED_NOT_TESTED |
@@ -75,9 +79,9 @@
 | DEST-04 одна команда, без shell | `CommandTextValidator.java` | `DestinationChecks` | IMPLEMENTED_NOT_TESTED |
 | DEST-05/06/07 состояния, verification, retries=0 | `DestinationExecutor.java` | `DestinationChecks` | IMPLEMENTED_NOT_TESTED |
 | DEST-08 без обхода серверных прав | `DestinationExecutor` (walk_only) | `DestinationChecks` | IMPLEMENTED_NOT_TESTED |
-| TEST-01/02 unit+integration | `src/test/java/silkvis/verify/*` | синтаксис 104/104 | IMPLEMENTED_NOT_TESTED (не запускались) |
+| TEST-01/02 unit+integration | `src/test/java/silkvis/verify/*` | `selfCheck`: `passed=60 failed=0` | IMPLEMENTED_TESTED |
 | TEST-03/04 ручные матрицы | — | — | BLOCKED (нет клиента) |
-| TEST-05 инварианты I1…I10 | self-checks + архитектура | — | IMPLEMENTED_NOT_TESTED |
+| TEST-05 инварианты I1…I10 | self-checks + архитектура | те же 60 проверок | IMPLEMENTED_TESTED (кроме клиентских) |
 | TEST-06 матрица | этот файл | — | IMPLEMENTED_TESTED |
 | DEV-01 scope до реализации | `docs/status-report.md` | — | IMPLEMENTED_TESTED |
 | DEV-02 цель Minecraft/без серверного мода | `fabric.mod.json` | — | IMPLEMENTED_TESTED |
