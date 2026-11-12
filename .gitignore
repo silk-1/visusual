@@ -12,7 +12,8 @@ run/
 
 # Local runtime data produced by the mod (never committed)
 silkvis-data/
-config/
+# Runtime data directory of the mod (repo root only). Must NOT match src/**/config/.
+/config/
 
 # OS noise
 .DS_Store
