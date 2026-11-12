@@ -28,13 +28,28 @@ winget install EclipseAdoptium.Temurin.21.JDK
 
 ## Шаг 2. Перейди в папку проекта
 
+Если в пути есть пробелы или кириллица — путь обязательно в кавычках:
+
 ```powershell
-cd C:\путь\к\папке\visusual
+cd "F:\спек\маинкрафт визуал\test v1\visusual-main"
 dir
 ```
 
 В списке должны быть `gradlew.bat`, `build.gradle`, `gradle.properties`.
-Если их нет — ты в неправильной папке, найди ту, где они есть.
+
+**Проверка, что копия свежая** (в старой версии нет пакета config, и сборка упадёт
+с `package silkvis.config does not exist`):
+
+```powershell
+Test-Path "src\main\java\silkvis\config\GlobalConfig.java"
+```
+
+Должно быть `True`. Если `False` — копия устарела: обнови её (`git pull` в папке
+проекта или скачай ZIP заново с GitHub, кнопка Code → Download ZIP).
+
+**Рекомендация:** папку с кириллицей в пути лучше скопировать в простое место,
+например `F:\silkvis`. Это убирает целый класс редких проблем с кодировкой пути
+у Java и Gradle.
 
 ## Шаг 3. Собери проект
 
