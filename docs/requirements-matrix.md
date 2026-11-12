@@ -3,7 +3,7 @@
 Статусы: `IMPLEMENTED_TESTED` · `IMPLEMENTED_NOT_TESTED` · `PLANNED` · `BLOCKED` ·
 `UNSUPPORTED`. В этой среде **нет JDK и нет Fabric Maven**, поэтому ни одна строка не
 может быть `IMPLEMENTED_TESTED`: единственная выполненная проверка — синтаксический
-разбор всех `.java` (127/127 без ошибок) и сверка lang-ключей.
+разбор всех `.java` (104/104 без ошибок) и сверка lang-ключей.
 
 | Requirement | Реализация | Evidence | Статус |
 |---|---|---|---|
@@ -75,7 +75,7 @@
 | DEST-04 одна команда, без shell | `CommandTextValidator.java` | `DestinationChecks` | IMPLEMENTED_NOT_TESTED |
 | DEST-05/06/07 состояния, verification, retries=0 | `DestinationExecutor.java` | `DestinationChecks` | IMPLEMENTED_NOT_TESTED |
 | DEST-08 без обхода серверных прав | `DestinationExecutor` (walk_only) | `DestinationChecks` | IMPLEMENTED_NOT_TESTED |
-| TEST-01/02 unit+integration | `src/test/java/silkvis/verify/*` | синтаксис 127/127 | IMPLEMENTED_NOT_TESTED (не запускались) |
+| TEST-01/02 unit+integration | `src/test/java/silkvis/verify/*` | синтаксис 104/104 | IMPLEMENTED_NOT_TESTED (не запускались) |
 | TEST-03/04 ручные матрицы | — | — | BLOCKED (нет клиента) |
 | TEST-05 инварианты I1…I10 | self-checks + архитектура | — | IMPLEMENTED_NOT_TESTED |
 | TEST-06 матрица | этот файл | — | IMPLEMENTED_TESTED |

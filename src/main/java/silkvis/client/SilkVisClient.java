@@ -11,6 +11,7 @@ import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.util.InputUtil;
 import net.minecraft.server.integrated.IntegratedServer;
 import net.minecraft.server.network.ServerInfo;
+import net.minecraft.util.Identifier;
 import org.lwjgl.glfw.GLFW;
 import silkvis.config.ProfileIdentity;
 import silkvis.hud.HudViewModel;
@@ -28,7 +29,9 @@ import java.nio.file.Path;
  * never loaded on a dedicated server.</p>
  */
 public final class SilkVisClient implements ClientModInitializer {
-    private static final String CATEGORY = "key.categories.silkvis";
+    /** 1.21.10 keybinding categories are objects, not translation-key strings. */
+    private static final KeyBinding.Category CATEGORY =
+            KeyBinding.Category.create(Identifier.of("silkvis", "main"));
     private static KeyBinding openMenu;
     private static KeyBinding hudInteraction;
     private static HudDataCollector collector;

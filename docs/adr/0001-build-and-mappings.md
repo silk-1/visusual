@@ -12,11 +12,13 @@
 ## Решение
 
 1. Используются **Yarn** mappings (одна система, без смешивания с Mojang names).
-2. Все версии вынесены в `gradle.properties` и помечены как кандидаты:
-   `minecraft_version`, `yarn_mappings`, `loader_version`, `fabric_api_version`,
-   `loom_version`. Запрещены `+`, `latest.release`, SNAPSHOT-зависимости проекта.
-3. `docs/dependency-matrix.md` содержит статус каждой строки. Строка без проверки
-   имеет статус `UNVERIFIED` и не считается принятой.
+2. Все версии вынесены в `gradle.properties`. На 2026-11-12 они закреплены по
+   метаданным Fabric: `minecraft_version=1.21.10`, `yarn_mappings=1.21.10+build.3`,
+   `loader_version=0.20.1`, `fabric_api_version=0.116.18+1.21.10`, `loom_version=1.19.4`.
+   Запрещены `+` (как динамика), `latest.release`, SNAPSHOT-зависимости проекта.
+3. `docs/dependency-matrix.md` содержит статус каждой строки. Существование версий
+   подтверждено, но фактическое скачивание/разрешение зависимостей в авторской среде
+   выполнить нельзя, поэтому статус — `PINNED_FROM_METADATA`, а не `VERIFIED`.
 4. Toolchain — Java 21 (`JavaLanguageVersion.of(21)`), `options.release = 21`.
 5. Мод клиентский: `fabric.mod.json` объявляет `environment: client` и точную версию
    Minecraft `=1.21.10`; dedicated server не загружает клиентские классы.

@@ -4,7 +4,7 @@ import net.minecraft.block.BlockState;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.world.ClientWorld;
 import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.MapColor;
+import net.minecraft.block.MapColor;
 import net.minecraft.world.Heightmap;
 import silkvis.core.ErrorCode;
 import silkvis.core.SilkError;

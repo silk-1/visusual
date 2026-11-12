@@ -2,7 +2,10 @@ package silkvis.client;
 
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.input.CharInput;
+import net.minecraft.client.input.KeyInput;
 import net.minecraft.text.Text;
 import silkvis.config.GlobalConfig;
 import silkvis.config.VisualPreset;
@@ -423,7 +426,10 @@ public final class SilkVisScreen extends Screen {
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+    public boolean mouseClicked(Click click, boolean doubled) {
+        double mouseX = click.x();
+        double mouseY = click.y();
+        int button = click.button();
         for (Widget widget : settingsWidgets) {
             if (widget.mouseClicked(mouseX, mouseY, button)) {
                 return true;
@@ -442,21 +448,29 @@ public final class SilkVisScreen extends Screen {
                 return true;
             }
         }
-        return super.mouseClicked(mouseX, mouseY, button);
+        return super.mouseClicked(click, doubled);
     }
 
     @Override
-    public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
+    public boolean mouseDragged(Click click, double offsetX, double offsetY) {
+        double mouseX = click.x();
+        double mouseY = click.y();
+        int button = click.button();
+        double deltaX = offsetX;
+        double deltaY = offsetY;
         for (Widget widget : settingsWidgets) {
             if (widget.mouseDragged(mouseX, mouseY, button, deltaX, deltaY)) {
                 return true;
             }
         }
-        return super.mouseDragged(mouseX, mouseY, button, deltaX, deltaY);
+        return super.mouseDragged(click, offsetX, offsetY);
     }
 
     @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+    public boolean mouseReleased(Click click) {
+        double mouseX = click.x();
+        double mouseY = click.y();
+        int button = click.button();
         for (Widget widget : settingsWidgets) {
             if (widget.mouseReleased(mouseX, mouseY, button)) {
                 return true;
@@ -467,7 +481,7 @@ public final class SilkVisScreen extends Screen {
                 return true;
             }
         }
-        return super.mouseReleased(mouseX, mouseY, button);
+        return super.mouseReleased(click);
     }
 
     @Override
@@ -482,7 +496,9 @@ public final class SilkVisScreen extends Screen {
     }
 
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+    public boolean keyPressed(KeyInput input) {
+        int keyCode = input.key();
+        int modifiers = input.modifiers();
         if (keyCode == Keys.ESCAPE) {
             if (focus.focused() != null) {
                 focus.clearFocus();
@@ -498,16 +514,23 @@ public final class SilkVisScreen extends Screen {
         if (focused != null && focused.keyPressed(keyCode, modifiers)) {
             return true;
         }
-        return super.keyPressed(keyCode, scanCode, modifiers);
+        return super.keyPressed(input);
     }
 
     @Override
-    public boolean charTyped(char chr, int modifiers) {
+    public boolean charTyped(CharInput input) {
         Widget focused = focus.focused();
-        if (focused != null && focused.charTyped(chr)) {
-            return true;
+        String typed = input == null ? "" : input.asString();
+        if (focused != null && !typed.isEmpty()) {
+            boolean handled = false;
+            for (int i = 0; i < typed.length(); i++) {
+                handled |= focused.charTyped(typed.charAt(i));
+            }
+            if (handled) {
+                return true;
+            }
         }
-        return super.charTyped(chr, modifiers);
+        return super.charTyped(input);
     }
 
     @Override
