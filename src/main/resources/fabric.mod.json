@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "id": "silkvis",
+  "version": "${version}",
+  "name": "SilkVis",
+  "description": "Client-side visual companion: design system, HUD, own map, media overlay, destinations. Automation is planned for a later stage and is not executable in this build.",
+  "authors": ["SilkVis"],
+  "contact": {},
+  "license": "MIT",
+  "icon": "assets/silkvis/icon.png",
+  "environment": "client",
+  "entrypoints": {
+    "client": ["silkvis.client.SilkVisClient"]
+  },
+  "depends": {
+    "fabricloader": ">=0.17.0 <0.18.0",
+    "minecraft": "=1.21.10",
+    "java": ">=21",
+    "fabric-api": ">=0.135.0"
+  },
+  "suggests": {
+    "sodium": "*",
+    "iris": "*"
+  },
+  "custom": {
+    "silkvis:stage": "P0/P1-scaffold",
+    "silkvis:notes": "See docs/requirements-matrix.md for the per-requirement status."
+  }
+}

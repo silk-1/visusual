@@ -1,0 +1,19 @@
+# Gradle / build outputs
+.gradle/
+build/
+out/
+run/
+*.class
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Local runtime data produced by the mod (never committed)
+silkvis-data/
+config/
+
+# OS noise
+.DS_Store
+Thumbs.db
