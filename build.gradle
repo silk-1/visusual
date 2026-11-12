@@ -47,12 +47,25 @@ processResources {
 // Runs on a plain JDK: ./gradlew selfCheck  (no JUnit / no external libraries).
 // JUnit is deliberately not used yet: no network access to Maven Central in the
 // authoring environment, and the core is testable with plain assertions.
+// There is no JUnit on purpose (dependency policy): the checks are plain Java in
+// src/test/java and run through 'selfCheck'. Gradle 9 fails a test task that
+// discovers no tests, so that guard is disabled for this project.
+tasks.named('test', Test) {
+    failOnNoDiscoveredTests = false
+}
+
 tasks.register('selfCheck', JavaExec) {
     group = 'verification'
     description = 'Runs SILKVIS core self checks (config, layout, map, media IPC, destinations).'
     dependsOn tasks.named('testClasses')
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'silkvis.verify.SelfCheck'
+}
+
+// 'build' must mean "verified", not just "compiled": the dependency-free checks
+// run as part of it, so a red selfCheck fails the build like a red test would.
+tasks.named('build') {
+    dependsOn tasks.named('selfCheck')
 }
 
 jar {
