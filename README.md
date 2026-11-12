@@ -4,7 +4,8 @@
 HUD с редактором, собственная карта, оверлей «сейчас играет», точки назначения и
 запланированная (не исполняемая) автоматизация.
 
-> **Статус: V0/V1-каркас, сборка и запуск не подтверждены.**
+> **Статус: V0/V1-каркас. Сборка зелёная** (`gradlew clean build` → `BUILD
+> SUCCESSFUL`, `selfCheck` → `passed=60 failed=0`), **запуск клиента ещё не проверен.**
 > В среде разработки не было JDK и доступа к `maven.fabricmc.net`, поэтому
 > `gradlew build` и `runClient` ни разу не выполнялись, а версия Loom оставлена
 > явным placeholder. См. `docs/status-report.md` и `docs/known-limitations.md`.
@@ -26,15 +27,18 @@ HUD с редактором, собственная карта, оверлей �
 
 ## Быстрый старт
 
-```bash
-gradle wrapper --gradle-version 9.0.0   # один раз, нужен установленный Gradle
-./gradlew selfCheck                     # проверки ядра без Minecraft
-./gradlew clean build                   # требует доступ к Fabric Maven
-./gradlew runClient                     # отдельный результат, не равен сборке
+```bat
+build.bat            :: Windows: находит JDK 25 и запускает clean build
+build.bat selfCheck  :: проверки ядра без Minecraft
+build.bat runClient  :: клиент с модом (пока не проверялся)
 ```
 
-Перед первой сборкой заменить `loom_version` в `gradle.properties` на реально
-существующую версию Loom для 1.21.10 (`docs/dependency-matrix.md`).
+POSIX: `./gradlew clean build`, `./gradlew selfCheck`, `./gradlew runClient`.
+Wrapper закоммичен, отдельно ставить Gradle не нужно; нужен только JDK 25.
+
+Версии уже закреплены (`loom 1.19.4`, `yarn 1.21.10+build.3`, `loader 0.20.1`,
+`fabric-api 0.138.4+1.21.10`); сборка требует JDK 25, байткод остаётся Java 21.
+Старая инструкция про замену `loom_version` больше не нужна (`docs/dependency-matrix.md`).
 
 ## Структура
 
