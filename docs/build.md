@@ -28,6 +28,7 @@ Wrapper **закоммичен целиком**: `gradlew`, `gradlew.bat`, `grad
 Все версии — в `gradle.properties`, placeholder'ов больше нет:
 
 ```properties
+mod_version=0.1.1-p0
 minecraft_version=1.21.10
 yarn_mappings=1.21.10+build.3
 loader_version=0.20.1
@@ -39,6 +40,11 @@ loom_version=1.19.4
 шаблон Fabric для 1.21.10 (`FabricMC/fabric-example-mod@1.21.10`); для Loom
 подтверждены и метаданные, и POM, и gradle-plugin-marker `fabric-loom:1.19.4`.
 См. `docs/dependency-matrix.md`.
+
+Важно: версии в `gradle.properties` — это версии **сборки**. Требования к установке у
+игрока мягче и заданы в `src/main/resources/fabric.mod.json`
+(`fabricloader >=0.19.0`, `fabric-api >=0.116.0`, `minecraft =1.21.10`) — см.
+`docs/install.md`.
 
 ## Команды
 

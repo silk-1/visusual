@@ -109,7 +109,7 @@ I2 (stale generation), I3 (disable отменяет), I5 (unknown ≠ success), 
 |---|---|
 | `gradlew.bat clean build` | `BUILD SUCCESSFUL in 2s` |
 | `selfCheck` (входит в `build`) | `passed=60 failed=0` |
-| артефакт | `build\libs\silkvis-0.1.0-p0+mc1.21.10.jar` |
+| артефакт | `build\libs\silkvis-0.1.0-p0+mc1.21.10.jar` (переименован в `0.1.1-p0` в раунде 4) |
 
 Впервые получен воспроизводимый зелёный прогон: компиляция основного кода и тестов,
 60 поведенческих проверок, JAR.
@@ -133,3 +133,56 @@ I2 (stale generation), I3 (disable отменяет), I5 (unknown ≠ success), 
 
 `runClient`, скриншоты HUD/меню, матрица MEDIA-*, GPU-путь карты, бюджеты PERF.
 Ничего из этого не помечено как проверенное.
+
+
+---
+
+## Раунд 4 — первая попытка запуска в игре (2026-11-12)
+
+### Что произошло
+
+Мод был собран (`0.1.0-p0`) и установлен в настоящий клиент. Игра **не стартовала**:
+
+```text
+Incompatible mods found!
+ - Install fabric-api, version 0.138.4 or later.
+ - Replace mod 'Fabric Loader' 0.19.2 with any version between 0.20.0 (inclusive) and 0.21.0 (exclusive).
+   Mod 'SilkVis' (silkvis) 0.1.0-p0+mc1.21.10 requires any version between 0.20.0 (inclusive)
+   and 0.21.0 (exclusive) of mod 'Fabric Loader', but only the wrong version is present: 0.19.2!
+   Mod 'SilkVis' requires version 0.138.4 or later of fabric-api, which is missing!
+```
+
+Это не краш кода мода: Loader отклонил мод **до** загрузки классов, по метаданным.
+То есть первый реальный прогон в игре вскрыл дефект, который не мог поймать ни `javac`,
+ни `selfCheck` — неверно объявленные зависимости.
+
+### Разбор
+
+| Симптом | Настоящая причина | Решение |
+|---|---|---|
+| `requires ... 0.20.0 <0.21.0 ... but only 0.19.2` | жёсткая **верхняя** граница в `fabric.mod.json`, скопированная из dev-окружения (`loader_version=0.20.1`), а не из требований кода | `fabricloader: ">=0.19.0"`, верхней границы нет |
+| `fabric-api ... is missing` | Fabric API не был установлен у игрока, а мод без него не работает (HUD, keybind, тики, события мира) | зависимость остаётся обязательной; описан порядок установки — `docs/install.md` |
+| `fabric-api 0.138.4 or later` | нижняя граница взята равной версии из dev-сборки, хотя код не требует именно её | `fabric-api: ">=0.116.0"` — подходит любой билд для 1.21.10 |
+
+Проверено по коду: из Loader API используются только `FabricLoader#getInstance`,
+`isModLoaded(String)`, `getGameDir()`, `getConfigDir()` — все стабильны с 0.16, поэтому
+нижняя граница 0.19.0 обоснована, а не «на глаз».
+
+### Изменено
+
+- `src/main/resources/fabric.mod.json` — диапазоны зависимостей: `>=0.19.0` и `>=0.116.0`,
+  верхних границ нет (они отсекают будущие версии загрузчика и ничего не гарантируют);
+- `gradle.properties` — `mod_version` → `0.1.1-p0`, чтобы новый jar отличался по имени;
+- `docs/install.md` — новый документ: что нужно игроку, откуда скачать, порядок установки,
+  проверка «мод загрузился», таблица диагностики `Incompatible mods found`;
+- `README.md` — раздел «Установка в игру»;
+- `docs/dependency-matrix.md` — обновлены строки 5 и 6 и добавлен риск 5 (верхние границы);
+- `docs/known-limitations.md` — пункт про непроверенный запуск уточнён.
+
+### Статус после раунда
+
+Сборка (`clean build`, `selfCheck 60/60`) от этих правок не зависит — менялись ресурсы и
+версия. **Запуск в игре по-прежнему не подтверждён**: следующий шаг — пересобрать
+(`build.bat`), положить `silkvis-0.1.1-p0+mc1.21.10.jar` + `fabric-api-…+1.21.10.jar`
+в `mods` и проверить `F1` / `Right Shift` / «по умолчанию ничего не нарисовано».
+До этого ни один UI/HUD-статус не поднимается выше `IMPLEMENTED_NOT_TESTED`.
