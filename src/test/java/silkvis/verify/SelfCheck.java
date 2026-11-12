@@ -31,9 +31,9 @@ public final class SelfCheck {
         for (String failure : failures) {
             System.out.println("FAILED: " + failure);
         }
-        if (!failures.isEmpty()) {
-            System.exit(1);
-        }
+        // Always exit explicitly: a single leaked non-daemon thread would otherwise
+        // keep the JVM (and the Gradle build) hanging after the report is printed.
+        System.exit(failures.isEmpty() ? 0 : 1);
     }
 
     interface Body {

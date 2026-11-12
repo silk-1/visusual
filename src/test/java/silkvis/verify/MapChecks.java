@@ -104,7 +104,15 @@ final class MapChecks {
                 }
                 return tile(key, 0xFF224466);
             };
-            MapService service = new MapService(clock, cache, store, Executors.newSingleThreadExecutor(),
+            // Daemon thread: a leaked non-daemon executor would keep the JVM alive
+            // after main() returns, which is exactly how this check used to hang.
+            java.util.concurrent.ExecutorService io =
+                    Executors.newSingleThreadExecutor(r -> {
+                        Thread thread = new Thread(r, "silkvis-selfcheck-io");
+                        thread.setDaemon(true);
+                        return thread;
+                    });
+            MapService service = new MapService(clock, cache, store, io,
                     sampler, t -> published.incrementAndGet());
             WorldSessionToken token = WorldSessionToken.mint("sp-abc");
             service.onSessionChanged(token, identity);

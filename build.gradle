@@ -60,6 +60,9 @@ tasks.register('selfCheck', JavaExec) {
     dependsOn tasks.named('testClasses')
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'silkvis.verify.SelfCheck'
+    // A leaked non-daemon thread once left this task running forever after the report.
+    // The checks finish in seconds; five minutes means something is genuinely wrong.
+    timeout = java.time.Duration.ofMinutes(5)
 }
 
 // 'build' must mean "verified", not just "compiled": the dependency-free checks
