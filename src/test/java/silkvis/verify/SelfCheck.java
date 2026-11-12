@@ -63,6 +63,11 @@ public final class SelfCheck {
         }
     }
 
+    /** Float-heavy UI values widen to double here; the tolerance is what matters. */
+    static void assertEquals(double expected, double actual, double delta, String message) {
+        assertClose(expected, actual, delta, message);
+    }
+
     static void assertClose(double expected, double actual, double tolerance, String message) {
         if (Math.abs(expected - actual) > tolerance) {
             throw new AssertionError(message + " (expected " + expected + ", actual " + actual + ")");
