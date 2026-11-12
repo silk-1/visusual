@@ -40,6 +40,20 @@ Wrapper закоммичен, отдельно ставить Gradle не нуж
 `fabric-api 0.138.4+1.21.10`); сборка требует JDK 25, байткод остаётся Java 21.
 Старая инструкция про замену `loom_version` больше не нужна (`docs/dependency-matrix.md`).
 
+## Установка в игру
+
+Готовый мод — это `build\libs\silkvis-<версия>+mc1.21.10.jar` (рядом лежит
+`-sources.jar`, он для игры не нужен). Для запуска у игрока нужны:
+
+- **Minecraft 1.21.10** и **Fabric Loader 0.19.0+** (ставить installer-ом с fabricmc.net);
+- **Fabric API для 1.21.10** — обязательная зависимость, без неё клиент не стартует;
+- Java 21+.
+
+Оба jar-а кладутся в `%appdata%\.minecraft\mods`, запускается fabric-профиль 1.21.10.
+Пошагово, со ссылками и разбором ошибки `Incompatible mods found` — **`docs/install.md`**.
+После запуска проверяются три вещи: `F1` скрывает оверлей, `Right Shift` открывает меню,
+по умолчанию не нарисовано ничего (всё выключено — требование ТЗ).
+
 ## Структура
 
 ```text
@@ -69,6 +83,7 @@ docs/                           матрицы, ADR, отчёт, огранич�
 - `docs/status-report.md` — что реально проверено, чем и с каким результатом
 - `docs/known-limitations.md` — известные ограничения и пробелы
 - `docs/dependency-matrix.md` — версии, лицензии, fallback, статусы
+- `docs/install.md` — установка в игру, зависимости игрока, диагностика запуска
 - `docs/build.md` — сборка, wrapper, артефакты
 - `docs/adr/` — ADR-0001…0005 (build, render adapter, media bridge, config, map)
 

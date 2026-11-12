@@ -16,12 +16,12 @@
 | 0.4/0.7 визуал доступен в соло и сети, координаты ≠ телепорт | `destinations/DestinationTarget.java`, `DestinationExecutor` | `DestinationChecks` (walk_only) | IMPLEMENTED_NOT_TESTED |
 | 0.5 все автоматизации выключены | `AutomationCatalog.canStart` всегда false | `MiscChecks` | IMPLEMENTED_NOT_TESTED |
 | 0.6 аварийный выход не убивает процесс | P2, только DTO/каталог | — | PLANNED |
-| BUILD-01 1.21.10, client JAR, Java 21 | `fabric.mod.json`, `build.gradle`, `gradle.properties` | `gradlew clean build` → `BUILD SUCCESSFUL` | IMPLEMENTED_TESTED (jar не инспектировался) |
+| BUILD-01 1.21.10, client JAR, Java 21 | `fabric.mod.json`, `build.gradle`, `gradle.properties` | `gradlew clean build` → `BUILD SUCCESSFUL`; зависимости объявлены как `fabricloader >=0.19.0`, `fabric-api >=0.116.0` (правка раунда 4 — первая попытка запуска в игре отклонена Loader-ом, разбор в `docs/status-report.md`) | IMPLEMENTED_TESTED (запуск в игре — нет) |
 | BUILD-02 аудит репозитория | см. `docs/status-report.md` (репозиторий содержал только `LICENSE`, `README.md`, `promt`) | git log | IMPLEMENTED_TESTED |
 | BUILD-03 pinned версии, одна система mappings | `gradle.properties`, ADR-0001, `dependency-matrix.md` | Loom `1.19.4` разрешён и запущен | IMPLEMENTED_TESTED |
 | BUILD-04 проверка render API 1.21.10 | `render/HudHook.java`, `render/VanillaPainter.java`, ADR-0002 | `javac` против 1.21.10 скомпилировал вызовы | IMPLEMENTED_TESTED (компиляция, не рендер) |
 | BUILD-05 команды проверок | `docs/build.md`, `docs/status-report.md` | фактические прогоны в отчёте | IMPLEMENTED_TESTED (отчёт) |
-| BUILD-06 production JAR | `jar`/`sourcesJar` задачи | `build/libs` заполняется задачей `build` | IMPLEMENTED_TESTED (запуск в игре — нет) |
+| BUILD-06 production JAR | `jar`/`sourcesJar` задачи | `build/libs` заполняется задачей `build`; `0.1.1-p0` содержит исправленные `depends` | IMPLEMENTED_TESTED (запуск в игре — нет) |
 | ARCH-01 направление зависимостей | `ui` → модели; `render` без бизнес-логики; `MediaService` без UI | архитектурный обзор | IMPLEMENTED_NOT_TESTED |
 | ARCH-02 ModuleDescriptor/lifecycle/reason | `core/ModuleRegistry.java`, `ModuleDescriptor.java` | `MiscChecks` | IMPLEMENTED_NOT_TESTED |
 | ARCH-03 клиентский поток владеет миром | `client/ClientTileSampler.java`, `MapService.tick()` | — | IMPLEMENTED_NOT_TESTED |

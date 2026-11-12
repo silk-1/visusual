@@ -15,8 +15,8 @@
 | 2 | Fabric Loom | `1.19.4` | плагин сборки | LGPL-3.0 | — (dev) | предыдущая стабильная Loom (`1.19.3`) | PINNED_FROM_METADATA (POM `1.19.4` получен) |
 | 3 | Minecraft | `com.mojang:minecraft:1.21.10` | целевая платформа | Mojang EULA (не распространяется) | — | нет: версия зафиксирована ТЗ | PINNED (версия есть в Fabric meta) |
 | 4 | Yarn mappings | `net.fabricmc:yarn:1.21.10+build.3:v2` | имена | CC0-1.0 | — | `build.2` / `build.1` для 1.21.10 | PINNED_FROM_METADATA + сверка имён по `FabricMC/yarn@1.21.10` |
-| 5 | Fabric Loader | `net.fabricmc:fabric-loader:0.20.1` | загрузчик | Apache-2.0 | ~1.5 MiB (в поставке пользователя) | диапазон в `fabric.mod.json`: `>=0.20.0 <0.21.0` | PINNED_FROM_METADATA (0.20.1 = stable) |
-| 6 | Fabric API | `net.fabricmc.fabric-api:0.138.4+1.21.10` | keybind/lifecycle/HUD hooks | Apache-2.0 | ~2 MiB | модули Fabric API по отдельности (key-binding, lifecycle-events, rendering-v1) | PINNED_FROM_METADATA + сверка API по исходникам ветки `1.21.10` |
+| 5 | Fabric Loader | `net.fabricmc:fabric-loader:0.20.1` | загрузчик | Apache-2.0 | ~1.5 MiB (в поставке пользователя) | диапазон в `fabric.mod.json`: `>=0.19.0` (без верхней границы) | PINNED_FROM_METADATA (0.20.1 = stable); реальный запуск на 0.19.2 — см. risk 5 |
+| 6 | Fabric API | `net.fabricmc.fabric-api:0.138.4+1.21.10` | keybind/lifecycle/HUD hooks | Apache-2.0 | ~2 MiB | **обязателен у игрока** (`fabric.mod.json`: `>=0.116.0`, т.е. любой билд для 1.21.10); без него клиент не стартует | PINNED_FROM_METADATA + сверка API по исходникам ветки `1.21.10` |
 | 7 | JDK | Temurin 21 / любой JDK 21 | toolchain | GPL-2.0+CE | — | JDK 21 обязателен (`release=21`) | локально **отсутствует** |
 | 8 | JUnit | не подключён | тесты | EPL-2.0 | — | self-checks на чистом JDK (`./gradlew selfCheck`) | осознанно отложен |
 | 9 | C++/WinRT helper | `native/media-helper` (исходник, бинарник не собран) | GSMTC-мост | исходник в репозитории | ~150–300 KiB (план) | `ProviderStatus.ERROR: helper_missing`, остальной мод работает | **BLOCKED** (нет MSVC) |
@@ -33,6 +33,15 @@
    не добавлено.
 4. Нативный helper — единственный допустимый native-компонент (MEDIA-04). Он не
    скачивается из сети и не требует MSVC у пользователя (только у сборщика релиза).
+5. **Верхняя граница версий — источник блокирующих ошибок, а не защита.** Первая же
+   попытка запуска у пользователя упала с `Incompatible mods found`: раньше в
+   `fabric.mod.json` стояло `fabricloader >=0.20.0 <0.21.0` и `fabric-api >=0.138.4`,
+   а на машине был Loader `0.19.2` и не было Fabric API. Узкое окно не защищало ни от
+   чего (код использует только `FabricLoader#getInstance`, `isModLoaded`, `getGameDir`,
+   `getConfigDir` — API, стабильные с 0.16) и при этом отсекало рабочие установки и все
+   будущие версии загрузчика. Теперь нижние границы намеренно низкие, верхних нет;
+   фактическую совместимость с игрой проверяет сам Loader. Разбор — `docs/status-report.md`,
+   «Раунд 4»; установка — `docs/install.md`.
 
 ## Сверенные API 1.21.10 (по `FabricMC/yarn@1.21.10` и исходникам Fabric API)
 
