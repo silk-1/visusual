@@ -49,7 +49,7 @@ final class MapChecks {
             assertEquals(127, TileMath.pixelInTile(-1, 0), "negative pixel");
             assertEquals(0, TileMath.tileCoordOf(127, 0), "last pixel of tile 0");
             assertEquals(-2, TileMath.tileCoordOf(-129, 0), "second negative tile");
-            assertEquals(1, TileMath.pixelInTile(-129, 0), "pixel in second negative tile");
+            assertEquals(127, TileMath.pixelInTile(-129, 0), "pixel in second negative tile");
             assertEquals(0, TileMath.lodForBlocksPerPixel(1), "lod for zoom 1");
             assertEquals(3, TileMath.lodForBlocksPerPixel(8), "lod for zoom 8");
         });
@@ -116,10 +116,13 @@ final class MapChecks {
             service.tick();
             assertEquals(1, published.get(), "published once");
             assertEquals(0, service.pendingJobs(), "queue drained");
-            service.onSessionChanged(WorldSessionToken.mint("other"), identity);
+            // Work queued for the previous session must never be published after a switch.
             service.markDirty(new TileKey(identity, 0, 1, 0));
+            service.onSessionChanged(WorldSessionToken.mint("other"),
+                    MapIdentity.surface("sp-other", "minecraft:overworld"));
             service.tick();
-            assertEquals(1, published.get(), "stale identity not published");
+            assertEquals(1, published.get(), "queued work of a previous session is dropped");
+            assertEquals(0, service.pendingJobs(), "stale queue cleared");
         });
 
         check("minimap view is bounded and lod aware", () -> {
@@ -128,7 +131,7 @@ final class MapChecks {
             MapIdentity identity = MapIdentity.surface("sp-abc", "minecraft:overworld");
             int tiles = view.visibleTiles(identity).size();
             assertTrue(tiles > 0 && tiles <= 16, "bounded tile count, was " + tiles);
-            assertEquals(1, view.lod(), "lod for default zoom");
+            assertEquals(0, view.lod(), "lod for default zoom (1 block per pixel)");
         });
 
         check("map identity isolates worlds, dimensions and modes", () -> {

@@ -51,7 +51,9 @@ public final class FocusManager {
         if (scope.isEmpty()) {
             return false;
         }
-        clearFocus();
+        if (index >= 0 && index < scope.size()) {
+            scope.get(index).setFocused(false);
+        }
         index = backwards
                 ? (index <= 0 ? scope.size() - 1 : index - 1)
                 : (index + 1) % scope.size();

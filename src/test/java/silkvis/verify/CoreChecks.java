@@ -39,7 +39,8 @@ final class CoreChecks {
             JsonObject parsed = JsonValue.parse(written).object();
             assertEquals(written, parsed.write(true), "stable serialization");
             assertEquals("text", parsed.get("b").string(), "string value");
-            assertEquals(2, parsed.get("e").object().get("nested").number().intValueExact(), "nested number");
+            assertEquals(2.5, parsed.get("e").object().get("nested").number().doubleValue(), 0.0001,
+                    "nested number");
         });
 
         check("json rejects trailing content and malformed input", () -> {

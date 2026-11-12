@@ -38,10 +38,11 @@ public final class HudLayoutEngine {
     /** Areas SilkVis must keep clear unless the user explicitly overrides them. */
     public static Rect[] protectedAreas(Rect screen) {
         int hotbarWidth = Math.min(screen.width(), 182);
+        int bossWidth = Math.min(screen.width(), 182);
         return new Rect[] {
                 new Rect((screen.width() - hotbarWidth) / 2, screen.bottom() - HOTBAR_HEIGHT - 16,
                         hotbarWidth, HOTBAR_HEIGHT + 16),
-                new Rect(0, 0, screen.width(), BOSS_BAR_HEIGHT),
+                new Rect((screen.width() - bossWidth) / 2, 0, bossWidth, BOSS_BAR_HEIGHT),
                 new Rect(0, screen.bottom() - HOTBAR_HEIGHT - SUBTITLE_HEIGHT - 20, screen.width(), SUBTITLE_HEIGHT)
         };
     }

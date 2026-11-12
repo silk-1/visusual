@@ -119,14 +119,14 @@ final class MiscChecks {
             log.log("CONFIG_INVALID", "same detail");
             log.log("CONFIG_INVALID", "same detail");
             assertEquals(1, log.entries().size(), "collapsed repeats");
-            assertEquals(2, log.suppressedCount(), "suppressed counted");
+            assertEquals(2L, log.suppressedCount(), "suppressed counted");
             clock.advanceMillis(1500);
             log.log("CONFIG_INVALID", "same detail");
             assertEquals(2, log.entries().size(), "new entry after interval");
         });
 
         check("timings report percentiles", () -> {
-            Timings timings = new Timings(64);
+            Timings timings = new Timings(128);
             for (int i = 1; i <= 100; i++) {
                 timings.record(i * 1_000_000L);
             }
