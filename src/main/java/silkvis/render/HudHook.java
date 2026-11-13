@@ -7,6 +7,7 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.render.RenderTickCounter;
 import net.minecraft.util.Identifier;
 import silkvis.client.HudOverlayRenderer;
+import silkvis.client.SilkVisClient;
 import silkvis.client.SilkVisRuntime;
 
 /**
@@ -49,6 +50,9 @@ public final class HudHook {
     }
 
     private static void render(DrawContext context, RenderTickCounter tickCounter) {
+        // Per-frame sampling happens here, not in the collector itself: the renderer may
+        // bail out early (open screen, hidden HUD) and frame times must keep counting.
+        SilkVisClient.onFrame();
         HudOverlayRenderer.render(context, tickCounter);
     }
 

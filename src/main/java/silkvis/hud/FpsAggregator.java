@@ -14,6 +14,7 @@ public final class FpsAggregator {
     private int cachedFps;
     private double cachedFrameMs;
     private long lastFrameStart;
+    private boolean primed;
     private final silkvis.diagnostics.Timings frameTimes = new silkvis.diagnostics.Timings(256);
 
     public FpsAggregator(Clock clock, int hz) {
@@ -25,9 +26,10 @@ public final class FpsAggregator {
     /** Call once per rendered frame. */
     public void onFrame() {
         long now = clock.monotonicNanos();
-        if (lastFrameStart != 0L) {
+        if (primed) {
             frameTimes.record(now - lastFrameStart);
         }
+        primed = true;
         lastFrameStart = now;
         frames++;
         long elapsed = now - windowStart;

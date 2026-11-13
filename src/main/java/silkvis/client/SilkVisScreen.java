@@ -108,7 +108,7 @@ public final class SilkVisScreen extends Screen {
                 .style(ButtonWidget.Style.SECONDARY));
 
         TextInputModel searchModel = new TextInputModel(runtime.screenModel().query(), 48, s -> true);
-        search = new TextInputWidget(layout.search(), searchModel, "silkvis.search.hint", value -> {
+        search = new TextInputWidget(layout.search(), searchModel, tr("silkvis.search.hint"), value -> {
             runtime.screenModel().setQuery(value);
             rebuildSettings();
         });
@@ -295,6 +295,7 @@ public final class SilkVisScreen extends Screen {
         renderNavigation(painter, theme);
         renderModuleList(painter, theme, mouseX, mouseY);
         renderSettings(painter, theme);
+        syncNavigationStyles();
         for (Widget widget : chrome) {
             widget.render(painter, theme);
         }
@@ -319,6 +320,22 @@ public final class SilkVisScreen extends Screen {
         painter.fill(nav, Color.argb(theme.surface().withAlpha(0.5f)));
         painter.text(tr("silkvis.screen.title"), nav.x() + 4, layout.window().y() + 10,
                 Color.argb(theme.accent()), true);
+    }
+
+    /**
+     * Navigation buttons must show the *current* tab, not the tab that happened to be
+     * selected when {@link #init()} last ran. Styles are re-derived every frame instead of
+     * only on build: without this the accent outline stayed on the previously built tab
+     * (seen in the first in-game run, 2026-11-12).
+     */
+    private void syncNavigationStyles() {
+        ModuleCategory selected = runtime.screenModel().selectedCategory();
+        List<ModuleCategory> tabs = MainScreenModel.p1Tabs();
+        for (int i = 0; i < navButtons.size() && i < tabs.size(); i++) {
+            navButtons.get(i).style(tabs.get(i) == selected
+                    ? ButtonWidget.Style.PRIMARY
+                    : ButtonWidget.Style.SECONDARY);
+        }
     }
 
     private void renderModuleList(Painter painter, ThemeTokens theme, int mouseX, int mouseY) {
@@ -430,6 +447,10 @@ public final class SilkVisScreen extends Screen {
         double mouseX = click.x();
         double mouseY = click.y();
         int button = click.button();
+        // Clicking a control hands it keyboard focus (UI-06). Without this the search field
+        // accepted clicks but typing went nowhere: only Tab ever set focus.
+        focusOnHit(settingsWidgets, mouseX, mouseY);
+        focusOnHit(chrome, mouseX, mouseY);
         for (Widget widget : settingsWidgets) {
             if (widget.mouseClicked(mouseX, mouseY, button)) {
                 return true;
@@ -448,7 +469,19 @@ public final class SilkVisScreen extends Screen {
                 return true;
             }
         }
+        if (button == 0) {
+            focus.clearFocus();
+        }
         return super.mouseClicked(click, doubled);
+    }
+
+    private void focusOnHit(List<Widget> widgets, double mouseX, double mouseY) {
+        for (Widget widget : widgets) {
+            if (widget.focusable() && widget.hit(mouseX, mouseY)) {
+                focus.focus(widget);
+                return;
+            }
+        }
     }
 
     @Override

@@ -29,20 +29,20 @@
 | ARCH-05 bounded pools/очереди | `core/BoundedExecutors.java`, `MapService` coalesce | `MiscChecks` | IMPLEMENTED_NOT_TESTED |
 | ARCH-06 классификация ошибок, bounded log | `core/ErrorCode.java`, `diagnostics/BoundedLog.java` | `MiscChecks` | IMPLEMENTED_NOT_TESTED |
 | ARCH-07 capability discovery | `integration/IntegrationRegistry.java` | `MiscChecks` (failure isolation) | IMPLEMENTED_NOT_TESTED |
-| UI-01 ThemeTokens, alpha, без hex в рендере | `ui/ThemeTokens.java`, `ui/Color.java` | grep hex по `render/`,`client/` | IMPLEMENTED_NOT_TESTED |
-| UI-02 spacing/radius/height/hit area | `ThemeTokens`, `ui/widget/Widget.java` | `UiChecks` | IMPLEMENTED_NOT_TESTED |
-| UI-03 Right Shift, max 960×620, breakpoints | `client/SilkVisClient.java`, `ui/MainScreenLayout.java` | `UiChecks` | IMPLEMENTED_NOT_TESTED |
-| UI-04 вкладки, поиск, избранное | `ui/MainScreenModel.java`, `SilkVisScreen` | — | IMPLEMENTED_NOT_TESTED (избранное — без экрана) |
-| UI-05 button/toggle/slider/text/search/scroll/tooltip | `ui/widget/*`, `ui/TooltipController.java`, `ui/ScrollModel.java` | `UiChecks` | IMPLEMENTED_NOT_TESTED |
+| UI-01 ThemeTokens, alpha, без hex в рендере | `ui/ThemeTokens.java`, `ui/Color.java` | grep hex по `render/`,`client/`; **первый запуск в игре 2026-11-12**: тема Graphite/Turquoise, состояния подписаны текстом | IMPLEMENTED_TESTED |
+| UI-02 spacing/radius/height/hit area | `ThemeTokens`, `ui/widget/Widget.java` | `UiChecks`; скриншоты запуска: кнопки/тумблеры/слайдер читаемы, кириллица рендерится | IMPLEMENTED_TESTED (визуально, без замера сетки) |
+| UI-03 Right Shift, max 960×620, breakpoints | `client/SilkVisClient.java`, `ui/MainScreenLayout.java` | `UiChecks`; **запуск 2026-11-12**: окно открылось по Right Shift, окно ≤ 960×620, компактный режим (< 700) включился сам, footer/close на месте | IMPLEMENTED_TESTED |
+| UI-04 вкладки, поиск, избранное | `ui/MainScreenModel.java`, `SilkVisScreen` | **запуск 2026-11-12**: 7 вкладок P1 переключаются, «Автоматизация» явно помечена как P2; поле поиска рисовалось пустым ящиком и не получало фокус по клику — исправлено после запуска | IMPLEMENTED_TESTED (поиск: фильтрация не видна в компактном режиме — список модулей по UI-03 замещён настройками; избранное — без экрана) |
+| UI-05 button/toggle/slider/text/search/scroll/tooltip | `ui/widget/*`, `ui/TooltipController.java`, `ui/ScrollModel.java` | `UiChecks`; **запуск 2026-11-12**: кнопки, тумблеры, слайдер (перетаскивание, значение меняется 4000↔5100) | IMPLEMENTED_TESTED (scroll/tooltip в игре не проверялись) |
 | UI-05 color/keybind/file picker, modal, toast UI | `ToastManager` модель | — | PLANNED |
 | UI-06 focus/modal/input routing | `ui/FocusManager.java`, `SilkVisScreen.keyPressed` | `UiChecks` | IMPLEMENTED_NOT_TESTED |
 | UI-07 120–180 ms, reduced motion, tooltip 350 ms | `ThemeTokens.motionDuration`, `TooltipController` | `UiChecks` | IMPLEMENTED_NOT_TESTED |
 | UI-08 blur, fallback opaque | `GlobalConfig.effectiveBlur`, `ThemeTokens.opaqueFallback` | — | PLANNED (эффект не рисуется) |
 | UI-09 RU/EN, plurals, glyphs | lang-файлы | сверка ключей | IMPLEMENTED_NOT_TESTED |
-| HUD-01 10 P1-виджетов + независимые настройки | `ui/hud/HudWidgetId.java`, `HudWidgetConfig.java` | — | IMPLEMENTED_NOT_TESTED |
+| HUD-01 10 P1-виджетов + независимые настройки | `ui/hud/HudWidgetId.java`, `HudWidgetConfig.java` | **запуск 2026-11-12**: в мире рисуются панель FPS и миникарта-заглушка; FPS показывал `0 FPS 0.0 ms` (агрегатор не вызывался) — исправлено | IMPLEMENTED_TESTED (рендер виджетов; карта — заглушка) |
 | HUD-02 anchor/offset, clamp, snap, guides, reset | `ui/hud/HudLayoutEngine.java`, `client/HudEditorScreen.java` | `UiChecks` | IMPLEMENTED_NOT_TESTED |
-| HUD-03 visibility policy, protected areas | `VisibilityPolicy.java`, `HudLayoutEngine.protectedAreas` | `UiChecks` | IMPLEMENTED_NOT_TESTED |
-| HUD-04 частоты 2 Hz/10 Hz, cached model | `hud/FpsAggregator.java`, `RateLimiter.java`, `client/HudDataCollector.java` | — | IMPLEMENTED_NOT_TESTED |
+| HUD-03 visibility policy, protected areas | `VisibilityPolicy.java`, `HudLayoutEngine.protectedAreas` | `UiChecks`; **F1 в игре ещё не проверялся** | IMPLEMENTED_NOT_TESTED |
+| HUD-04 частоты 2 Hz/10 Hz, cached model | `hud/FpsAggregator.java`, `RateLimiter.java`, `client/HudDataCollector.java` | **запуск 2026-11-12** показал `0 FPS 0.0 ms`: `HudDataCollector.onFrame()` не вызывался ниоткуда; вызов добавлен в HUD-хук, `RateLimiter`/`FpsAggregator` больше не полагаются на нулевое начало часов. Повторного замера не было | IMPLEMENTED_NOT_TESTED (исправлено, ждёт проверки) |
 | HUD-05 click-through + interaction mode | `SilkVisRuntime.setHudInteractionMode`, биндинг по умолчанию не назначен | — | IMPLEMENTED_NOT_TESTED (кнопки оверлея не кликабельны) |
 | VIS-01/02/03 настройки камеры/мира/маркеров | `visual/VisualSettings.java` + UI | — | BLOCKED (нет hook, эффекты не применяются) |
 | VIS-04 AUTO по Sodium/Iris | `IntegrationRegistry.shaderMode` | `MiscChecks` | IMPLEMENTED_NOT_TESTED |
