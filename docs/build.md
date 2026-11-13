@@ -28,7 +28,7 @@ Wrapper **закоммичен целиком**: `gradlew`, `gradlew.bat`, `grad
 Все версии — в `gradle.properties`, placeholder'ов больше нет:
 
 ```properties
-mod_version=0.1.1-p0
+mod_version=0.1.2-p0
 minecraft_version=1.21.10
 yarn_mappings=1.21.10+build.3
 loader_version=0.20.1

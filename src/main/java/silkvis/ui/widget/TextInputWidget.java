@@ -14,14 +14,18 @@ import java.util.function.Consumer;
 public final class TextInputWidget extends Widget {
     private final TextInputModel model;
     private final Consumer<String> onCommit;
-    private final String placeholderKey;
+    private final String placeholder;
     private boolean showError;
 
-    public TextInputWidget(Rect bounds, TextInputModel model, String placeholderKey, Consumer<String> onCommit) {
+    /**
+     * @param placeholder already-localized hint text, drawn while the field is empty; the
+     *                    {@code ui} package must not depend on Minecraft translation classes
+     */
+    public TextInputWidget(Rect bounds, TextInputModel model, String placeholder, Consumer<String> onCommit) {
         super(bounds);
         this.model = model;
         this.onCommit = onCommit;
-        this.placeholderKey = placeholderKey;
+        this.placeholder = placeholder;
     }
 
     public TextInputModel model() {
@@ -33,8 +37,15 @@ public final class TextInputWidget extends Widget {
         painter.fill(bounds, Color.argb(theme.surface()));
         painter.outline(bounds, Color.argb(showError ? theme.error() : focused ? theme.accent() : theme.border()), 1);
         String text = model.text();
-        int textColor = Color.argb(text.isEmpty() ? theme.textSecondary() : theme.textPrimary());
-        painter.text(text, bounds.x() + 4, bounds.centerY() - painter.lineHeight() / 2, textColor, false);
+        int textY = bounds.centerY() - painter.lineHeight() / 2;
+        // The hint used to be received and never drawn, so the search field rendered as a
+        // blank box with no way to tell what it was (first in-game run, 2026-11-12).
+        if (text.isEmpty() && placeholder != null && !placeholder.isEmpty()) {
+            painter.text(placeholder, bounds.x() + 4, textY, Color.argb(theme.textSecondary()), false);
+        }
+        if (!text.isEmpty()) {
+            painter.text(text, bounds.x() + 4, textY, Color.argb(theme.textPrimary()), false);
+        }
         if (focused) {
             int caretX = bounds.x() + 4 + painter.textWidth(text.substring(0, model.cursor()));
             painter.fill(new Rect(caretX, bounds.y() + 3, 1, bounds.height() - 6), Color.argb(theme.accent()));

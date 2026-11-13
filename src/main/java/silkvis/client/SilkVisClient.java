@@ -119,6 +119,17 @@ public final class SilkVisClient implements ClientModInitializer {
         }
     }
 
+    /**
+     * Once per rendered HUD frame: drives the 2 Hz FPS / frame-time aggregator (HUD-04).
+     * {@code HudDataCollector#onFrame} existed but was never called, so the FPS widget
+     * always rendered "0 FPS 0.0 ms" (first in-game run, 2026-11-12).
+     */
+    public static void onFrame() {
+        if (collector != null) {
+            collector.onFrame();
+        }
+    }
+
     /** Cached HUD model for the renderer; never collects data during rendering. */
     public static HudViewModel hudModel() {
         return collector == null ? HudViewModel.empty() : collector.model();
