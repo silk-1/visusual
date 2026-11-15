@@ -790,3 +790,15 @@ i18n, виджеты) прошёл проверку типов. То есть п
 запуск моста при включении музыки, ни иконки брони. Строки `drawItem` в 1.21.10 сверены по
 yarn-мэппингам (метод есть), но живой отрисовки в этой среде нет.
 
+### 0.1.13-p0 не собралась: исправлено в 0.1.13-p1
+
+| Ошибка компиляции | Причина | Правка |
+|---|---|---|
+| `int cannot be converted to Color` ×6, `Color cannot be converted to int` ×2 (`HudOverlayRenderer`) | `durabilityColor` возвращал `int`, а токены темы (`theme.error()/warning()/success()/border()`) — это `silkvis.ui.Color`; смешивание в тернарном операторе не компилируется | метод возвращает `Color`, все вызовы уже обёрнуты в `Color.argb(...)` |
+| `static method should be qualified by type name, net.minecraft.enchantment.Enchantment` (`HudDataCollector:171`) | `Enchantment#getName(RegistryEntry, int)` — статический метод, вызван через выражение `entry.getKey().value()` | вызов через тип: `Enchantment.getName(entry.getKey(), …)` + импорт |
+| `getValue() in Object2IntMap.Entry has been deprecated` | `getEnchantmentEntries()` отдаёт fastutil-записи `Object2IntMap.Entry`, у которых `getValue()` устарел | `getIntValue()` |
+
+Проверено парсером: `parsed=139 failed=0`. Типы `Color`/`int` — единственное место, где я
+перепутал доменный тип с ARGB-числом; других таких смешений в новом коде нет (все
+остальные вызовы уже шли через `Color.argb(...)`).
+

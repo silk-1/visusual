@@ -255,8 +255,12 @@ public final class HudOverlayRenderer {
         }
     }
 
-    /** Durability colour: green, amber, red. Same thresholds the vanilla bar implies. */
-    private static int durabilityColor(ThemeTokens theme, float ratio) {
+    /**
+     * Durability colour: green, amber, red. Same thresholds the vanilla bar implies.
+     * Returns {@link Color}, not an int: theme tokens are {@code Color}, and mixing the two
+     * in a conditional expression does not compile (reported on 0.1.13-p0).
+     */
+    private static Color durabilityColor(ThemeTokens theme, float ratio) {
         if (ratio <= 0.15f) {
             return theme.error();
         }

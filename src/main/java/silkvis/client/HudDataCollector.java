@@ -3,6 +3,7 @@ package silkvis.client;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.entity.EquipmentSlot;
+import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.entity.effect.StatusEffectInstance;
 import net.minecraft.item.ItemStack;
@@ -167,8 +168,10 @@ public final class HudDataCollector {
         }
         List<String> names = new ArrayList<>();
         for (var entry : component.getEnchantmentEntries()) {
-            names.add(entry.getKey().value()
-                    .getName(entry.getKey(), entry.getValue()).getString());
+            // Entries are fastutil Object2IntMap.Entry: getIntValue() instead of the
+            // deprecated getValue(), and Enchantment#getName is static, so it is qualified
+            // by the type rather than by an instance (both reported on 0.1.13-p0).
+            names.add(Enchantment.getName(entry.getKey(), entry.getIntValue()).getString());
             if (names.size() >= 2) {
                 break;
             }
