@@ -122,13 +122,13 @@ public final class SilkVisClient implements ClientModInitializer {
         // One line in latest.log that names the running jar. A failed `build.bat` leaves the
         // previous jar in mods/, so "the fix did nothing" is usually "the old build is still
         // installed": this line answers that without guessing.
-        LOGGER.info("SilkVis {} initialised ({})", FabricLoader.getInstance()
-                        .getModContainer("silkvis")
-                        .map(container -> container.getMetadata().getVersion().getFriendlyString())
-                        .orElse("unknown"),
-                FabricLoader.getInstance().getModContainer("silkvis")
-                        .map(container -> container.getMetadata().getVersion().toString())
-                        .orElse("no jar metadata"));
+        // java.util.logging has no "{}" placeholders, so the line is built explicitly.
+        LOGGER.info("SilkVis " + FabricLoader.getInstance().getModContainer("silkvis")
+                .map(container -> container.getMetadata().getVersion().getFriendlyString())
+                .orElse("unknown")
+                + " initialised (" + FabricLoader.getInstance().getModContainer("silkvis")
+                .map(container -> container.getMetadata().getVersion().toString())
+                .orElse("no jar metadata") + ")");
         ClientTickEvents.END_CLIENT_TICK.register(this::onClientTick);
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> onJoin(client));
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> runtime.onWorldLeft());

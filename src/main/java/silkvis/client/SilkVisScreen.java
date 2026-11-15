@@ -1017,7 +1017,9 @@ public final class SilkVisScreen extends Screen {
         settingsWidgets.add(new ButtonWidget(new Rect(area.x(), y, Math.min(width, 260),
                 ROW_HEIGHT), tr("silkvis.soup.open"), () -> {
             if (client != null) {
-                client.setScreen(new SoupSettingsScreen(this));
+                // Open on this module, not on the first one in the list: the player clicked
+                // this row and expects that module's settings.
+                client.setScreen(new SoupSettingsScreen(this, id));
             }
         }));
         y += ROW_HEIGHT + 10;
