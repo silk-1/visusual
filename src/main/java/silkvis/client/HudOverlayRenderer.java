@@ -21,8 +21,11 @@ import silkvis.ui.hud.VisibilityContext;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalLong;
 
 /**
  * HUD overlay (HUD-01..HUD-04).
@@ -32,7 +35,21 @@ import java.util.Optional;
  * never covers the hotbar/health band unless the user overrode it in the editor.</p>
  */
 public final class HudOverlayRenderer {
+    /**
+     * Rectangles drawn in the last frame, published for the HUD editor. The editor used to
+     * guess widget sizes (110x22 for everything) and then converted the dropped box back
+     * into an anchor offset with the wrong width — widgets jumped as soon as the editor
+     * closed, which read as "the editor edits nothing".
+     */
+    private static volatile Map<HudWidgetId, Rect> lastRects = Map.of();
+    private static EnumMap<HudWidgetId, Rect> frameRects = new EnumMap<>(HudWidgetId.class);
+
     private HudOverlayRenderer() {
+    }
+
+    /** Real widget boxes of the last rendered frame; empty outside a world. */
+    public static Map<HudWidgetId, Rect> lastRects() {
+        return lastRects;
     }
 
     public static void render(DrawContext context, RenderTickCounter tickCounter) {
@@ -41,9 +58,13 @@ public final class HudOverlayRenderer {
             return;
         }
         SilkVisRuntime runtime = SilkVisRuntime.get();
-        if (client.currentScreen != null && !runtime.hudInteractionMode()) {
+        // The editor needs the real widgets on screen: without them it can only draw
+        // placeholder rectangles and drag those.
+        if (client.currentScreen != null && !runtime.hudInteractionMode()
+                && !(client.currentScreen instanceof HudEditorScreen)) {
             return;
         }
+        frameRects = new EnumMap<>(HudWidgetId.class);
         VanillaPainter painter = new VanillaPainter(context);
         ThemeTokens theme = runtime.theme();
         Rect screen = new Rect(0, 0, client.getWindow().getScaledWidth(), client.getWindow().getScaledHeight());
@@ -93,6 +114,7 @@ public final class HudOverlayRenderer {
             }
             renderPanel(painter, theme, screen, safe, cfg, lines, occupied);
         }
+        lastRects = Map.copyOf(frameRects);
     }
 
     /**
@@ -135,6 +157,7 @@ public final class HudOverlayRenderer {
         Rect box = avoidOverlap(HudLayoutEngine.resolve(screen, safe, cfg, width + 8, height + 6),
                 occupied, screen);
         occupied.add(box);
+        frameRects.put(cfg.id(), box);
         painter.roundRect(box, theme.radiusControl(),
                 Color.argb(theme.surface().withAlpha(theme.surface().alpha() * 0.55f * cfg.alpha())));
         int y = box.y() + 3;
@@ -207,6 +230,7 @@ public final class HudOverlayRenderer {
         Rect box = clampToSafe(HudLayoutEngine.resolve(screen, safe, cfg, width, height), safe);
         box = clampToSafe(avoidOverlap(box, occupied, screen), safe);
         occupied.add(box);
+        frameRects.put(cfg.id(), box);
         painter.roundRect(box, theme.radiusControl(),
                 Color.argb(theme.surface().withAlpha(theme.surface().alpha() * 0.55f * cfg.alpha())));
         int y = box.y() + 3;
@@ -279,6 +303,7 @@ public final class HudOverlayRenderer {
         Rect box = clampToSafe(HudLayoutEngine.resolve(screen, safe, cfg, width, 16), safe);
         box = clampToSafe(avoidOverlap(box, occupied, screen), safe);
         occupied.add(box);
+        frameRects.put(cfg.id(), box);
         painter.roundRect(box, theme.radiusControl(),
                 Color.argb(theme.surface().withAlpha(theme.surface().alpha() * 0.55f * cfg.alpha())));
         painter.text(ellipsize(painter, text, width - 8), box.x() + 4,
@@ -334,6 +359,7 @@ public final class HudOverlayRenderer {
         };
         Rect box = avoidOverlap(HudLayoutEngine.resolve(screen, safe, cfg, width, height), occupied, screen);
         occupied.add(box);
+        frameRects.put(cfg.id(), box);
         painter.roundPanel(box, theme.radiusControl(),
                 Color.argb(theme.surface().withAlpha(theme.surface().alpha() * 0.7f * cfg.alpha())),
                 Color.argb(theme.border()));
@@ -341,8 +367,12 @@ public final class HudOverlayRenderer {
         String title = snapshot.titleOpt().orElse("—");
         String artist = snapshot.artistOpt().orElse("");
         long now = runtime.clock().monotonicNanos();
-        long position = MediaTimeline.projectPosition(snapshot, now, runtime.clock()).orElse(0L);
-        double fraction = progressFraction(snapshot, position);
+        OptionalLong projected = MediaTimeline.projectPosition(snapshot, now, runtime.clock());
+        // A fake 0:00 looked like a frozen player (owner report, 2026-11-15): when the
+        // source reports no position, say so instead of inventing a start.
+        String positionText = projected.isPresent()
+                ? MediaTimeline.formatPosition(projected.getAsLong()) : "--:--";
+        double fraction = projected.isPresent() ? progressFraction(snapshot, projected.getAsLong()) : 0d;
 
         switch (variant) {
             case LINE -> {
@@ -359,8 +389,7 @@ public final class HudOverlayRenderer {
                 String second = artist.isBlank() ? snapshot.displaySource() : artist;
                 painter.text(ellipsize(painter, second, textWidth), textX, box.y() + 15,
                         Color.argb(theme.textSecondary()), false);
-                String time = MediaTimeline.formatPosition(position) + " / "
-                        + MediaTimeline.describeLength(snapshot);
+                String time = positionText + " / " + lengthText(runtime, snapshot);
                 painter.text(time, box.right() - 5 - painter.textWidth(time), box.y() + 15,
                         Color.argb(theme.textSecondary()), false);
                 drawProgressBar(painter, theme, new Rect(textX, box.bottom() - 8, textWidth, 3),
@@ -379,8 +408,7 @@ public final class HudOverlayRenderer {
                 }
                 painter.text(snapshot.displaySource(), textX, box.y() + 28,
                         Color.argb(theme.textSecondary()), false);
-                String time = MediaTimeline.formatPosition(position) + " / "
-                        + MediaTimeline.describeLength(snapshot);
+                String time = positionText + " / " + lengthText(runtime, snapshot);
                 painter.text(time, textX, box.y() + 39, Color.argb(theme.textSecondary()), false);
                 drawProgressBar(painter, theme,
                         new Rect(textX, box.bottom() - 9, textWidth, 3), fraction);
@@ -394,6 +422,18 @@ public final class HudOverlayRenderer {
         if (variant != silkvis.config.NowPlayingVariant.CARD) {
             controlRects = null;
         }
+    }
+
+    /**
+     * Length as text. The media layer answers "LIVE"/"--:--" in English, and a Russian
+     * interface must not print "LIVE" (round 15 rule), so the word is translated here.
+     */
+    private static String lengthText(SilkVisRuntime runtime, MediaSnapshot snapshot) {
+        if (!MediaTimeline.isLiveOrUnknownLength(snapshot)) {
+            return MediaTimeline.formatPosition(snapshot.endMs());
+        }
+        return snapshot.playbackState() == silkvis.media.PlaybackState.PLAYING
+                ? runtime.localizer().get("silkvis.media.live") : "--:--";
     }
 
     /** 0..1 progress, or 0 for live/unknown length: never a fake half-filled bar. */

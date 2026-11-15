@@ -218,5 +218,17 @@
   "silkvis.hud.dir.s": "Ю",
   "silkvis.hud.dir.sw": "ЮЗ",
   "silkvis.hud.dir.w": "З",
-  "silkvis.hud.dir.nw": "СЗ"
+  "silkvis.hud.dir.nw": "СЗ",
+  "silkvis.media.prev": "Назад",
+  "silkvis.media.toggle": "Пауза / Играть",
+  "silkvis.media.next": "Далее",
+  "silkvis.media.now.none": "Ничего не воспроизводится",
+  "silkvis.media.now.unknown": "Без названия",
+  "silkvis.media.live": "прямой эфир",
+  "silkvis.hud.interaction_open": "Взаимодействие с HUD",
+  "silkvis.hud.interaction_why": "Режим даёт кликать по кнопкам на карточке музыки. Esc — выйти. Клавиша не назначена, чтобы не занимать чужие биндинги.",
+  "silkvis.media.playback.playing": "играет",
+  "silkvis.media.playback.paused": "пауза",
+  "silkvis.media.playback.stopped": "остановлено",
+  "silkvis.hud.editor.reset": "Сбросить"
 }

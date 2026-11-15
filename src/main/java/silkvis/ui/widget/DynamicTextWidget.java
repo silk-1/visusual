@@ -33,7 +33,22 @@ public final class DynamicTextWidget extends Widget {
             nextRefreshAt = now + REFRESH_NANOS;
             cached = read();
         }
-        painter.text(cached, bounds.x(), bounds.y(), Color.argb(theme.textSecondary()), false);
+        // Long diagnostic lines used to run over the panel edge and into the next column.
+        painter.text(fit(painter, cached), bounds.x(), bounds.y(),
+                Color.argb(theme.textSecondary()), false);
+    }
+
+    /** Ellipsis inside the row width: the text is diagnostic, not a scroll area. */
+    private String fit(Painter painter, String text) {
+        if (text == null || text.isEmpty() ||
+                painter.textWidth(text) <= bounds.width()) {
+            return text;
+        }
+        String trimmed = text;
+        while (trimmed.length() > 1 && painter.textWidth(trimmed + "\u2026") > bounds.width()) {
+            trimmed = trimmed.substring(0, trimmed.length() - 1);
+        }
+        return trimmed + "\u2026";
     }
 
     private String read() {

@@ -206,6 +206,15 @@ final class MediaChecks {
             assertTrue(cache.size() < 10, "eviction happened");
         });
 
+        check("artwork accepts jpeg and png, rejects garbage", () -> {
+            byte[] jpeg = {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) 0xE0, 0, 0, 0, 0};
+            byte[] png = {(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A};
+            assertTrue(ArtworkCache.looksLikeImage(jpeg), "jpeg accepted");
+            assertTrue(ArtworkCache.looksLikeImage(png), "png accepted");
+            assertTrue(!ArtworkCache.looksLikeImage(new byte[]{1, 2, 3, 4, 5, 6, 7, 8}),
+                    "garbage rejected");
+        });
+
         check("close releases provider resources", () -> {
             FakeProvider provider = new FakeProvider();
             MediaService service = new MediaService(provider, new FakeClock(), s -> { }, r -> { });

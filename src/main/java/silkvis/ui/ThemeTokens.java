@@ -29,6 +29,28 @@ public record ThemeTokens(
         int motionMs,
         int tooltipDelayMs
 ) {
+    /**
+     * Density variant used by the visual presets. LOW packs the interface (smaller radii,
+     * tighter spacing, less rounded controls), QUALITY gives it more air. Before 0.1.15 the
+     * preset was stored, shown in the footer and applied to nothing at all.
+     */
+    public ThemeTokens withDensity(int newRadiusPanel, int newRadiusControl, int spacingDelta) {
+        return new ThemeTokens(id, background, surface, surfaceHover, border, accent, accentHover,
+                textPrimary, textSecondary, success, warning, error,
+                Math.max(0, spacingXs + spacingDelta), Math.max(0, spacingSm + spacingDelta),
+                Math.max(0, spacingMd + spacingDelta), Math.max(0, spacingLg + spacingDelta),
+                Math.max(0, spacingXl + spacingDelta), Math.max(0, newRadiusPanel),
+                Math.max(0, newRadiusControl), controlHeight, minHitSize, motionMs, tooltipDelayMs);
+    }
+
+    /** Reduced motion: every transition collapses to zero duration. */
+    public ThemeTokens withMotion(int durationMs) {
+        return new ThemeTokens(id, background, surface, surfaceHover, border, accent, accentHover,
+                textPrimary, textSecondary, success, warning, error, spacingXs, spacingSm,
+                spacingMd, spacingLg, spacingXl, radiusPanel, radiusControl, controlHeight,
+                minHitSize, Math.max(0, durationMs), tooltipDelayMs);
+    }
+
     /** Graphite / Turquoise, dark matte glass (0.3). */
     public static ThemeTokens graphiteTurquoise() {
         return new ThemeTokens(
