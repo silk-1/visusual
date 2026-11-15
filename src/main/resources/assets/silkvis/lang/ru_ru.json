@@ -206,5 +206,8 @@
   "silkvis.language.title": "Язык интерфейса",
   "silkvis.language.auto": "Авто",
   "silkvis.language.ru": "Русский",
-  "silkvis.language.en": "English"
+  "silkvis.language.en": "English",
+  "silkvis.media.restart": "Перезапустить мост",
+  "silkvis.media.restart.desc": "Пересоздать подключение к медиа-сессиям Windows без перезапуска игры",
+  "silkvis.media.hud.status": "Музыка: %s"
 }

@@ -241,6 +241,11 @@ public final class SilkVisScreen extends Screen {
                 y = addToggle(area, y, width, tr("silkvis.media.artwork"),
                         tr("silkvis.media.artwork.desc"), global.media().showArtwork(),
                         value -> saveMediaArtwork(value));
+                // Manual retry: if the bridge was refused (PowerShell blocked by policy, no
+                // media session yet), fixing the cause should not require restarting the game.
+                settingsWidgets.add(new ButtonWidget(new Rect(area.x(), y + 6, Math.min(width, 220), ROW_HEIGHT),
+                        tr("silkvis.media.restart"), () -> runtime.restartMedia()));
+                y += ROW_HEIGHT + 10;
             }
             case VISUAL -> {
                 VisualSettings visual = runtime.ui().visual();

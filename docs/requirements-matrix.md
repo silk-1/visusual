@@ -63,7 +63,9 @@
 | MEDIA-09 AUTO/PINNED | `MediaService.onSnapshot` | `MediaChecks` | IMPLEMENTED_NOT_TESTED |
 | MEDIA-10/11/12 поля, capabilities, Try* | `MediaSnapshot`, `MediaCapabilities`, `silkvis-media-helper.ps1` | **раунд 13**: capabilities из `Controls`, команды `Try*` реализованы в скрипте | IMPLEMENTED_NOT_TESTED (helper) |
 | MEDIA-13 timeline/LIVE/seek | `media/MediaTimeline.java` | `MediaChecks` | IMPLEMENTED_NOT_TESTED |
-| MEDIA-14 сброс прогресса, pending seek, timeout | `MediaService` | `MediaChecks` | IMPLEMENTED_NOT_TESTED |
+| MEDIA-14 сброс прогресса, pending seek, timeout | `MediaService`, `HudOverlayRenderer.renderMediaHint` | **раунд 16**: пустое состояние по-прежнему молчит, но отказ провайдера (`ERROR`/`UNSUPPORTED`) рисует на HUD причину, а не тишину | IMPLEMENTED_NOT_TESTED |
+| MEDIA-02 запуск по требованию | `SilkVisRuntime.tryStartMedia/setMediaEnabled/stopMedia`, `SilkVisClient.setMediaFactory`, `SilkVisScreen` (кнопка «Перезапустить мост») | **раунд 16**: включение музыки раньше не запускало провайдер (создавался только на старте клиента при уже включённом флаге); теперь старт/стоп/перезапуск по требованию, ретрай с троттлингом 15 с | IMPLEMENTED_NOT_TESTED |
+| HUD-01 иконки брони | `client/ArmorSnapshot.java`, `client/HudDataCollector.armor`, `HudOverlayRenderer.renderArmor` | **раунд 16**: по просьбе владельца — иконка предмета вместо названия, прочность `320/528` с цветом и полосой, до двух зачарований; `drawItem` сверен по yarn 1.21.10, фолбэк на рамку при несовместимости | IMPLEMENTED_NOT_TESTED |
 | MEDIA-15 keybinds не назначены, ellipsis | `SilkVisClient`, `HudOverlayRenderer`, `HudInteractionScreen` | **раунд 14**: управление через экран взаимодействия, медиа-клавиши не перехватываются; ellipsis общий | IMPLEMENTED_NOT_TESTED |
 | MEDIA-16/17 без громкости, bounded cache, без истории | `ArtworkCache`, `ArtworkPixels`, `MediaService` | `MediaChecks`; **раунд 14**: обложка рисуется сеткой 26×26 из RAM-кэша, декод вне кадра, на диск ничего | IMPLEMENTED_NOT_TESTED |
 | 7.4 матрица совместимости | — | — | BLOCKED (нет прогона) |

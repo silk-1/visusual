@@ -8,6 +8,7 @@ import silkvis.map.MapIdentity;
 import silkvis.map.MapService;
 import silkvis.media.MediaService;
 import silkvis.media.MediaSnapshot;
+import silkvis.media.ProviderStatus;
 import silkvis.media.MediaTimeline;
 import silkvis.render.VanillaPainter;
 import silkvis.ui.Color;
@@ -59,9 +60,15 @@ public final class HudOverlayRenderer {
                 client.currentScreen != null,
                 client.player.isSpectator());
 
+        // Two switches can turn the music widget on: the HUD editor and the Music tab.
+        // The Music tab flag was written to the config and read by nobody until 0.1.13.
+        boolean nowPlayingOnHud = runtime.global().media().enabled()
+                && runtime.global().media().hudWidgetEnabled();
         List<HudWidgetConfig> enabled = new ArrayList<>();
         for (HudWidgetConfig cfg : layout.byId().values()) {
-            if (cfg.enabled() && cfg.id().p1() && cfg.visibility().permits(visibility)) {
+            boolean on = cfg.enabled()
+                    || (cfg.id() == HudWidgetId.NOW_PLAYING && nowPlayingOnHud);
+            if (on && cfg.id().p1() && cfg.visibility().permits(visibility)) {
                 enabled.add(cfg);
             }
         }
@@ -77,6 +84,10 @@ public final class HudOverlayRenderer {
             List<String> lines = model.lines(cfg.id());
             if (cfg.id() == HudWidgetId.NOW_PLAYING) {
                 renderNowPlaying(painter, theme, screen, safe, cfg, runtime, occupied);
+                continue;
+            }
+            if (cfg.id() == HudWidgetId.ARMOR) {
+                renderArmor(painter, context, theme, screen, safe, cfg, runtime, occupied);
                 continue;
             }
             if (cfg.id() == HudWidgetId.MINIMAP) {
@@ -179,19 +190,149 @@ public final class HudOverlayRenderer {
         return null;
     }
 
+    private static final int ARMOR_ICON = 16;
+    private static final int ARMOR_ROW = 20;
+    /** Cleared after the first failure so an unsupported drawItem cannot spam the log. */
+    private static boolean itemIconsSupported = true;
+
+    /**
+     * Armor as inventory icons (owner request, 2026-11-12): the piece itself, not the words
+     * "алмазный нагрудник". Each row is a 16x16 item icon, a durability bar and the numbers;
+     * enchantments follow the durability in the secondary colour.
+     *
+     * <p>Typed API risk is contained: {@code DrawContext#drawItem(ItemStack, int, int)}
+     * exists in 1.21.10 yarn, and a failure falls back to a bordered plate of the same size
+     * with the row text intact — never to an exception in the render loop.</p>
+     */
+    private static void renderArmor(VanillaPainter painter, DrawContext context, ThemeTokens theme,
+                                    Rect screen, Rect safe, HudWidgetConfig cfg, SilkVisRuntime runtime,
+                                    List<Rect> occupied) {
+        HudDataCollector collector = SilkVisClient.collector();
+        ArmorSnapshot snapshot = collector == null ? ArmorSnapshot.EMPTY : collector.armorSnapshot();
+        if (snapshot.slots().isEmpty()) {
+            return;
+        }
+        int textWidth = 0;
+        for (ArmorSnapshot.Slot slot : snapshot.slots()) {
+            int row = painter.textWidth(slot.durability());
+            if (!slot.enchantments().isEmpty()) {
+                row += 6 + painter.textWidth(slot.enchantments());
+            }
+            textWidth = Math.max(textWidth, row);
+        }
+        int width = 4 + ARMOR_ICON + 5 + textWidth + 5;
+        int height = snapshot.slots().size() * ARMOR_ROW + 4;
+        Rect box = clampToSafe(HudLayoutEngine.resolve(screen, safe, cfg, width, height), safe);
+        box = clampToSafe(avoidOverlap(box, occupied, screen), safe);
+        occupied.add(box);
+        painter.roundRect(box, theme.radiusControl(),
+                Color.argb(theme.surface().withAlpha(theme.surface().alpha() * 0.55f * cfg.alpha())));
+        int y = box.y() + 3;
+        for (ArmorSnapshot.Slot slot : snapshot.slots()) {
+            Rect icon = new Rect(box.x() + 4, y, ARMOR_ICON, ARMOR_ICON);
+            drawItemIcon(context, painter, theme, icon, slot, runtime);
+            if (slot.hasDurability()) {
+                int barWidth = ARMOR_ICON - 2;
+                painter.fill(new Rect(icon.x() + 1, icon.bottom() - 2, barWidth, 2),
+                        Color.argb(theme.surfaceHover()));
+                int filled = Math.round(barWidth * Math.max(0f, Math.min(1f, slot.durabilityRatio())));
+                if (filled > 0) {
+                    painter.fill(new Rect(icon.x() + 1, icon.bottom() - 2, filled, 2),
+                            Color.argb(durabilityColor(theme, slot.durabilityRatio())));
+                }
+            }
+            int textX = icon.right() + 5;
+            int textY = icon.y() + (ARMOR_ICON - painter.lineHeight()) / 2;
+            int durabilityWidth = painter.text(slot.durability(), textX, textY,
+                    Color.argb(slot.hasDurability()
+                            ? durabilityColor(theme, slot.durabilityRatio())
+                            : theme.textSecondary()), true);
+            if (!slot.enchantments().isEmpty()) {
+                painter.text(slot.enchantments(), textX + durabilityWidth + 6, textY,
+                        Color.argb(theme.textSecondary()), true);
+            }
+            y += ARMOR_ROW;
+        }
+    }
+
+    /** Durability colour: green, amber, red. Same thresholds the vanilla bar implies. */
+    private static int durabilityColor(ThemeTokens theme, float ratio) {
+        if (ratio <= 0.15f) {
+            return theme.error();
+        }
+        return ratio <= 0.5f ? theme.warning() : theme.success();
+    }
+
+    private static void drawItemIcon(DrawContext context, VanillaPainter painter, ThemeTokens theme,
+                                     Rect area, ArmorSnapshot.Slot slot, SilkVisRuntime runtime) {
+        if (context != null && itemIconsSupported) {
+            try {
+                context.drawItem(slot.stack(), area.x(), area.y());
+                return;
+            } catch (RuntimeException | LinkageError e) {
+                itemIconsSupported = false;
+                runtime.log().log("ARMOR_ICON_UNSUPPORTED", e.getClass().getSimpleName());
+            }
+        }
+        painter.fill(area, Color.argb(theme.surfaceHover()));
+        painter.outline(area, Color.argb(slot.hasDurability()
+                ? durabilityColor(theme, slot.durabilityRatio()) : theme.border()), 1);
+    }
+
+    /**
+     * One line explaining the media state on the HUD. Shown only when the user enabled
+     * music: a mod that is off by default must not nag about a feature nobody asked for.
+     */
+    private static void renderMediaHint(VanillaPainter painter, ThemeTokens theme, Rect screen, Rect safe,
+                                        HudWidgetConfig cfg, SilkVisRuntime runtime, List<Rect> occupied) {
+        if (!runtime.global().media().enabled()) {
+            return;
+        }
+        String text = runtime.localizer().get("silkvis.media.hud.status", runtime.mediaStatusLine());
+        int width = Math.min(260, Math.max(120, painter.textWidth(text) + 10));
+        Rect box = clampToSafe(HudLayoutEngine.resolve(screen, safe, cfg, width, 16), safe);
+        box = clampToSafe(avoidOverlap(box, occupied, screen), safe);
+        occupied.add(box);
+        painter.roundRect(box, theme.radiusControl(),
+                Color.argb(theme.surface().withAlpha(theme.surface().alpha() * 0.55f * cfg.alpha())));
+        painter.text(ellipsize(painter, text, width - 8), box.x() + 4,
+                box.centerY() - painter.lineHeight() / 2, Color.argb(theme.textSecondary()), false);
+    }
+
+    private static Rect clampToSafe(Rect box, Rect safe) {
+        int y = box.y();
+        if (y < safe.y()) {
+            y = safe.y();
+        }
+        if (y + box.height() > safe.bottom()) {
+            y = Math.max(safe.y(), safe.bottom() - box.height());
+        }
+        return new Rect(box.x(), y, box.width(), box.height());
+    }
+
     private static void renderNowPlaying(VanillaPainter painter, ThemeTokens theme, Rect screen, Rect safe,
                                          HudWidgetConfig cfg, SilkVisRuntime runtime, List<Rect> occupied) {
         Optional<MediaService> serviceOpt = runtime.mediaService();
         if (serviceOpt.isEmpty()) {
             controlRects = null;
+            // "Music does nothing" was the whole in-game experience when the bridge was
+            // refused: say why on the HUD instead of staying silent.
+            renderMediaHint(painter, theme, screen, safe, cfg, runtime, occupied);
             return;
         }
         MediaService service = serviceOpt.get();
         Optional<MediaSnapshot> snapshotOpt = service.snapshot();
         if (snapshotOpt.isEmpty()) {
             // Nothing playing: draw nothing at all. An empty frame with a title placeholder
-            // is worse than an absent widget (MEDIA-14).
+            // is worse than an absent widget (MEDIA-14) — unless the provider itself failed,
+            // which the user needs to see.
             controlRects = null;
+            // Only a refusal is worth a line on the HUD. NO_SESSION means "nothing is
+            // playing", which must stay silent (MEDIA-14), and STARTING lasts a moment.
+            ProviderStatus status = service.status();
+            if (status == ProviderStatus.ERROR || status == ProviderStatus.UNSUPPORTED) {
+                renderMediaHint(painter, theme, screen, safe, cfg, runtime, occupied);
+            }
             return;
         }
         MediaSnapshot snapshot = snapshotOpt.get();

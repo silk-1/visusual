@@ -95,7 +95,10 @@ public final class SilkVisClient implements ClientModInitializer {
     private void startMedia(SilkVisRuntime runtime) {
         Path helperDir = FabricLoader.getInstance().getGameDir()
                 .resolve("silkvis-data").resolve("native").resolve("media-helper-1");
-        runtime.startMediaIfEnabled(() -> {
+        // Registered, not started: the bridge is built the moment music is switched on in
+        // the Music tab, not only at launch when the flag was still off (the reason "музыка
+        // не робит" existed at all).
+        runtime.setMediaFactory(() -> {
             MediaHelperLauncher exe = new ExeHelperLauncher(MediaHelperBinary.system(helperDir));
             if (exe.verify() == null) {
                 return new WindowsMediaProvider(exe, runtime.clock());
@@ -107,6 +110,7 @@ public final class SilkVisClient implements ClientModInitializer {
             }
             throw new IllegalStateException(problem);
         });
+        runtime.startMediaIfEnabled();
     }
 
     private void onClientTick(MinecraftClient client) {
