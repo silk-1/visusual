@@ -14,6 +14,7 @@ import silkvis.core.ModuleDescriptor;
 import silkvis.core.ModuleRegistry;
 import silkvis.map.MapSettings;
 import silkvis.render.VanillaPainter;
+import silkvis.ui.Animation;
 import silkvis.ui.Color;
 import silkvis.ui.FocusManager;
 import silkvis.ui.Insets;
@@ -61,6 +62,8 @@ public final class SilkVisScreen extends Screen {
     private final List<Widget> settingsWidgets = new ArrayList<>();
     private final List<ButtonWidget> navButtons = new ArrayList<>();
 
+    /** Fade-in of the backdrop only: panels appearing from zero look like a glitch. */
+    private final long openedAtNanos = System.nanoTime();
     private MainScreenLayout layout;
     private TextInputWidget search;
     private int hoveredRow = -1;
@@ -305,7 +308,9 @@ public final class SilkVisScreen extends Screen {
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
         Painter painter = new VanillaPainter(context);
         ThemeTokens theme = runtime.theme();
-        painter.fill(new Rect(0, 0, width, height), Color.argb(theme.background().withAlpha(0.55f)));
+        float open = Animation.progress(openedAtNanos, theme.motionMs());
+        painter.fill(new Rect(0, 0, width, height),
+                theme.background().withAlpha(0.55f * open).argb());
         Rect window = layout.window();
         // Depth without blur: three expanding translucent layers behind the window (UI-08
         // allows a bounded number of passes, not a per-panel effect).

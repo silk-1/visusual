@@ -1,5 +1,6 @@
 package silkvis.ui.widget;
 
+import silkvis.ui.Animation;
 import silkvis.ui.Color;
 import silkvis.ui.Painter;
 import silkvis.ui.Rect;
@@ -12,6 +13,8 @@ public final class ToggleWidget extends Widget {
     private boolean value;
     private final BooleanConsumer onChange;
     private boolean hovered;
+    private final Animation.Fade switchFade = new Animation.Fade();
+    private final Animation.Fade hoverFade = new Animation.Fade();
 
     public ToggleWidget(Rect bounds, String label, String descriptionKey, boolean initial, BooleanConsumer onChange) {
         super(bounds);
@@ -48,20 +51,26 @@ public final class ToggleWidget extends Widget {
         if (focused) {
             painter.roundRect(track.inset(-2, -2), toggleHeight / 2 + 2, Color.argb(theme.accent()));
         }
-        // Row highlight, then the label, so the text stays readable.
-        if (hovered) {
+        // Row highlight fades in over the theme's motion duration (UI-07); a hard toggle on
+        // hover reads as a click.
+        float hover = hoverFade.update(hovered, theme.motionMs());
+        float state = switchFade.update(value, theme.motionMs());
+        if (hover > 0.01f) {
             painter.roundRect(bounds, theme.radiusControl(),
-                    Color.argb(theme.surfaceHover().withAlpha(0.18f)));
+                    theme.surfaceHover().withAlpha(0.18f * hover).argb());
         }
         painter.text(label, bounds.x(), bounds.centerY() - painter.lineHeight() / 2,
                 Color.argb(enabled ? theme.textPrimary() : theme.textSecondary()), false);
         // Pill switch: radius is half the height, which reads as a switch, not a checkbox.
-        painter.roundPanel(track, toggleHeight / 2,
-                Color.argb(!enabled ? theme.surface()
-                        : value ? theme.accent().withAlpha(0.85f) : theme.surfaceHover()),
-                Color.argb(theme.border()));
+        int trackFill = !enabled ? theme.surface().argb()
+                : Animation.mix(theme.surfaceHover().argb(),
+                        theme.accent().withAlpha(0.85f).argb(), state);
+        painter.roundPanel(track, toggleHeight / 2, trackFill, Color.argb(theme.border()));
+        // The knob slides with the same curve as the track colour, so they never disagree.
         int knobSize = toggleHeight - 6;
-        int knobX = value ? track.right() - knobSize - 4 : track.x() + 4;
+        int leftX = track.x() + 4;
+        int rightX = track.right() - knobSize - 4;
+        int knobX = Math.round(leftX + (rightX - leftX) * state);
         Rect knob = new Rect(knobX, track.centerY() - knobSize / 2, knobSize, knobSize);
         painter.roundRect(knob, knobSize / 2,
                 Color.argb(enabled ? theme.textPrimary() : theme.textSecondary()));

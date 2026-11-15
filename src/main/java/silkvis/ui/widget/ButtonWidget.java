@@ -1,5 +1,6 @@
 package silkvis.ui.widget;
 
+import silkvis.ui.Animation;
 import silkvis.ui.Color;
 import silkvis.ui.Painter;
 import silkvis.ui.Rect;
@@ -18,6 +19,7 @@ public final class ButtonWidget extends Widget {
     private Style style = Style.SECONDARY;
     private boolean pressed;
     private boolean hovered;
+    private final Animation.Fade hoverFade = new Animation.Fade();
 
     public ButtonWidget(Rect bounds, String label, Runnable action) {
         super(bounds);
@@ -39,10 +41,18 @@ public final class ButtonWidget extends Widget {
         if (!visible) {
             return;
         }
-        Color fill = !enabled ? theme.surface().withAlpha(theme.surface().alpha() * 0.6f)
-                : hovered ? theme.surfaceHover()
-                : style == Style.PRIMARY ? theme.accent().withAlpha(0.22f)
-                : theme.surface();
+        // Hover is a 140 ms fade, not a jump (UI-07). The reduced-motion theme reports
+        // motionMs() == 0, which makes the same call snap to the target.
+        float hover = hoverFade.update(hovered, theme.motionMs());
+        int fillArgb;
+        if (!enabled) {
+            fillArgb = theme.surface().withAlpha(theme.surface().alpha() * 0.6f).argb();
+        } else if (style == Style.PRIMARY) {
+            fillArgb = Animation.mix(theme.accent().withAlpha(0.18f).argb(),
+                    theme.accent().withAlpha(0.30f).argb(), hover);
+        } else {
+            fillArgb = Animation.mix(theme.surface().argb(), theme.surfaceHover().argb(), hover);
+        }
         // Border and fill are two rounded shapes (UI-02 radius). The fill is inset by one
         // unit so the border stays a ring; drawing both on the same rect made a translucent
         // PRIMARY fill sit on top of an opaque accent border, i.e. a solid accent plate.
@@ -51,7 +61,7 @@ public final class ButtonWidget extends Widget {
         int outerRadius = focused ? radius + 1 : radius;
         painter.roundRect(outer, outerRadius,
                 Color.argb(style == Style.PRIMARY || focused ? theme.accent() : theme.border()));
-        painter.roundRect(outer.inset(1, 1), Math.max(0, outerRadius - 1), Color.argb(fill));
+        painter.roundRect(outer.inset(1, 1), Math.max(0, outerRadius - 1), fillArgb);
         int textColor = Color.argb(!enabled ? theme.textSecondary()
                 : style == Style.DANGER ? theme.error() : theme.textPrimary());
         int width = painter.textWidth(label);
