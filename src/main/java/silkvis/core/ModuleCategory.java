@@ -7,6 +7,8 @@ public enum ModuleCategory {
     MAP("map"),
     MUSIC("music"),
     THEME("theme"),
+    /** Custom totem texture (ASSET-04): the only asset override this build ships. */
+    TOTEMS("totems"),
     INTEGRATIONS("integrations"),
     SETTINGS("settings"),
     AUTOMATION_P2("automation");

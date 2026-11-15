@@ -245,5 +245,20 @@
   "silkvis.media.playback.playing": "playing",
   "silkvis.media.playback.paused": "paused",
   "silkvis.media.playback.stopped": "stopped",
-  "silkvis.hud.editor.reset": "Reset"
+  "silkvis.hud.editor.reset": "Reset",
+  "silkvis.tab.totems": "Totems",
+  "silkvis.totems.hint": "Drop a picture (PNG or JPG) into the folder below and click its name: SilkVis builds a resource pack with your totem of undying.",
+  "silkvis.totems.folder": "Picture folder",
+  "silkvis.totems.empty": "No pictures in the folder yet.",
+  "silkvis.totems.refresh": "Refresh list",
+  "silkvis.totems.enable": "After building, enable the «silkvis-totem» pack in Options → Resource Packs; no restart is needed; if the pack is already enabled, press F3+T to reload textures.",
+  "silkvis.totems.status.none": "Nothing built yet",
+  "silkvis.totems.status.busy": "Building the pack…",
+  "silkvis.totems.status.ok": "Done: %s. Enable «silkvis-totem» in Resource Packs; if it is already on, press F3+T.",
+  "silkvis.totems.status.failed": "Failed: %s",
+  "silkvis.totems.reason.file_missing": "file not found",
+  "silkvis.totems.reason.file_too_large": "file is larger than 4 MB",
+  "silkvis.totems.reason.image_unreadable": "not a readable picture (PNG or JPG expected)",
+  "silkvis.totems.reason.image_too_large": "picture is larger than 4096 px per side",
+  "silkvis.totems.reason.write_failed": "could not write the resource pack"
 }

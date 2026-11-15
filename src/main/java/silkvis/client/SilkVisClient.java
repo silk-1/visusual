@@ -61,6 +61,12 @@ public final class SilkVisClient implements ClientModInitializer {
         }
         runtime.applyExternalMapPolicy(externalMap);
 
+        // Totem pack paths: the source folder players drop pictures into, and the instance
+        // resourcepacks folder the generated pack goes to.
+        Path gameDir = FabricLoader.getInstance().getGameDir();
+        runtime.setTotemPaths(gameDir.resolve("silkvis-data").resolve("totems"),
+                gameDir.resolve("resourcepacks"));
+
         runtime.integrations().probe("sodium", () -> FabricLoader.getInstance().isModLoaded("sodium"));
         runtime.integrations().probe("iris", () -> FabricLoader.getInstance().isModLoaded("iris"));
         runtime.integrations().probe("baritone", () -> FabricLoader.getInstance().isModLoaded("baritone"));

@@ -1,5 +1,7 @@
 package silkvis.verify;
 
+import silkvis.assets.TotemLibrary;
+import silkvis.assets.TotemPackBuilder;
 import silkvis.config.ConfigException;
 import silkvis.config.Debouncer;
 import silkvis.config.GlobalConfig;
@@ -26,6 +28,21 @@ import static silkvis.verify.SelfCheck.expectThrows;
 
 final class CoreChecks {
     private CoreChecks() {
+    }
+
+    /** Temp folders in the self checks must not pile up in %TEMP%. */
+    private static void deleteTree(Path root) {
+        try (java.util.stream.Stream<Path> walk = Files.walk(root)) {
+            walk.sorted(java.util.Comparator.reverseOrder()).forEach(path -> {
+                try {
+                    Files.deleteIfExists(path);
+                } catch (java.io.IOException ignored) {
+                    // Best effort only.
+                }
+            });
+        } catch (java.io.IOException ignored) {
+            // Best effort only.
+        }
     }
 
     static void run() {
@@ -173,6 +190,73 @@ final class CoreChecks {
                             .put("widgets", JsonValue.newArray().add(
                                     JsonValue.newObject().put("id", "NOPE").put("anchor", "TOP_LEFT")))),
                     "unknown id still rejected");
+        });
+
+        check("nine navigation tabs stay inside the panel", () -> {
+            int tabs = silkvis.ui.MainScreenModel.p1Tabs().size();
+            assertEquals(9, tabs, "tab count");
+            for (int[] screen : new int[][]{{480, 270}, {640, 360}, {960, 620}}) {
+                silkvis.ui.MainScreenLayout layout =
+                        silkvis.ui.MainScreenLayout.compute(screen[0], screen[1]);
+                silkvis.ui.Rect nav = layout.navigation();
+                int[] rows = silkvis.ui.MainScreenLayout.navRows(nav, tabs);
+                int bottom = 4 + rows[1] * (tabs - 1) + rows[0];
+                assertTrue(bottom <= Math.max(rows[0], nav.height()),
+                        "fits " + screen[0] + "x" + screen[1] + ": " + bottom + " <= " + nav.height());
+                assertTrue(rows[0] >= 12, "rows remain clickable: " + rows[0]);
+            }
+        });
+
+        check("totem builder writes a 16x16 texture and a loadable pack", () -> {
+            Path dir = Files.createTempDirectory("silkvis-totem");
+            try {
+                Path source = dir.resolve("source.png");
+                java.awt.image.BufferedImage image =
+                        new java.awt.image.BufferedImage(32, 32, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+                javax.imageio.ImageIO.write(image, "png", source.toFile());
+                Path packs = dir.resolve("resourcepacks");
+                TotemPackBuilder.Result result = TotemPackBuilder.apply(source, packs);
+                assertTrue(result.ok(), "pack built: " + result.reason());
+                Path texture = packs.resolve(TotemPackBuilder.PACK_DIR_NAME)
+                        .resolve(TotemPackBuilder.TEXTURE_PATH);
+                assertTrue(Files.isRegularFile(texture), "texture written");
+                java.awt.image.BufferedImage decoded = javax.imageio.ImageIO.read(texture.toFile());
+                assertEquals(16, decoded.getWidth(), "texture width");
+                assertEquals(16, decoded.getHeight(), "texture height");
+                String meta = Files.readString(packs.resolve(TotemPackBuilder.PACK_DIR_NAME)
+                        .resolve("pack.mcmeta"), StandardCharsets.UTF_8);
+                assertTrue(meta.contains("supported_formats"), "format range keeps it loadable");
+
+                Path junk = dir.resolve("junk.png");
+                Files.write(junk, new byte[]{1, 2, 3, 4, 5, 6, 7, 8});
+                assertEquals("image_unreadable", TotemPackBuilder.apply(junk, packs).reason(),
+                        "garbage rejected");
+                assertEquals("file_missing",
+                        TotemPackBuilder.apply(dir.resolve("absent.png"), packs).reason(),
+                        "missing file rejected");
+            } finally {
+                deleteTree(dir);
+            }
+        });
+
+        check("totem library lists images, skips junk, caps the list", () -> {
+            Path dir = Files.createTempDirectory("silkvis-totem-lib");
+            try {
+                Files.write(dir.resolve("a.png"), new byte[]{1});
+                Files.write(dir.resolve("b.JPG"), new byte[]{1});
+                Files.write(dir.resolve("notes.txt"), new byte[]{1});
+                Files.createDirectories(dir.resolve("folder.png"));
+                for (int i = 0; i < TotemLibrary.MAX_ENTRIES + 3; i++) {
+                    Files.write(dir.resolve("extra" + i + ".png"), new byte[]{1});
+                }
+                java.util.List<TotemLibrary.Entry> entries = TotemLibrary.scan(dir);
+                assertEquals(TotemLibrary.MAX_ENTRIES, entries.size(), "capped");
+                assertTrue(entries.stream().noneMatch(e -> e.name().endsWith(".txt")),
+                        "text file skipped");
+                assertEquals("a", entries.get(0).displayName(), "sorted, name without extension");
+            } finally {
+                deleteTree(dir);
+            }
         });
 
         check("debouncer coalesces edits and flushes once", () -> {

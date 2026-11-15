@@ -38,6 +38,19 @@ public record MainScreenLayout(
     public static final int HEADER_HEIGHT = 32;
     public static final int FOOTER_HEIGHT = 32;
 
+    /**
+     * Row geometry for the navigation list, so a growing tab count never pushes buttons out
+     * of the window: index 0 is the row height, index 1 the vertical stride. On a 1080p
+     * screen at GUI scale 4 nine tabs used to end below the panel; a guessed 28 px stride
+     * was the bug, not the tab count.
+     */
+    public static int[] navRows(Rect navigation, int count) {
+        int available = Math.max(0, navigation.height() - 8);
+        int stride = Math.max(14, Math.min(28, available / Math.max(1, count)));
+        int rowHeight = Math.max(12, Math.min(24, stride - 2));
+        return new int[]{rowHeight, stride};
+    }
+
     public static MainScreenLayout compute(int screenWidth, int screenHeight) {
         int margin = SAFE_MARGIN;
         int width = Math.min(MAX_WIDTH, Math.max(0, screenWidth - margin * 2));

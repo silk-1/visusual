@@ -25,8 +25,8 @@ public final class MainScreenModel {
 
     public static List<ModuleCategory> p1Tabs() {
         return List.of(ModuleCategory.VISUAL, ModuleCategory.HUD, ModuleCategory.MAP,
-                ModuleCategory.MUSIC, ModuleCategory.THEME, ModuleCategory.INTEGRATIONS,
-                ModuleCategory.SETTINGS, ModuleCategory.AUTOMATION_P2);
+                ModuleCategory.MUSIC, ModuleCategory.THEME, ModuleCategory.TOTEMS,
+                ModuleCategory.INTEGRATIONS, ModuleCategory.SETTINGS, ModuleCategory.AUTOMATION_P2);
     }
 
     public ModuleCategory selectedCategory() {
