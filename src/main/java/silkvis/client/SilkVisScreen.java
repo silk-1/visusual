@@ -8,6 +8,7 @@ import net.minecraft.client.input.CharInput;
 import net.minecraft.client.input.KeyInput;
 import net.minecraft.text.Text;
 import silkvis.assets.TotemDownloader;
+import silkvis.assets.TotemLibrary;
 import silkvis.config.GlobalConfig;
 import silkvis.config.VisualPreset;
 import silkvis.core.ModuleCategory;
