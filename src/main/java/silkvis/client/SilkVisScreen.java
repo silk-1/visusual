@@ -315,7 +315,7 @@ public final class SilkVisScreen extends Screen {
         }
         Rect footer = layout.footer();
         painter.roundPanel(footer, theme.radiusControl() + 2,
-                Color.argb(theme.surface().withAlpha(0.45f)), Color.argb(theme.border().withAlpha(0.5f)));
+                Color.argb(theme.surface().withAlpha(0.45f)), Color.argb(theme.border()));
         painter.text(tr("silkvis.footer.hint"), footer.x() + 6,
                 footer.centerY() - painter.lineHeight() / 2, Color.argb(theme.textSecondary()), false);
 
@@ -336,7 +336,7 @@ public final class SilkVisScreen extends Screen {
         // Card, not a slab: the window already has its own radius.
         painter.roundPanel(nav, theme.radiusPanel(),
                 Color.argb(theme.surface().withAlpha(0.55f)),
-                Color.argb(theme.border().withAlpha(0.45f)));
+                Color.argb(theme.border()));
         Rect window = layout.window();
         painter.text(tr("silkvis.screen.title"), nav.x() + 2, window.y() + 10,
                 Color.argb(theme.accent()), true);
@@ -371,7 +371,7 @@ public final class SilkVisScreen extends Screen {
             return;
         }
         painter.roundPanel(list, theme.radiusPanel(), Color.argb(theme.surface().withAlpha(0.35f)),
-                Color.argb(theme.border().withAlpha(0.35f)));
+                Color.argb(theme.border().multiplyAlpha(0.6f)));
         List<ModuleDescriptor> modules = runtime.screenModel().visibleModules(localizer());
         int rowY = list.y() + 4 - listScroll.offset();
         hoveredRow = -1;
@@ -413,7 +413,7 @@ public final class SilkVisScreen extends Screen {
             return;
         }
         painter.roundPanel(area, theme.radiusPanel(), Color.argb(theme.surface().withAlpha(0.55f)),
-                Color.argb(theme.border().withAlpha(0.45f)));
+                Color.argb(theme.border()));
         ModuleCategory category = runtime.screenModel().selectedCategory();
         String title = tr(category.langKey());
         painter.text(title, area.x() + 10, area.y() + 8, Color.argb(theme.textPrimary()), true);
@@ -429,7 +429,7 @@ public final class SilkVisScreen extends Screen {
         painter.fill(new Rect(area.x() + 10, area.y() + 32, Math.min(28, painter.textWidth(title)), 2),
                 Color.argb(theme.accent().withAlpha(0.8f)));
         painter.fill(new Rect(area.x() + 10, area.y() + 36, area.width() - 20, 1),
-                Color.argb(theme.border().withAlpha(0.7f)));
+                Color.argb(theme.border()));
         painter.pushClip(area.inset(0, 38, 0, 0));
         for (Widget widget : settingsWidgets) {
             widget.render(painter, theme);

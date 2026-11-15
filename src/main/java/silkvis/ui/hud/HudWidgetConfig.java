@@ -34,11 +34,11 @@ public record HudWidgetConfig(
         return switch (id) {
             case COORDINATES -> new HudWidgetConfig(id, true, Anchor.TOP_LEFT, 6, 6, 1f, 0.95f, 10,
                     VisibilityPolicy.defaults());
-            case FPS -> new HudWidgetConfig(id, true, Anchor.TOP_LEFT, 6, 24, 1f, 0.95f, 9,
+            case FPS -> new HudWidgetConfig(id, true, Anchor.TOP_LEFT, 6, 34, 1f, 0.95f, 9,
                     VisibilityPolicy.defaults());
-            case DIRECTION -> new HudWidgetConfig(id, false, Anchor.TOP_LEFT, 6, 42, 1f, 0.95f, 8,
+            case DIRECTION -> new HudWidgetConfig(id, false, Anchor.TOP_LEFT, 6, 52, 1f, 0.95f, 8,
                     VisibilityPolicy.defaults());
-            case BIOME -> new HudWidgetConfig(id, false, Anchor.TOP_LEFT, 6, 60, 1f, 0.95f, 7,
+            case BIOME -> new HudWidgetConfig(id, false, Anchor.TOP_LEFT, 6, 70, 1f, 0.95f, 7,
                     VisibilityPolicy.defaults());
             case WORLD_TIME -> new HudWidgetConfig(id, false, Anchor.TOP_RIGHT, 6, 6, 1f, 0.95f, 7,
                     VisibilityPolicy.defaults());
@@ -48,7 +48,7 @@ public record HudWidgetConfig(
                     VisibilityPolicy.defaults());
             case ACTIVE_TOOL -> new HudWidgetConfig(id, false, Anchor.BOTTOM_RIGHT, 6, 60, 1f, 0.95f, 9,
                     VisibilityPolicy.defaults());
-            case MINIMAP -> new HudWidgetConfig(id, true, Anchor.TOP_RIGHT, 6, 60, 1f, 0.9f, 20,
+            case MINIMAP -> new HudWidgetConfig(id, true, Anchor.TOP_RIGHT, 6, 90, 1f, 0.9f, 20,
                     VisibilityPolicy.defaults());
             case NOW_PLAYING -> new HudWidgetConfig(id, true, Anchor.BOTTOM_RIGHT, 6, 6, 1f, 0.95f, 21,
                     VisibilityPolicy.defaults());
