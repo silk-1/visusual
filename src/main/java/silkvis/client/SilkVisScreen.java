@@ -7,6 +7,7 @@ import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.input.CharInput;
 import net.minecraft.client.input.KeyInput;
 import net.minecraft.text.Text;
+import silkvis.assets.TotemDownloader;
 import silkvis.config.GlobalConfig;
 import silkvis.config.VisualPreset;
 import silkvis.core.ModuleCategory;
@@ -71,6 +72,9 @@ public final class SilkVisScreen extends Screen {
     private final long openedAtNanos = System.nanoTime();
     private MainScreenLayout layout;
     private TextInputWidget search;
+    /** Link field of the Totems tab; kept across rebuilds so typing survives a scroll tick. */
+    private TextInputModel totemUrlModel;
+    private long totemVersionSeen;
     private int hoveredRow = -1;
 
     public SilkVisScreen() {
@@ -95,6 +99,15 @@ public final class SilkVisScreen extends Screen {
         chrome.clear();
         navButtons.clear();
         settingsWidgets.clear();
+        // A link that is obviously wrong (ftp:, a bare word) is marked while typing; the
+        // empty field stays valid so Enter does nothing instead of shouting at the player.
+        // init() also runs on a window resize, so an existing field keeps what was typed.
+        if (totemUrlModel == null) {
+            totemUrlModel = new TextInputModel(runtime.totemUrlDraft(),
+                    TotemDownloader.MAX_URL_LENGTH,
+                    value -> value.isBlank() || TotemDownloader.validate(value) == null);
+        }
+        totemVersionSeen = runtime.totemVersion();
 
         List<ModuleCategory> tabs = MainScreenModel.p1Tabs();
         Rect nav = layout.navigation();
@@ -346,6 +359,26 @@ public final class SilkVisScreen extends Screen {
                 settingsWidgets.add(new DynamicTextWidget(new Rect(area.x(), y, width, 12),
                         this::totemFolderText));
                 y += 18;
+                // Add by link (player request): a text field rather than a second folder, and
+                // the same picture pipeline behind it — download, then the pack builder.
+                settingsWidgets.add(new FixedText(tr("silkvis.totems.url.label"),
+                        new Rect(area.x(), y, width, 12)));
+                y += 14;
+                settingsWidgets.add(new TextInputWidget(
+                        new Rect(area.x(), y, Math.min(width, 320), ROW_HEIGHT),
+                        totemUrlModel, tr("silkvis.totems.url.hint"), runtime::downloadTotem));
+                y += ROW_HEIGHT + 4;
+                settingsWidgets.add(new ButtonWidget(
+                        new Rect(area.x(), y, Math.min(width, 220), ROW_HEIGHT),
+                        tr("silkvis.totems.url.add"),
+                        () -> runtime.downloadTotem(totemUrlModel.text())));
+                y += ROW_HEIGHT + 4;
+                settingsWidgets.add(new FixedText(tr("silkvis.totems.url.note"),
+                        new Rect(area.x(), y, width, 22)));
+                y += 26;
+                settingsWidgets.add(new FixedText(tr("silkvis.totems.list.label"),
+                        new Rect(area.x(), y, width, 12)));
+                y += 14;
                 List<TotemLibrary.Entry> entries = runtime.totemEntries();
                 if (entries.isEmpty()) {
                     settingsWidgets.add(new FixedText(tr("silkvis.totems.empty"),
@@ -569,6 +602,13 @@ public final class SilkVisScreen extends Screen {
 
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+        // A download finishes on the IO thread; the open tab must show the new file without
+        // asking the player to reopen it. Rebuilding before any widget is touched keeps the
+        // list consistent for this frame.
+        if (totemVersionSeen != runtime.totemVersion()) {
+            totemVersionSeen = runtime.totemVersion();
+            rebuildSettings();
+        }
         Painter painter = new VanillaPainter(context);
         ThemeTokens theme = runtime.theme();
         float open = Animation.progress(openedAtNanos, theme.motionMs());
@@ -894,6 +934,18 @@ public final class SilkVisScreen extends Screen {
             return focus.tab((modifiers & Keys.MOD_SHIFT) != 0);
         }
         Widget focused = focus.focused();
+        if (focused instanceof TextInputWidget target && (modifiers & Keys.MOD_CONTROL) != 0
+                && keyCode == Keys.V) {
+            // The custom text model has no clipboard of its own; paste is wired here because
+            // only the screen can reach the client clipboard. Retyping a long link by hand
+            // was the obvious way to make "add by URL" useless.
+            String clip = MinecraftClient.getInstance().keyboard.getClipboard();
+            String clean = clip == null ? "" : clip.replaceAll("\\s+", "");
+            if (!clean.isEmpty()) {
+                target.model().insert(clean);
+                return true;
+            }
+        }
         if (focused != null && focused.keyPressed(keyCode, modifiers)) {
             return true;
         }

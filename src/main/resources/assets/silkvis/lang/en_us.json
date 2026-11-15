@@ -260,5 +260,15 @@
   "silkvis.totems.reason.file_too_large": "file is larger than 4 MB",
   "silkvis.totems.reason.image_unreadable": "not a readable picture (PNG or JPG expected)",
   "silkvis.totems.reason.image_too_large": "picture is larger than 4096 px per side",
-  "silkvis.totems.reason.write_failed": "could not write the resource pack"
+  "silkvis.totems.reason.write_failed": "could not write the resource pack",
+  "silkvis.tab.totems.hint": "Your own totem of undying from a picture: a folder, a file or a link.",
+  "silkvis.totems.url.label": "Add by link",
+  "silkvis.totems.url.hint": "https://… direct link to a picture",
+  "silkvis.totems.url.add": "Download and apply",
+  "silkvis.totems.url.note": "It is saved into the folder above, where you can delete or replace it any time.",
+  "silkvis.totems.list.label": "Pictures in the folder",
+  "silkvis.totems.status.downloading": "Downloading the picture…",
+  "silkvis.totems.reason.url_invalid": "that link will not do: an http:// or https:// address is required",
+  "silkvis.totems.reason.download_failed": "download failed: the server did not answer or the link is broken",
+  "silkvis.totems.reason.folder_full": "the folder already holds 8 pictures — remove some"
 }

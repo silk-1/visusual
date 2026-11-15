@@ -1,5 +1,6 @@
 package silkvis.verify;
 
+import silkvis.assets.TotemDownloader;
 import silkvis.assets.TotemLibrary;
 import silkvis.assets.TotemPackBuilder;
 import silkvis.config.ConfigException;
@@ -190,6 +191,74 @@ final class CoreChecks {
                             .put("widgets", JsonValue.newArray().add(
                                     JsonValue.newObject().put("id", "NOPE").put("anchor", "TOP_LEFT")))),
                     "unknown id still rejected");
+        });
+
+        check("totem link rules reject anything but http(s)", () -> {
+            assertEquals(null, TotemDownloader.validate("https://example.com/a.png"), "https accepted");
+            assertEquals(null, TotemDownloader.validate("http://example.com/a.png"), "http accepted");
+            assertEquals("url_invalid", TotemDownloader.validate(null), "null rejected");
+            assertEquals("url_invalid", TotemDownloader.validate("   "), "blank rejected");
+            assertEquals("url_invalid", TotemDownloader.validate("ftp://example.com/a.png"), "ftp rejected");
+            assertEquals("url_invalid", TotemDownloader.validate("file:///C:/Windows/a.png"), "file rejected");
+            assertEquals("url_invalid", TotemDownloader.validate("javascript:alert(1)"), "javascript rejected");
+            assertEquals("url_invalid", TotemDownloader.validate("https://"), "empty host rejected");
+            assertEquals("url_invalid",
+                    TotemDownloader.validate("https://example.com/" + "a".repeat(600)),
+                    "over-long link rejected");
+        });
+
+        check("totem link becomes a safe file name", () -> {
+            assertEquals("cat.png", TotemDownloader.fileNameFor("https://ex.com/pics/cat.png", ""),
+                    "name from the path");
+            assertEquals("my-cat.jpg",
+                    TotemDownloader.fileNameFor("https://ex.com/a/my%20cat.jpg?x=1", ""),
+                    "decoded and sanitized");
+            assertEquals("img.png", TotemDownloader.fileNameFor("https://ex.com/img.php", "image/png"),
+                    "extension from the content type");
+            assertEquals("totem.jpg", TotemDownloader.fileNameFor("https://ex.com/", "image/jpeg"),
+                    "generic name");
+            assertTrue(TotemDownloader.fileNameFor("https://ex.com/" + "a".repeat(200) + ".png", "")
+                    .length() <= 52, "name stays bounded");
+            assertTrue(TotemDownloader.fileNameFor("https://ex.com/", "").endsWith(".png"),
+                    "unknown type falls back to png");
+        });
+
+        check("downloaded totems never overwrite each other", () -> {
+            Path dir = Files.createTempDirectory("silkvis-totem-url");
+            try {
+                assertEquals(dir.resolve("cat.png"), TotemDownloader.freePath(dir, "cat.png"), "free");
+                Files.write(dir.resolve("cat.png"), new byte[]{1});
+                assertEquals(dir.resolve("cat-2.png"), TotemDownloader.freePath(dir, "cat.png"),
+                        "second name");
+                Files.write(dir.resolve("cat-2.png"), new byte[]{1});
+                assertEquals(dir.resolve("cat-3.png"), TotemDownloader.freePath(dir, "cat.png"),
+                        "third name");
+            } finally {
+                deleteTree(dir);
+            }
+        });
+
+        check("an oversized download is refused, not buffered", () -> {
+            java.io.InputStream endless = new java.io.InputStream() {
+                private int served;
+
+                @Override
+                public int read() {
+                    return 0;
+                }
+
+                @Override
+                public int read(byte[] buffer, int offset, int length) {
+                    int remaining = TotemDownloader.MAX_DOWNLOAD_BYTES + 1 - served;
+                    if (remaining <= 0) {
+                        return -1;
+                    }
+                    int chunk = Math.min(Math.min(length, 8192), remaining);
+                    served += chunk;
+                    return chunk;
+                }
+            };
+            assertEquals(null, TotemDownloader.readBounded(endless), "cap enforced");
         });
 
         check("nine navigation tabs stay inside the panel", () -> {
