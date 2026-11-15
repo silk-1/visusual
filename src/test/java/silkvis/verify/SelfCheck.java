@@ -26,6 +26,7 @@ public final class SelfCheck {
         DestinationChecks.run();
         MiscChecks.run();
         SoupVisualsChecks.run();
+        SoupVisualsChecks2.run();
 
         System.out.println();
         System.out.println("passed=" + passed + " failed=" + failures.size());

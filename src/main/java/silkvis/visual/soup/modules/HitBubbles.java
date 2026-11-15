@@ -44,6 +44,10 @@ import java.util.List;
  * {@link #deactivate()} and also when the world reference changes).</p>
  */
 public class HitBubbles extends SoupModule implements ParticleModule {
+    /** Option labels of "Color Animation"; the renderer compares against these, not literals. */
+    public static final String ANIM_WAVE = "Wave";
+    public static final String ANIM_VERTEXES = "Vertexes";
+
     private final List<Bubble> bubbles = new ArrayList<>();
     private boolean wasLastAttackCrit;
 
@@ -63,7 +67,7 @@ public class HitBubbles extends SoupModule implements ParticleModule {
             .visible(() -> this.colorMode.isSelected("Custom"));
     public final SelectSetting colorAnimation = new SelectSetting(
             "setting.hitbubbles.coloranimation.name", "setting.hitbubbles.coloranimation.desc")
-            .value("Wave", "Vertexes")
+            .value(ANIM_WAVE, ANIM_VERTEXES)
             .selected("Wave")
             .visible(() -> this.colorMode.isSelected("Custom"));
     private final SelectSetting bubbleTexture = new SelectSetting(
@@ -243,8 +247,10 @@ public class HitBubbles extends SoupModule implements ParticleModule {
             float size = 2.0F * bubbleScale;
             // The matrix already carries the camera offset, so the quad is emitted around the
             // origin of the translated space; depth=false matches the original.
+            // Per-vertex colours: the original passes its whole Vector4i here, which is what
+            // the "Vertexes" animation needs.
             SoupRender.drawTexture(matrix, texture, -size / 2.0F, -size / 2.0F, size, size,
-                    colors.x, false);
+                    colors, false);
         }
     }
 
@@ -277,11 +283,11 @@ public class HitBubbles extends SoupModule implements ParticleModule {
             int[] colors = getCustomColors();
             if (colors != null && colors.length > 0) {
                 String animType = this.colorAnimation.getSelected();
-                if ("Wave".equals(animType)) {
+                if (ANIM_WAVE.equals(animType)) {
                     int color = getWaveColor(colors, alpha);
                     return new Vector4i(color, color, color, color);
                 }
-                if ("Vertex".equals(animType)) {
+                if (ANIM_VERTEXES.equals(animType)) {
                     return getVertexColors(colors, alpha);
                 }
             }

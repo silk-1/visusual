@@ -1232,3 +1232,72 @@ if ($size -gt 8 -and $buffer[0] -eq 0x89 -and $buffer[1] -eq 0x50) { ... }
 * Пул `Firefly` в AmbientParticles пуст: нужен `FireFlyParticle` с буфером следа.
 * Ширина линий Network в оригинале настраивалась 1..3 px; в 1.21.10 линии идут через
   `RenderLayer.getLines()` (1 px).
+
+## Раунд 20: порт SoupVisuals -- вторая партия (7 модулей) и триггеры без миксинов
+
+Тот же источник, что и в раунде 19. Цель партии -- закрыть все High-модули списка, кроме
+третьей партии Medium.
+
+### Что портировано
+
+| Модуль | Настроек | Состав |
+|---|---|---|
+| Hitboxes | 5 | Fill/Outline/Both, линия глаз, Sync/Custom, цвет друга, градиент по `hurtTime` |
+| JumpCircles | 18 | 4 цвета, 4 текстуры (`circle`, `circle_bold`, `portal`, `soup`), 3-стадийная анимация с отрицательным `existDuration`, Bounce/Smooth, вращение, масштаб, `Bright` |
+| Trails | 16 | Trail/Tail, Solid/Faded/Invert, альфа-фактор, время жизни 1.5 с, режим «только F5», отладочные линии, билборд-хвост |
+| HitSounds | 9 | 16 trinket-звуков + 7 kill-звуков, крит-правило (кулдаун >= 0.848 и 7 условий), громкости sweep/crit/knockback |
+| KillEffect | 22 | 18 режимов частиц, Fall/Fly/Emerge, Thunder, трекинг атак (окно 5 с, подтверждение по `hurtTime`, отложенный килл 100 мс, телепорт+хил), `TR Sync` как заглушка |
+| FriendsTargetRender | 26 | Legacy/Circle/Ghosts/Crystals, 9 легаси-текстур, палитра до 4 цветов, `followTime`/`speedMod`, приоритет, `showOn` |
+| HandTweaks | 26 | 7 типов свинга, скорость, сдвиги и повороты обеих рук, масштабы; **вызова нет** (ADR-0010) |
+
+Инфраструктура партии:
+
+* `util.EntitySnapshot` -- record-снимок сущности (`id/name/player/friend/x/y/z/prev*/eyeY/
+  width/height/hurtTime/health/alive/living/elytraFlying`), единственный тип на границе
+  «модуль <-> игра» (правило 10 AGENTS.md). Добавлено поле `health` -- без него правило
+  «телепорт + лечение = смерть» из `KillEffect` не воспроизводится.
+* `util.FriendList` -- порт `FriendUtils` (сравнение по имени, регистронезависимое удаление).
+* `util.SoupSounds` -- 23 пути (`TRINKET_*`, `KILL_*`), интерфейс `Player` и `ALL_PATHS`
+  как единственный источник для регистрации.
+* `assets/silkvis/sounds.json` + 23 `.ogg` из оригинала (16 в корне, 7 в `kill_sounds/`).
+* `assets/silkvis/textures/soup/legacy/` -- 9 легаси-текстур таргета.
+* `SoupRender`: `drawTexture(..., Vector4i, ...)` (цвет на вершину -- режим `Vertexes`) и,
+  главное, исправление: `flushQuads`/`flushLines` больше не игнорируют матрицу квада.
+  До правки все текстурированные квады рисовались бы в точке камеры, а линии -- в мировых
+  координатах.
+
+### Версийная работа (1.21.11 -> 1.21.10)
+
+* Триггеры без миксинов (ADR-0009): прыжок -- смена `onGround`, тотем -- исчезновение
+  тотема из руки, атака -- `AttackEntityCallback`. Точки инъекции оригинала и их замены
+  перечислены в ADR.
+* HandTweaks: в Fabric API 1.21.10 нет хука первого лица, миксин без ADR запрещён --
+  модуль перенесён целиком, но не вызывается (ADR-0010).
+* Hitboxes рисуются в `WorldRenderEvents.END_MAIN`, а не миксином в `EntityRenderManager`.
+* `TR Sync` в KillEffect до появления TargetRender вырождается в `Particles`.
+
+### Проверено
+
+* `SoupVisualsChecks2` -- 16 новых проверок: дефолты и списки опций всех семи модулей,
+  метки цветовых анимаций (нашёл и закрыл расхождение `Vertex`/`Vertexes` в HitBubbles),
+  129 стабильных ключей конфига без дублей, крит-правило (8 случаев + порог 0.847/0.848),
+  цветовые хелперы, геометрия свинга, время жизни точки трейла, список друзей, трекинг
+  киллов, паритет `sounds.json` и `ALL_PATHS` и наличие всех 23 `.ogg`.
+* Прогон: `SoupVisualsChecks` (9) + `SoupVisualsChecks2` (16) -> `passes=25 failed=0`
+  на чистом JDK против стабов.
+* JDT: `silkvis.visual.soup.**` + `silkvis.client.SoupVisualsClient` против стабов 1.21.10
+  -- 0 ошибок (129 классов вместе со стабами).
+* java-parser: 187/187 файлов `src/main` + `src/test` без синтаксических ошибок; ASCII-only.
+* Lang-паритет: 726/726 ключей (было 410/410; добавлено 316 ключей второй партии).
+
+### Не проверено
+
+* Игра не запускалась и Gradle не запускался (нет сети к maven.fabricmc.net и JDK с
+  `javac`): всё выше -- статическая проверка. «Работает» пока не утверждается нигде.
+* Экран настроек для новых модулей не сделан: включение по-прежнему из кода.
+
+### Известные ограничения
+
+См. `docs/known-limitations.md`, раздел «Вторая партия»: HandTweaks без хука, Ghosts/Crystals
+на заглушке Legacy, `TR Sync`, sweep/knockback-звуки, порядок отрисовки хитбоксов,
+сэмплирование трейлов на тике.

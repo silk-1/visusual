@@ -76,6 +76,14 @@
 | VIS-12 TotemParticles (порт SoupVisuals) | `visual/soup/modules/TotemParticles.java`, `client/SoupVisualsClient.detectTotemPops` | `SoupVisualsChecks`; логика эмиттера/цвета «Vanilla» перенесена 1:1 | IMPLEMENTED_NOT_TESTED |
 | VIS-13 AmbientParticles (порт SoupVisuals) | `visual/soup/modules/AmbientParticles.java`, `visual/soup/particles/*`, `visual/soup/util/SpatialGrid3D.java` | `SoupVisualsChecks` (сетка соседей, физика через `AbstractParticle`) | IMPLEMENTED_NOT_TESTED |
 | VIS-14 каркас настроек SoupVisuals | `visual/soup/setting/*` (Setting, Boolean/Select/Value/MultiSelect/MultiColor/Color/Group/Bind/Button/Text, SettingRepository) | `SoupVisualsChecks` (значения, видимость, reset, стабильные ключи конфига) | IMPLEMENTED_TESTED |
+| VIS-15 Hitboxes (порт SoupVisuals) | `visual/soup/modules/Hitboxes.java` | `SoupVisualsChecks2` (дефолты, режимы, градиент по `hurtTime`); JDT-компиляция без ошибок | IMPLEMENTED_NOT_TESTED |
+| VIS-16 JumpCircles (порт SoupVisuals) | `visual/soup/modules/JumpCircles.java`, `client/SoupVisualsClient.detectJump` | `SoupVisualsChecks2` (дефолты, четыре текстуры, длительности, `Bright` = число кругов); триггер — смена `onGround`, ADR-0009 | IMPLEMENTED_NOT_TESTED |
+| VIS-17 Trails (порт SoupVisuals) | `visual/soup/modules/Trails.java` | `SoupVisualsChecks2` (дефолты, прогресс/альфа точки, удаление по времени) | IMPLEMENTED_NOT_TESTED |
+| VIS-18 HitSounds (порт SoupVisuals) | `visual/soup/modules/HitSounds.java`, `visual/soup/util/SoupSounds.java`, `assets/silkvis/sounds.json` | `SoupVisualsChecks2` (крит-правило по кулдауну/падению/эффектам, паритет `sounds.json` и `ALL_PATHS`, наличие всех 23 `.ogg`) | IMPLEMENTED_NOT_TESTED |
+| VIS-19 KillEffect (порт SoupVisuals) | `visual/soup/modules/KillEffect.java` | `SoupVisualsChecks2` (18 режимов, дефолты, трекинг атаки/подтверждения/отложенного килла, карта звуков) | IMPLEMENTED_NOT_TESTED |
+| VIS-20 FriendsTargetRender (порт SoupVisuals) | `visual/soup/modules/FriendsTargetRender.java`, `assets/silkvis/textures/soup/legacy/*` | `SoupVisualsChecks2` (26 настроек, 9 легаси-текстур, формат пути); Ghosts/Crystals — заглушка на Legacy | IMPLEMENTED_NOT_TESTED |
+| VIS-21 HandTweaks (порт SoupVisuals) | `visual/soup/modules/HandTweaks.java` | `SoupVisualsChecks2` (26 настроек, `applySwing`/`handScale`/`swingDuration`); **вызова нет** — ADR-0010 | IMPLEMENTED_NOT_TESTED |
+| VIS-22 триггеры без миксинов | `client/SoupVisualsClient.java` (`detectJump`, `detectTotemPops`, `onAttack`) | ADR-0009; JDT-компиляция клиентского слоя против стабов без ошибок | IMPLEMENTED_NOT_TESTED |
 | 7.4 матрица совместимости | — | — | BLOCKED (нет прогона) |
 | CFG-01 пути и безопасные имена | `config/ConfigPaths.java` | — | IMPLEMENTED_NOT_TESTED |
 | CFG-02 разделение global/profile | `GlobalConfig`, `UiConfig`, `DestinationsConfig` | — | IMPLEMENTED_NOT_TESTED |
