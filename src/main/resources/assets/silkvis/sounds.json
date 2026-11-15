@@ -1,0 +1,186 @@
+{
+  "8bit": {
+    "sounds": [
+      {
+        "name": "silkvis:8bit",
+        "stream": false
+      }
+    ]
+  },
+  "aimbooster_hit": {
+    "sounds": [
+      {
+        "name": "silkvis:aimbooster_hit",
+        "stream": false
+      }
+    ]
+  },
+  "bell": {
+    "sounds": [
+      {
+        "name": "silkvis:bell",
+        "stream": false
+      }
+    ]
+  },
+  "blip": {
+    "sounds": [
+      {
+        "name": "silkvis:blip",
+        "stream": false
+      }
+    ]
+  },
+  "bonk": {
+    "sounds": [
+      {
+        "name": "silkvis:bonk",
+        "stream": false
+      }
+    ]
+  },
+  "bubble": {
+    "sounds": [
+      {
+        "name": "silkvis:bubble",
+        "stream": false
+      }
+    ]
+  },
+  "drum_bass": {
+    "sounds": [
+      {
+        "name": "silkvis:drum_bass",
+        "stream": false
+      }
+    ]
+  },
+  "get": {
+    "sounds": [
+      {
+        "name": "silkvis:get",
+        "stream": false
+      }
+    ]
+  },
+  "glass": {
+    "sounds": [
+      {
+        "name": "silkvis:glass",
+        "stream": false
+      }
+    ]
+  },
+  "magic_pok": {
+    "sounds": [
+      {
+        "name": "silkvis:magic_pok",
+        "stream": false
+      }
+    ]
+  },
+  "off": {
+    "sounds": [
+      {
+        "name": "silkvis:off",
+        "stream": false
+      }
+    ]
+  },
+  "on": {
+    "sounds": [
+      {
+        "name": "silkvis:on",
+        "stream": false
+      }
+    ]
+  },
+  "plastic_ball": {
+    "sounds": [
+      {
+        "name": "silkvis:plastic_ball",
+        "stream": false
+      }
+    ]
+  },
+  "pop": {
+    "sounds": [
+      {
+        "name": "silkvis:pop",
+        "stream": false
+      }
+    ]
+  },
+  "squish": {
+    "sounds": [
+      {
+        "name": "silkvis:squish",
+        "stream": false
+      }
+    ]
+  },
+  "trinket_hit": {
+    "sounds": [
+      {
+        "name": "silkvis:trinket_hit",
+        "stream": false
+      }
+    ]
+  },
+  "kill_sounds/abmiss": {
+    "sounds": [
+      {
+        "name": "silkvis:kill_sounds/abmiss",
+        "stream": false
+      }
+    ]
+  },
+  "kill_sounds/critow": {
+    "sounds": [
+      {
+        "name": "silkvis:kill_sounds/critow",
+        "stream": false
+      }
+    ]
+  },
+  "kill_sounds/final_blink": {
+    "sounds": [
+      {
+        "name": "silkvis:kill_sounds/final_blink",
+        "stream": false
+      }
+    ]
+  },
+  "kill_sounds/final_pok": {
+    "sounds": [
+      {
+        "name": "silkvis:kill_sounds/final_pok",
+        "stream": false
+      }
+    ]
+  },
+  "kill_sounds/neptune": {
+    "sounds": [
+      {
+        "name": "silkvis:kill_sounds/neptune",
+        "stream": false
+      }
+    ]
+  },
+  "kill_sounds/rust_headshot": {
+    "sounds": [
+      {
+        "name": "silkvis:kill_sounds/rust_headshot",
+        "stream": false
+      }
+    ]
+  },
+  "kill_sounds/whii": {
+    "sounds": [
+      {
+        "name": "silkvis:kill_sounds/whii",
+        "stream": false
+      }
+    ]
+  }
+}
