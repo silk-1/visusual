@@ -385,27 +385,36 @@ public final class SilkVisScreen extends Screen {
                 }
             }
             case TOTEMS -> {
-                // Texture size first: this is the setting that decides how sharp the picture
-                // looks. It used to be hard-wired to the vanilla 16x16, which is why a photo
-                // came out as a blurry smear.
+                // Texture size: the setting that decides how sharp the picture looks. It used
+                // to be hard-wired to the vanilla 16x16, which is why a photo came out as a
+                // blurry smear. One row, four segments: holding four stacked full-width rows
+                // here would push the actual totem controls below the fold.
+                settingsWidgets.add(new FixedText(tr("silkvis.totems.size"),
+                        new Rect(area.x(), y, width, 14)));
+                y += 16;
                 VisualSettings totemVisual = runtime.ui().visual();
+                int segmentWidth = Math.max(24,
+                        Math.min(width, 320) / VisualSettings.TOTEM_TEXTURE_SIZES.length);
+                int segmentX = area.x();
                 for (int size : VisualSettings.TOTEM_TEXTURE_SIZES) {
                     boolean active = totemVisual.totemTextureSize() == size;
                     ButtonWidget sizeButton = new ButtonWidget(
-                            new Rect(area.x(), y, Math.min(width, 220), ROW_HEIGHT),
-                            tr("silkvis.totems.size") + ": " + tr("silkvis.totems.size." + size)
-                                    + (active ? "  \u2713" : ""), () -> {
+                            new Rect(segmentX, y, segmentWidth - 2, ROW_HEIGHT),
+                            tr("silkvis.totems.size." + size), () -> {
+                        if (runtime.ui().visual().totemTextureSize() == size) {
+                            return;
+                        }
                         // Copy the record with the new edge (records have no wither), save it,
-                        // then rebuild the pack from the picture already lying in the folder:
-                        // without the rebuild the player changes the setting and sees nothing.
-                        VisualSettings updated = new VisualSettings(totemVisual.fovEnabled(),
-                                totemVisual.fovDegrees(), totemVisual.viewBobbing(),
-                                totemVisual.hurtCameraIntensity(), totemVisual.screenEffectIntensity(),
-                                totemVisual.fogEnabled(), totemVisual.fogStartRatio(),
-                                totemVisual.fogEndRatio(), totemVisual.particleCap(),
-                                totemVisual.rainVisualIntensity(), totemVisual.cloudsVisible(),
-                                totemVisual.entityMarkersEnabled(), totemVisual.depthAwareMarkers(),
-                                size);
+                        // then rebuild the pack from the picture already applied: without the
+                        // rebuild the player changes the setting and sees nothing.
+                        VisualSettings current = runtime.ui().visual();
+                        VisualSettings updated = new VisualSettings(current.fovEnabled(),
+                                current.fovDegrees(), current.viewBobbing(),
+                                current.hurtCameraIntensity(), current.screenEffectIntensity(),
+                                current.fogEnabled(), current.fogStartRatio(),
+                                current.fogEndRatio(), current.particleCap(),
+                                current.rainVisualIntensity(), current.cloudsVisible(),
+                                current.entityMarkersEnabled(), current.depthAwareMarkers(), size);
                         runtime.requestUiSave(new silkvis.config.UiConfig(runtime.hudLayout(),
                                 runtime.ui().map(), updated));
                         runtime.rebuildTotemWithCurrentSize();
@@ -415,9 +424,13 @@ public final class SilkVisScreen extends Screen {
                         sizeButton.style(ButtonWidget.Style.PRIMARY);
                     }
                     settingsWidgets.add(sizeButton);
-                    y += ROW_HEIGHT + 4;
+                    segmentX += segmentWidth;
                 }
-                y += 8;
+                y += ROW_HEIGHT + 2;
+                settingsWidgets.add(new FixedText(tr("silkvis.totems.size.desc"),
+                        new Rect(area.x(), y, width, 22)));
+                y += 26;
+
                 // ASSET-04: a picture in a folder becomes a real resource pack. No file
                 // dialog (a mod cannot open one without native code) and no typed paths.
                 settingsWidgets.add(new FixedText(tr("silkvis.totems.hint"),
