@@ -1,5 +1,6 @@
 package silkvis.ui;
 
+import silkvis.config.json.JsonException;
 import silkvis.config.json.JsonObject;
 import silkvis.config.json.JsonValue;
 
@@ -66,8 +67,9 @@ public final class LangTable {
                 }
             }
             return out;
-        } catch (IOException | RuntimeException e) {
-            // A broken language file must not break the UI: the game language takes over.
+        } catch (IOException | JsonException | RuntimeException e) {
+            // JsonException is checked on purpose in this code base: a malformed language
+            // file must fall back to the game language, never crash the client.
             return Map.of();
         }
     }

@@ -476,10 +476,6 @@ public final class SilkVisRuntime {
     }
 
     /**
-     * One-line media state for the Music tab: provider status and, when the provider never
-     * started, the reason it was refused (helper_missing, powershell_missing, ...).
-     */
-    /**
      * Before 0.1.12 the language field was written to the config and never read: the UI always
      * followed Minecraft's own language. Such a stored value is not a choice, so it is aligned
      * with the system language exactly once, guarded by a marker file.
@@ -530,7 +526,6 @@ public final class SilkVisRuntime {
         }
     }
 
-    /** Human-readable dimension name for the map header and the HUD. */
     /** Applies a language choice from the settings tab and reloads the table immediately. */
     public void setLanguage(String language) {
         langTable = silkvis.ui.LangTable.load("auto".equals(language) ? detectLanguage() : language);
@@ -538,6 +533,7 @@ public final class SilkVisRuntime {
                 global.blurEnabled(), global.verboseDiagnostics(), global.media()));
     }
 
+    /** Human-readable dimension name for the map header and the HUD. */
     public String dimensionLabel(String dimensionId) {
         if (dimensionId == null || dimensionId.isBlank()) {
             return "—";
@@ -548,6 +544,10 @@ public final class SilkVisRuntime {
         return label.equals(key) ? code : label;
     }
 
+    /**
+     * One-line media state for the Music tab: provider status and, when the provider never
+     * started, the reason it was refused (helper_missing, powershell_missing, ...).
+     */
     public String mediaStatusLine() {
         Localizer l = localizer();
         return mediaService()
