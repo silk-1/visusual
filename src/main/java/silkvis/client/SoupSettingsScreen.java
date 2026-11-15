@@ -79,10 +79,21 @@ public final class SoupSettingsScreen extends Screen {
     private SoupModule selected;
     private String query = "";
     private int hoveredModule = -1;
+    /** Module id requested by the caller (the module list link), applied on first init. */
+    private String initialModuleId;
 
     public SoupSettingsScreen(Screen parent) {
-        super(Text.translatable("silkvis.soup.title"));
+        // Literal, not Text.translatable("silkvis.soup.title"): Screen.title is only used for
+        // narration here, and translatable() would have to resolve a key this screen resolves
+        // itself through the mod's own language table.
+        super(Text.literal("SoupVisuals"));
         this.parent = parent;
+    }
+
+    /** Opens the screen on a specific module, by registry id or by module key. */
+    public SoupSettingsScreen(Screen parent, String moduleId) {
+        this(parent);
+        this.initialModuleId = moduleId;
     }
 
     private String tr(String key) {
@@ -137,6 +148,17 @@ public final class SoupSettingsScreen extends Screen {
     protected void init() {
         this.layout = MainScreenLayout.compute(this.width, this.height);
         this.chrome.clear();
+        if (this.initialModuleId != null) {
+            String wanted = this.initialModuleId.startsWith("soup.")
+                    ? this.initialModuleId.substring("soup.".length()) : this.initialModuleId;
+            for (SoupModule module : this.soup.modules()) {
+                if (SoupSettingsFile.keyOf(module).equals(wanted)) {
+                    this.selected = module;
+                    break;
+                }
+            }
+            this.initialModuleId = null;
+        }
         if (this.selected == null && !this.soup.modules().isEmpty()) {
             this.selected = this.soup.modules().get(0);
         }
@@ -144,10 +166,10 @@ public final class SoupSettingsScreen extends Screen {
         this.listScroll = new ScrollModel(Math.max(1, list.height() - 8), MODULE_ROW);
         this.chrome.add(new ButtonWidget(this.layout.closeButton(), "\u00d7", this::close)
                 .style(ButtonWidget.Style.SECONDARY));
-        TextInputModel searchModel = new TextInputModel("", 32, value -> {
-            this.query = value == null ? "" : value;
-            rebuildSettings();
-        });
+        // The third argument is a validator, not a change listener: a statement lambda made
+        // the constructor call uncompilable ("missing return value"). Filtering happens in
+        // rebuildSettings()/visibleModules() from the field the commit callback writes.
+        TextInputModel searchModel = new TextInputModel("", 32, value -> true);
         this.search = new TextInputWidget(this.layout.search(), searchModel,
                 tr("silkvis.search.hint"), value -> {
             this.query = value == null ? "" : value;

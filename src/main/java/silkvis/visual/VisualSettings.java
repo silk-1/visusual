@@ -24,12 +24,10 @@ public record VisualSettings(
         boolean cloudsVisible,
         boolean entityMarkersEnabled,
         boolean depthAwareMarkers,
-        /** Edge of the generated totem texture: 16, 32, 64 or 128 (see TotemPackBuilder). */
+        // Edge of the generated totem texture: 16, 32, 64 or 128 (see TotemPackBuilder).
         int totemTextureSize,
-        /**
-         * Cut the plain background out of the totem picture (white, black, grey and the
-         * corners) so only the drawing is left. On by default: the owner asked for it.
-         */
+        // Cut the plain background out of the totem picture (white, black, grey and the
+        // corners) so only the drawing is left. On by default: the owner asked for it.
         boolean totemTrimBackground
 ) {
     /** Valid totem edges; the generated pack uses one of these, never an arbitrary number. */

@@ -450,7 +450,7 @@ public final class SilkVisRuntime {
                 soupOn++;
             }
         }
-        String summary = "modules=" + modules.size()
+        String summary = "modules=" + modules.all().size()
                 + " soupvisuals=" + soupOn + "/" + SoupVisualsClient.get().modules().size()
                 + " soupfile=" + paths.soupFile();
         log.event("STARTUP", summary);

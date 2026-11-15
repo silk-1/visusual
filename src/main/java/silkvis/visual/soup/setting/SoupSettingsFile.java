@@ -183,7 +183,8 @@ public final class SoupSettingsFile {
             return select.getSelected() == null ? null : JsonValue.of(select.getSelected());
         }
         if (setting instanceof MultiSelectSetting multi) {
-            JsonArray array = new JsonArray();
+            // JsonArray's constructor is package-private; the factory is public (CFG-01).
+            JsonArray array = JsonValue.newArray();
             for (String option : multi.getSelected()) {
                 array.add(option);
             }

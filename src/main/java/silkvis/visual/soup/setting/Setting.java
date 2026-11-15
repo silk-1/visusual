@@ -44,7 +44,6 @@ public abstract class Setting {
         textSink = sink == null ? key -> key : sink;
     }
 
-    /** Read-only access for subclasses that use their own key prefixes (GroupSetting). */
     /**
      * Public localization for code outside this package (the module list prints module names
      * through it). Returns the key unchanged when no translation is installed, so callers can
