@@ -18,6 +18,7 @@
 
 param(
     [switch]$Probe,
+    [switch]$ProbeArtwork,
     [string]$PinnedSession = ''
 )
 
@@ -347,7 +348,7 @@ function Invoke-Command($Payload) {
     Send-Snapshot
 }
 
-function Send-Artwork($Payload) {
+function Send-Artwork($Payload, [switch]$Summary) {
     $sessionId = if ($Payload.PSObject.Properties['sessionId']) { [string]$Payload.sessionId } else { '' }
     $target = $null
     foreach ($s in @($script:Manager.GetSessions())) {
@@ -359,31 +360,106 @@ function Send-Artwork($Payload) {
     }
     $ref = if ($Payload.PSObject.Properties['artworkRef']) { [string]$Payload.artworkRef } else { '' }
     $base64 = ''
+    $mime = ''
+    $byteCount = 0
+    $reason = ''
+    $stream = $null
+    $reader = $null
     try {
         $props = Await-Operation ($target.TryGetMediaPropertiesAsync()) $MediaPropsType
-        if ($null -ne $props -and $null -ne $props.Thumbnail) {
+        if ($null -eq $props -or $null -eq $props.Thumbnail) {
+            $reason = 'no_thumbnail'
+        } else {
             $stream = Await-Operation ($props.Thumbnail.OpenReadAsync()) ([Windows.Storage.Streams.IRandomAccessStreamWithContentType])
-            $size = [int]$stream.Size
-            $buffer = New-Object byte[] $size
-            $reader = New-Object Windows.Storage.Streams.DataReader($stream)
-            $loaded = Await-Operation ($reader.LoadAsync([uint32]$size)) ([uint32])
-            $reader.ReadBytes($buffer)
-            # Java decodes PNG; a JPEG stream is reported as unsupported instead of being
-            # passed off as an image it is not.
-            if ($size -gt 8 -and $buffer[0] -eq 0x89 -and $buffer[1] -eq 0x50) {
-                $base64 = [Convert]::ToBase64String($buffer)
+            if ($null -eq $stream) {
+                $reason = 'open_failed'
+            } else {
+                $size = [int]$stream.Size
+                if ($size -le 8) {
+                    $reason = 'empty_stream'
+                } elseif ($size -gt 524288) {
+                    $reason = 'too_large'
+                } else {
+                    $reader = New-Object -TypeName Windows.Storage.Streams.DataReader -ArgumentList $stream
+                    # One LoadAsync may deliver fewer bytes than asked for; a truncated JPEG
+                    # decodes to garbage, which is why the cover never appeared. Read until
+                    # the whole thumbnail is buffered (bounded by the size check above).
+                    $spins = 0
+                    while ($reader.UnconsumedBufferLength -lt $size -and $spins -lt 32) {
+                        $spins++
+                        $want = [Math]::Min(65536, $size - $reader.UnconsumedBufferLength)
+                        $got = Await-Operation ($reader.LoadAsync([uint32]$want)) ([uint32])
+                        if ($null -eq $got -or $got -le 0) { break }
+                    }
+                    # Use what actually arrived: a short read is reported, never passed off
+                    # as a complete picture (a truncated JPEG decodes to noise or throws).
+                    $available = [int]$reader.UnconsumedBufferLength
+                    if ($available -le 8) {
+                        $reason = 'empty_stream'
+                    } else {
+                        $buffer = [byte[]]::new($available)
+                        $reader.ReadBytes($buffer)
+                        $byteCount = $available
+                        if ($available -lt $size) { Write-Diag "artwork truncated: $available of $size" }
+                        # Spotify and Chrome publish JPEG thumbnails. Until 0.1.18 this branch
+                        # only forwarded PNG, so the picture was dropped every single time.
+                        $isPng = $buffer[0] -eq 0x89 -and $buffer[1] -eq 0x50 -and $buffer[2] -eq 0x4E -and $buffer[3] -eq 0x47
+                        $isJpeg = $buffer[0] -eq 0xFF -and $buffer[1] -eq 0xD8 -and $buffer[2] -eq 0xFF
+                        $isGif = $buffer[0] -eq 0x47 -and $buffer[1] -eq 0x49 -and $buffer[2] -eq 0x46
+                        $isBmp = $buffer[0] -eq 0x42 -and $buffer[1] -eq 0x4D
+                        if ($isPng) { $mime = 'image/png' }
+                        elseif ($isJpeg) { $mime = 'image/jpeg' }
+                        elseif ($isGif) { $mime = 'image/gif' }
+                        elseif ($isBmp) { $mime = 'image/bmp' }
+                        if ($mime -ne '') {
+                            $base64 = [Convert]::ToBase64String($buffer)
+                        } else {
+                            $reason = 'not_an_image'
+                        }
+                    }
+                }
             }
         }
     } catch {
+        $reason = 'exception'
         Write-Diag "artwork failed: $($_.Exception.GetType().Name)"
+    } finally {
+        if ($null -ne $reader) { try { $reader.Dispose() } catch { } }
+        if ($null -ne $stream) { try { $stream.Dispose() } catch { } }
     }
-    Write-Protocol 'ARTWORK' ([ordered]@{ artworkRef = $ref; pngBase64 = $base64 }) $null
+    if ($reason -ne '' -and $reason -ne 'no_thumbnail') {
+        Write-Diag "artwork: $reason ($byteCount bytes)"
+    }
+    if ($Summary) {
+        # Human-readable, for -ProbeArtwork: no base64 in the terminal.
+        [Console]::Error.WriteLine("[silkvis-helper] artwork mime=$mime bytes=$byteCount reason=$reason ref=$ref")
+        return
+    }
+    Write-Protocol 'ARTWORK' ([ordered]@{
+            artworkRef = $ref
+            mime       = $mime
+            bytes      = [int]$byteCount
+            reason     = $reason
+            pngBase64  = $base64
+        }) $null
 }
 
 # ---------------------------------------------------------------- entry points
 
 if ($Probe) {
     Send-Snapshot
+    exit 0
+}
+
+# Cover probe: one command that says whether the thumbnail can be read at all, and in
+# which format. Prints a summary to stderr instead of dumping base64 into the terminal.
+if ($ProbeArtwork) {
+    $target = Get-TargetSession
+    if ($null -eq $target) {
+        Write-Failure 'no_session' $null
+        exit 0
+    }
+    Send-Artwork ([pscustomobject]@{ sessionId = (Get-SessionId $target); artworkRef = 'probe' }) -Summary
     exit 0
 }
 

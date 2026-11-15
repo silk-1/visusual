@@ -188,8 +188,23 @@ public final class WindowsMediaProvider implements MediaProvider {
                 byte[] data = envelope.payload().has("pngBase64")
                         ? java.util.Base64.getDecoder().decode(envelope.payload().get("pngBase64").string())
                         : new byte[0];
+                String reason = envelope.payload().has("reason")
+                        ? envelope.payload().get("reason").string() : "";
+                if (data.length == 0 && !reason.isEmpty() && !"no_thumbnail".equals(reason)) {
+                    // Keep the helper's own words in the stderr tail: the bug report carries
+                    // them, and until 0.1.18 an empty cover left no trace at all.
+                    synchronized (stderrTail) {
+                        stderrTail.add("artwork: " + reason);
+                        while (stderrTail.size() > STDERR_MAX_LINES) {
+                            stderrTail.remove(0);
+                        }
+                    }
+                }
                 if (listener != null) {
                     listener.onArtwork(ref, data);
+                    if (data.length == 0 && !reason.isEmpty()) {
+                        listener.onArtworkNotice(reason);
+                    }
                 }
             }
             case IpcProtocol.ERROR -> {

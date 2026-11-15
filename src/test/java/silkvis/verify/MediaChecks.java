@@ -215,6 +215,25 @@ final class MediaChecks {
                     "garbage rejected");
         });
 
+        check("a missing cover always has a reason", () -> {
+            FakeClock clock = new FakeClock();
+            FakeProvider provider = new FakeProvider();
+            MediaService service = new MediaService(provider, clock, s -> { }, r -> { });
+            service.start(SessionSelection.AUTO, "");
+            service.onSnapshot(new MediaSnapshot("test", "s1", 1, 5, "spotify", "Spotify", "T", null, null,
+                    "ref-1", PlaybackState.PLAYING, 0L, 0L, 1000L, 0L, 1000L, 1.0, 0L,
+                    MediaCapabilities.of(MediaAction.PLAY), null));
+            service.onArtworkNotice("no_thumbnail");
+            assertEquals("no_thumbnail", service.artworkNotice(), "helper reason is kept");
+            // Spotify and Chrome publish JPEG; a PNG-only check dropped every cover.
+            byte[] jpeg = {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) 0xE0, 0, 0, 0, 0, 1, 2};
+            service.onArtwork("ref-1", jpeg);
+            assertTrue(service.currentArtworkHash().isPresent(), "jpeg cover accepted");
+            assertEquals("", service.artworkNotice(), "a real cover clears the reason");
+            service.onArtwork("ref-1", new byte[]{1, 2, 3, 4, 5, 6, 7, 8, 9});
+            assertEquals("not_an_image", service.artworkNotice(), "garbage is named");
+        });
+
         check("close releases provider resources", () -> {
             FakeProvider provider = new FakeProvider();
             MediaService service = new MediaService(provider, new FakeClock(), s -> { }, r -> { });

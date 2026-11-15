@@ -31,6 +31,33 @@ powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File .\silkvi
 | ничего, окно закрылось мгновенно | скрипт заблокирован политикой/антивирусом | см. раздел ниже |
 | `... не может быть загружено, так как выполнение сценариев отключено` | ExecutionPolicy | запусти с `-ExecutionPolicy Bypass`, как в команде выше |
 
+## Проверка обложки отдельной командой
+
+Обложка идёт по тому же мосту, но её можно проверить, не запуская игру:
+
+```powershell
+cd F:\silkvis\scripts\media-helper
+powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File .\silkvis-media-helper.ps1 -ProbeArtwork
+```
+
+Строка печатается в stderr, без base64. Ожидаемо:
+
+```
+[silkvis-helper] artwork mime=image/jpeg bytes=48213 reason= ref=probe
+```
+
+| Что видно | Что значит |
+|---|---|
+| `mime=image/jpeg`, `bytes` больше нуля | обложка читается — мод получит её |
+| `mime=image/png` | то же, PNG (Spotify иногда отдаёт PNG) |
+| `reason=no_thumbnail` | у текущего трека нет картинки (локальный файл, подкаст) |
+| `reason=too_large` | картинка больше 512 КБ — Windows отдаёт такую редко, сообщи |
+| `reason=not_an_image` | источник отдал не картинку |
+| `ERROR code=no_session` | нет активной медиа-сессии: включи трек и повтори |
+
+До 0.1.18 обложка отбрасывалась, если была не PNG: Spotify и Chrome присылают JPEG, поэтому
+пусто было почти всегда.
+
 ## Если PowerShell блокирован
 
 1. Проверить политику: `Get-ExecutionPolicy -List`.
