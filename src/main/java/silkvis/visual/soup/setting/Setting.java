@@ -45,6 +45,16 @@ public abstract class Setting {
     }
 
     /** Read-only access for subclasses that use their own key prefixes (GroupSetting). */
+    /**
+     * Public localization for code outside this package (the module list prints module names
+     * through it). Returns the key unchanged when no translation is installed, so callers can
+     * compare and fall back instead of printing an empty label.
+     */
+    public static String translate(String key) {
+        String translated = textSink.get(key);
+        return translated == null ? key : translated;
+    }
+
     protected static String text(String key) {
         return textSink.get(key);
     }

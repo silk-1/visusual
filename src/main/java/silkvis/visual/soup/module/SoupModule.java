@@ -51,6 +51,16 @@ public abstract class SoupModule {
         return this.nameKey;
     }
 
+    /**
+     * Localized display name of the module ({@code module.hitbubbles.name} -> "Hit bubbles").
+     * Goes through the same {@link Setting.TextSink} the settings use, so the module list and
+     * the settings screen of the original print the same words here.
+     */
+    public String getName() {
+        String translated = Setting.translate(this.nameKey);
+        return translated == null || translated.equals(this.nameKey) ? this.nameKey : translated;
+    }
+
     public SoupModuleCategory getCategory() {
         return this.category;
     }

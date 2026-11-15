@@ -150,6 +150,16 @@ public final class SoupRender {
      * Draws everything queued since the last flush. Must run on the render thread inside a
      * world render event, where a {@link VertexConsumerProvider} is valid.
      */
+    /**
+     * How many primitives are waiting for the next flush. Used by the periodic debug line: a
+     * module that is on but queues nothing is a different bug from one that queues nothing
+     * because it is off, and only the queue size tells them apart.
+     */
+    public static int pending() {
+        return QUADS.size() + QUADS_DEPTH.size() + LINES.size() + LINES_DEPTH.size()
+                + FACES.size() + FACES_DEPTH.size();
+    }
+
     public static void flush(MatrixStack matrices, VertexConsumerProvider consumers) {
         if (consumers == null) {
             clearAll();

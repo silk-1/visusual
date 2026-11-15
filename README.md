@@ -41,6 +41,21 @@ Wrapper закоммичен, отдельно ставить Gradle не нуж
 `fabric-api 0.138.4+1.21.10`); сборка требует JDK 25, байткод остаётся Java 21.
 Старая инструкция про замену `loom_version` больше не нужна (`docs/dependency-matrix.md`).
 
+## Где что искать в интерфейсе
+
+`Right Shift` открывает меню SilkVis. Дальше:
+
+| Что нужно | Куда идти |
+|-----------|-----------|
+| Эффекты ударов и прочий перенесённый визуал (HitBubbles, TotemParticles, AmbientParticles, Hitboxes, JumpCircles, Trails, HitSounds, KillEffect, FriendsTargetRender, HandTweaks) | вкладка **VISUAL** → кнопка «Модули SoupVisuals»; либо строка модуля в списке → переключатель; либо клавиша «Настройки модулей SoupVisuals» (по умолчанию не назначена, назначается в управлении) |
+| Свой тотем: картинка, ссылка, размер текстуры (16/32/64/128), обрезка фона | вкладка **ТОТЕМЫ** |
+| HUD: виджеты, их положение | вкладка **HUD** → «Редактор HUD» |
+
+Модули SoupVisuals по умолчанию **выключены** (AGENTS.md, правило 7: при первом запуске
+ничего не рисуется). Состояние и настройки лежат в `config/silkvis/soupvisuals.json`.
+При старте в `latest.log` появляются две строки — `SilkVis <версия> initialised` и
+`STARTUP: modules=… soupvisuals=N/10 soupfile=…`; если числа не те, в игре стоит старый jar.
+
 ## Установка в игру
 
 Готовый мод — это `build\libs\silkvis-<версия>+mc1.21.10.jar` (рядом лежит

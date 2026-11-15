@@ -88,6 +88,8 @@ public final class SilkVisRuntime {
     private volatile List<TotemLibrary.Entry> totemEntries = List.of();
     private volatile String totemReason = "";
     private volatile String totemAppliedName = "";
+    /** The entry that produced the current pack, so a rebuild does not have to re-resolve it. */
+    private volatile TotemLibrary.Entry totemAppliedEntry;
     private volatile boolean totemBusy;
     /** Which "working" line to show: building a local file or downloading a link. */
     private volatile String totemBusyKey = "silkvis.totems.status.busy";
@@ -119,6 +121,8 @@ public final class SilkVisRuntime {
     private long mediaNextAttemptNanos;
     private static final long MEDIA_RETRY_MS = 15_000L;
     private boolean hudInteractionMode;
+    /** True when {@code soupvisuals.json} existed and was applied over the defaults. */
+    private boolean soupLoaded;
 
     private final RateLimiter mediaPollLimiter = new RateLimiter(clock, 1);
     /** Pseudo-profile for HUD/UI edits made before any world is loaded. */
@@ -134,6 +138,10 @@ public final class SilkVisRuntime {
         this.screenModel = new MainScreenModel(modules);
         registerModules();
         loadGlobal();
+        // The ported modules keep their own file: it is a verbatim port of the original
+        // settings tree, and mixing it into global.json would tie two unrelated schemas.
+        this.soupLoaded = silkvis.visual.soup.setting.SoupSettingsFile.load(
+                paths.soupFile(), SoupVisualsClient.get().modules());
     }
 
     public static synchronized SilkVisRuntime get() {
@@ -181,6 +189,40 @@ public final class SilkVisRuntime {
                 "silkvis.module.integrations.probe", "silkvis.module.integrations.probe.desc", 1,
                 Set.of(), java.util.List.of()),
                 noop());
+        // The ten ported SoupVisuals modules were fully wired but missing from this list, so
+        // the module page could not show them and there was no on/off switch anywhere except
+        // the dedicated screen. They appear here in the same order as in the original and are
+        // driven by the module objects themselves: no second source of truth for "is it on".
+        registerSoupModules();
+    }
+
+    /**
+     * Registers one descriptor per ported module. Everything (labels, defaults, order) comes
+     * from {@link SoupVisualsClient#modules()}, so a newly ported module shows up in the
+     * module list automatically.
+     */
+    private void registerSoupModules() {
+        for (silkvis.visual.soup.module.SoupModule module : SoupVisualsClient.get().modules()) {
+            String id = "soup." + silkvis.visual.soup.setting.SoupSettingsFile.keyOf(module);
+            register(new ModuleDescriptor(id, ModuleCategory.VISUAL,
+                    module.getNameKey(),
+                    // Settings keys are {@code setting.<id>.<name>.name}, the module
+                    // description the port shipped is {@code module.<id>.desc}.
+                    "module." + silkvis.visual.soup.setting.SoupSettingsFile.keyOf(module) + ".desc", 1,
+                    Set.of(Capability.CLIENT_RENDER), java.util.List.of()),
+                    new ModuleRegistry.Module() {
+                        @Override
+                        public void enable() {
+                            module.setEnabled(true);
+                            saveSoupSettings();
+                        }
+
+                        @Override
+                        public void disable() {
+                            module.setEnabled(false);
+                        }
+                    });
+        }
     }
 
     private void register(ModuleDescriptor descriptor, ModuleRegistry.Module module) {
@@ -396,7 +438,74 @@ public final class SilkVisRuntime {
         }
     }
 
+    /**
+     * One line with what this build actually loaded: the module count, how many ported modules
+     * are on, and where their config lives. Logged at start-up, because "the fix did nothing"
+     * is almost always the previous jar still sitting in {@code mods/} after a failed build.
+     */
+    public void logStartupSummary() {
+        int soupOn = 0;
+        for (silkvis.visual.soup.module.SoupModule module : SoupVisualsClient.get().modules()) {
+            if (module.isEnabled()) {
+                soupOn++;
+            }
+        }
+        String summary = "modules=" + modules.size()
+                + " soupvisuals=" + soupOn + "/" + SoupVisualsClient.get().modules().size()
+                + " soupfile=" + paths.soupFile();
+        log.event("STARTUP", summary);
+        // Also on stdout: the diagnostics log is only visible inside the mod, and this line is
+        // what a player is asked to check in latest.log when something looks stale.
+        java.util.logging.Logger.getLogger("silkvis").info("SilkVis start-up: " + summary);
+    }
+
+    /**
+     * Turns the modules the player had switched on back on at start-up.
+     *
+     * <p>It has to happen here and not only in the screen: modules are the thing that draws, and
+     * "the effect does not work after a restart" is exactly what happens when only the config is
+     * read and the registry is left thinking everything is off. Also re-runs the mod load, so a
+     * jar swapped under the same mods folder picks up the change.</p>
+     */
+    public void startSoupModules() {
+        for (silkvis.visual.soup.module.SoupModule module : SoupVisualsClient.get().modules()) {
+            if (module.isEnabled()) {
+                module.setEnabled(true);
+                log.event("SOUP_MODULE", "enabled at start: " + module.getNameKey());
+            }
+        }
+    }
+
+    /**
+     * Pushes the state loaded from {@code soupvisuals.json} into the module registry, so the
+     * list and the module objects agree from the first frame. Registered modules are the only
+     * ones the list can switch, so an unregistered id is skipped instead of throwing.
+     */
+    public void syncSoupModulesIntoRegistry() {
+        for (silkvis.visual.soup.module.SoupModule module : SoupVisualsClient.get().modules()) {
+            String id = soupModuleId(module);
+            if (module.isEnabled() && modules.get(id).isPresent()) {
+                modules.enable(id);
+            }
+        }
+    }
+
+    /** Registry id of a ported module ({@code soup.hitbubbles}). */
+    public static String soupModuleId(silkvis.visual.soup.module.SoupModule module) {
+        return "soup." + silkvis.visual.soup.setting.SoupSettingsFile.keyOf(module);
+    }
+
     public void onWorldLeft() {
+        // disableAll() is about the world session, not about the player's choice: the ported
+        // modules that were on are switched back on after the world state is dropped, exactly
+        // like the original (which keeps its module switches across worlds). Without this a
+        // portal or a reconnect silently turned every visual module off.
+        java.util.List<String> soupOn = new java.util.ArrayList<>();
+        for (silkvis.visual.soup.module.SoupModule module : SoupVisualsClient.get().modules()) {
+            if (module.isEnabled()) {
+                soupOn.add(soupModuleId(module));
+            }
+        }
         modules.disableAll();
         token = WorldSessionToken.none();
         if (map != null) {
@@ -405,11 +514,15 @@ public final class SilkVisRuntime {
         if (media != null && global.media().pauseSourceOnWorldExit()) {
             media.command(silkvis.media.MediaAction.PAUSE);
         }
+        for (String id : soupOn) {
+            modules.enable(id);
+        }
     }
 
     public void shutdown() {
         globalDebouncer.flush();
         uiDebouncer.flush();
+        saveSoupSettings();
         modules.disableAll();
         if (media != null) {
             media.close();
@@ -545,8 +658,9 @@ public final class SilkVisRuntime {
     }
 
     /**
-     * Builds the resource pack off the client thread: decoding a 4 MB picture must never
+     * Builds the resource pack off the client thread: decoding a large picture must never
      * stall a frame, and the pack is plain files on disk (no mixin, no texture injection).
+     * The edge length comes from the saved setting ({@code visual.totemTextureSize}).
      */
     public void applyTotem(TotemLibrary.Entry entry) {
         if (entry == null || resourcePacksDir == null) {
@@ -556,15 +670,48 @@ public final class SilkVisRuntime {
         totemBusyKey = "silkvis.totems.status.busy";
         totemReason = "";
         totemAppliedName = entry.displayName();
+        totemAppliedEntry = entry;
         executors.io().execute(() -> {
-            TotemPackBuilder.Result result = TotemPackBuilder.apply(entry.path(), resourcePacksDir);
+            TotemPackBuilder.Result result = TotemPackBuilder.apply(entry.path(), resourcePacksDir,
+                    ui().visual().totemTextureSize(), ui().visual().totemTrimBackground());
             totemReason = result.reason();
             totemBusy = false;
-            log.log("TOTEM_PACK", entry.name() + ":" + TotemPackBuilder.describe(result));
+            log.event("TOTEM_PACK", entry.name() + " size=" + ui().visual().totemTextureSize()
+                    + " trim=" + ui().visual().totemTrimBackground() + " reason=" + result.reason()
+                    + " src=" + result.sourceWidth() + "x" + result.sourceHeight()
+                    + " -> " + totemAppliedSize(result));
             if (result.ok()) {
                 notifyTotemPack();
             }
         });
+    }
+
+    /** Size of the texture that was actually written, read back from disk. */
+    private static String totemAppliedSize(TotemPackBuilder.Result result) {
+        if (result == null || !result.ok() || result.texture() == null) {
+            return "no texture";
+        }
+        try {
+            java.awt.image.BufferedImage written =
+                    javax.imageio.ImageIO.read(result.texture().toFile());
+            return written == null ? "unreadable"
+                    : written.getWidth() + "x" + written.getHeight();
+        } catch (java.io.IOException e) {
+            return "unreadable";
+        }
+    }
+
+    /**
+     * Rebuilds the generated pack from the entry that was applied last, so a change of the
+     * texture size or of the background trimming takes effect on the picture already in use
+     * instead of waiting for the player to pick it again.
+     */
+    public void rebuildTotemWithCurrentSize() {
+        TotemLibrary.Entry entry = totemAppliedEntry;
+        if (entry == null || !java.nio.file.Files.isRegularFile(entry.path())) {
+            return;
+        }
+        applyTotem(entry);
     }
 
     public long totemVersion() {
@@ -635,7 +782,8 @@ public final class SilkVisRuntime {
                 return;
             }
             refreshTotems();
-            TotemPackBuilder.Result pack = TotemPackBuilder.apply(download.file(), resourcePacksDir);
+            TotemPackBuilder.Result pack = TotemPackBuilder.apply(download.file(), resourcePacksDir,
+                    ui().visual().totemTextureSize(), ui().visual().totemTrimBackground());
             totemAppliedName = download.file().getFileName().toString();
             totemReason = pack.reason();
             totemBusy = false;
@@ -687,6 +835,26 @@ public final class SilkVisRuntime {
     /** Paths of this profile's config/data files; used by the bug report and diagnostics. */
     public ConfigPaths paths() {
         return paths;
+    }
+
+    /**
+     * Persists the ported module states and values. Called on shutdown and after every change
+     * made in {@link SoupSettingsScreen}; a failed write is logged, never thrown, because
+     * losing a config write must not take the game down.
+     */
+    public void saveSoupSettings() {
+        try {
+            silkvis.visual.soup.setting.SoupSettingsFile.save(
+                    paths.soupFile(), SoupVisualsClient.get().modules());
+        } catch (java.io.IOException e) {
+            // BoundedLog takes a code and a detail, not a log level.
+            log.log("SOUP_CONFIG", "not saved: " + e.getMessage());
+        }
+    }
+
+    /** Whether {@code soupvisuals.json} was present at start-up; shown in the settings screen. */
+    public boolean soupSettingsLoaded() {
+        return soupLoaded;
     }
 
     public BoundedExecutors executors() {

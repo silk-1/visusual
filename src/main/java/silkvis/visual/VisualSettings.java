@@ -23,10 +23,31 @@ public record VisualSettings(
         double rainVisualIntensity,
         boolean cloudsVisible,
         boolean entityMarkersEnabled,
-        boolean depthAwareMarkers
+        boolean depthAwareMarkers,
+        /** Edge of the generated totem texture: 16, 32, 64 or 128 (see TotemPackBuilder). */
+        int totemTextureSize,
+        /**
+         * Cut the plain background out of the totem picture (white, black, grey and the
+         * corners) so only the drawing is left. On by default: the owner asked for it.
+         */
+        boolean totemTrimBackground
 ) {
+    /** Valid totem edges; the generated pack uses one of these, never an arbitrary number. */
+    public static final int[] TOTEM_TEXTURE_SIZES = {16, 32, 64, 128};
+
     public static VisualSettings defaults() {
-        return new VisualSettings(false, 70, 1.0, 1.0, 1.0, false, 0.35, 1.0, 4000, 1.0, true, false, true);
+        return new VisualSettings(false, 70, 1.0, 1.0, 1.0, false, 0.35, 1.0, 4000, 1.0, true, false,
+                true, 128, true);
+    }
+
+    public VisualSettings(boolean fovEnabled, double fovDegrees, double viewBobbing,
+                          double hurtCameraIntensity, double screenEffectIntensity, boolean fogEnabled,
+                          double fogStartRatio, double fogEndRatio, int particleCap,
+                          double rainVisualIntensity, boolean cloudsVisible,
+                          boolean entityMarkersEnabled, boolean depthAwareMarkers) {
+        this(fovEnabled, fovDegrees, viewBobbing, hurtCameraIntensity, screenEffectIntensity,
+                fogEnabled, fogStartRatio, fogEndRatio, particleCap, rainVisualIntensity,
+                cloudsVisible, entityMarkersEnabled, depthAwareMarkers, 128, true);
     }
 
     public JsonObject encode() {
@@ -43,7 +64,9 @@ public record VisualSettings(
                 .put("rainVisualIntensity", rainVisualIntensity)
                 .put("cloudsVisible", cloudsVisible)
                 .put("entityMarkersEnabled", entityMarkersEnabled)
-                .put("depthAwareMarkers", depthAwareMarkers);
+                .put("depthAwareMarkers", depthAwareMarkers)
+                .put("totemTextureSize", totemTextureSize)
+                .put("totemTrimBackground", totemTrimBackground);
     }
 
     public static VisualSettings decode(JsonObject o) throws ConfigException {
@@ -64,7 +87,13 @@ public record VisualSettings(
                         : d.rainVisualIntensity(),
                 o.has("cloudsVisible") ? o.get("cloudsVisible").bool() : d.cloudsVisible(),
                 o.has("entityMarkersEnabled") ? o.get("entityMarkersEnabled").bool() : d.entityMarkersEnabled(),
-                o.has("depthAwareMarkers") ? o.get("depthAwareMarkers").bool() : d.depthAwareMarkers());
+                o.has("depthAwareMarkers") ? o.get("depthAwareMarkers").bool() : d.depthAwareMarkers(),
+                o.has("totemTextureSize") ? o.get("totemTextureSize").number().intValueExact()
+                        : d.totemTextureSize(),
+                // Configs written before this option existed must get the default (on), not
+                // "false because the key was missing".
+                o.has("totemTrimBackground") ? o.get("totemTrimBackground").bool()
+                        : d.totemTrimBackground());
     }
 
     public void validate() throws ConfigException {
@@ -82,6 +111,15 @@ public record VisualSettings(
         if (entityMarkersEnabled && !depthAwareMarkers) {
             throw ConfigException.of("visual.depthAwareMarkers",
                     "through-wall markers are not supported; markers stay depth-aware");
+        }
+        boolean knownSize = false;
+        for (int size : TOTEM_TEXTURE_SIZES) {
+            if (totemTextureSize == size) {
+                knownSize = true;
+            }
+        }
+        if (!knownSize) {
+            throw ConfigException.of("visual.totemTextureSize", "must be 16, 32, 64 or 128");
         }
     }
 }

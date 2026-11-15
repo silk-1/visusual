@@ -40,13 +40,28 @@ public final class SilkVisClient implements ClientModInitializer {
     private static KeyBinding hudInteraction;
     private static KeyBinding bugReport;
     private static KeyBinding openMap;
+    /** Direct shortcut to the ported module settings; the same screen is on the VISUAL tab. */
+    private static KeyBinding openSoupModules;
     private static final MapPrefetcher MAP_PREFETCH = new MapPrefetcher();
+    // java.util.logging on purpose: slf4j is not a declared dependency of this build (the mod
+    // compiles against Minecraft and Fabric Loader only). On Fabric the JDK logger's output
+    // still lands in latest.log.
+    private static final java.util.logging.Logger LOGGER =
+            java.util.logging.Logger.getLogger("silkvis");
     private static HudDataCollector collector;
     private static String lastDimension = "";
 
     @Override
     public void onInitializeClient() {
         SilkVisRuntime runtime = SilkVisRuntime.get();
+        // The ported modules take part in the registry (their switches live there), so the
+        // state the registry shows and the module state start out in agreement: whatever the
+        // settings file said on load is pushed into the registry once.
+        runtime.syncSoupModulesIntoRegistry();
+        // Module objects are the part that actually draws: switch them on explicitly instead of
+        // trusting whoever read the config earlier.
+        runtime.startSoupModules();
+        runtime.logStartupSummary();
         // Localizer is a functional interface (String -> String), so the reference has to go
         // through the method, not to the factory method that returns it.
         collector = new HudDataCollector(runtime.clock(),
@@ -97,9 +112,23 @@ public final class SilkVisClient implements ClientModInitializer {
         // Unbound by default: M belongs to AtlasMap (ADR-0007), and our own map is reachable
         // from the Map tab. A default bind that fires alongside another mod's map is worse
         // than no bind at all.
+        // Unbound by default like the other extra keys: the screen is also reachable from
+        // the SilkVis menu (VISUAL tab), so no default bind can collide with anything.
+        openSoupModules = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+                "key.silkvis.soup_visuals", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN, CATEGORY));
         openMap = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                 "key.silkvis.open_map", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN, CATEGORY));
 
+        // One line in latest.log that names the running jar. A failed `build.bat` leaves the
+        // previous jar in mods/, so "the fix did nothing" is usually "the old build is still
+        // installed": this line answers that without guessing.
+        LOGGER.info("SilkVis {} initialised ({})", FabricLoader.getInstance()
+                        .getModContainer("silkvis")
+                        .map(container -> container.getMetadata().getVersion().getFriendlyString())
+                        .orElse("unknown"),
+                FabricLoader.getInstance().getModContainer("silkvis")
+                        .map(container -> container.getMetadata().getVersion().toString())
+                        .orElse("no jar metadata"));
         ClientTickEvents.END_CLIENT_TICK.register(this::onClientTick);
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> onJoin(client));
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> runtime.onWorldLeft());
@@ -157,6 +186,11 @@ public final class SilkVisClient implements ClientModInitializer {
         while (openMenu.wasPressed()) {
             if (!(client.currentScreen instanceof SilkVisScreen)) {
                 client.setScreen(new SilkVisScreen());
+            }
+        }
+        while (openSoupModules.wasPressed()) {
+            if (client.currentScreen == null) {
+                client.setScreen(new SoupSettingsScreen(null));
             }
         }
         while (openMap.wasPressed()) {

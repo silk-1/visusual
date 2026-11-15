@@ -178,6 +178,10 @@ public final class SilkVisScreen extends Screen {
         int y = contentTop - settingsScroll.offset();
         int width = Math.max(80, area.width() - 8);
 
+        // Selecting a module row in the list must do something: this puts that module's
+        // switch (and the link to its full settings) above the tab's own controls.
+        y = addSoupModuleSwitch(area, y, width);
+
         switch (category) {
             case HUD -> {
                 // The editor is the place where position, scale and opacity live; the tab
@@ -309,6 +313,14 @@ public final class SilkVisScreen extends Screen {
                 y += ROW_HEIGHT + 10;
             }
             case VISUAL -> {
+                settingsWidgets.add(new ButtonWidget(
+                        new Rect(area.x(), y + 4, Math.min(width, 240), ROW_HEIGHT),
+                        tr("silkvis.soup.open"), () -> {
+                    if (client != null) {
+                        client.setScreen(new SoupSettingsScreen(this));
+                    }
+                }).style(ButtonWidget.Style.PRIMARY));
+                y += ROW_HEIGHT + 14;
                 VisualSettings visual = runtime.ui().visual();
                 y = addToggle(area, y, width, tr("silkvis.visual.fov"), tr("silkvis.visual.fov.desc"),
                         visual.fovEnabled(), value -> {
@@ -373,6 +385,77 @@ public final class SilkVisScreen extends Screen {
                 }
             }
             case TOTEMS -> {
+                // Texture size: the setting that decides how sharp the picture looks. It used
+                // to be hard-wired to the vanilla 16x16, which is why a photo came out as a
+                // blurry smear. One row, four segments: holding four stacked full-width rows
+                // here would push the actual totem controls below the fold.
+                settingsWidgets.add(new FixedText(tr("silkvis.totems.size"),
+                        new Rect(area.x(), y, width, 14)));
+                y += 16;
+                VisualSettings totemVisual = runtime.ui().visual();
+                int segmentWidth = Math.max(24,
+                        Math.min(width, 320) / VisualSettings.TOTEM_TEXTURE_SIZES.length);
+                int segmentX = area.x();
+                for (int size : VisualSettings.TOTEM_TEXTURE_SIZES) {
+                    boolean active = totemVisual.totemTextureSize() == size;
+                    ButtonWidget sizeButton = new ButtonWidget(
+                            new Rect(segmentX, y, segmentWidth - 2, ROW_HEIGHT),
+                            tr("silkvis.totems.size." + size), () -> {
+                        if (runtime.ui().visual().totemTextureSize() == size) {
+                            return;
+                        }
+                        // Copy the record with the new edge (records have no wither), save it,
+                        // then rebuild the pack from the picture already applied: without the
+                        // rebuild the player changes the setting and sees nothing.
+                        VisualSettings current = runtime.ui().visual();
+                        VisualSettings updated = new VisualSettings(current.fovEnabled(),
+                                current.fovDegrees(), current.viewBobbing(),
+                                current.hurtCameraIntensity(), current.screenEffectIntensity(),
+                                current.fogEnabled(), current.fogStartRatio(),
+                                current.fogEndRatio(), current.particleCap(),
+                                current.rainVisualIntensity(), current.cloudsVisible(),
+                                current.entityMarkersEnabled(), current.depthAwareMarkers(), size,
+                                current.totemTrimBackground());
+                        runtime.requestUiSave(new silkvis.config.UiConfig(runtime.hudLayout(),
+                                runtime.ui().map(), updated));
+                        runtime.rebuildTotemWithCurrentSize();
+                        rebuildSettings();
+                    });
+                    if (active) {
+                        sizeButton.style(ButtonWidget.Style.PRIMARY);
+                    }
+                    settingsWidgets.add(sizeButton);
+                    segmentX += segmentWidth;
+                }
+                y += ROW_HEIGHT + 2;
+                settingsWidgets.add(new FixedText(tr("silkvis.totems.size.desc"),
+                        new Rect(area.x(), y, width, 22)));
+                y += 26;
+                // Background trim: one switch, because the player's complaint was "a white
+                // square instead of my picture" and the fix has to be one click.
+                boolean trim = totemVisual.totemTrimBackground();
+                settingsWidgets.add(new ButtonWidget(
+                        new Rect(area.x(), y, Math.min(width, 320), ROW_HEIGHT),
+                        tr("silkvis.totems.trim") + ": "
+                                + tr(trim ? "silkvis.state.on" : "silkvis.state.off"), () -> {
+                    VisualSettings current = runtime.ui().visual();
+                    VisualSettings updated = new VisualSettings(current.fovEnabled(),
+                            current.fovDegrees(), current.viewBobbing(),
+                            current.hurtCameraIntensity(), current.screenEffectIntensity(),
+                            current.fogEnabled(), current.fogStartRatio(), current.fogEndRatio(),
+                            current.particleCap(), current.rainVisualIntensity(),
+                            current.cloudsVisible(), current.entityMarkersEnabled(),
+                            current.depthAwareMarkers(), current.totemTextureSize(), !trim);
+                    runtime.requestUiSave(new silkvis.config.UiConfig(runtime.hudLayout(),
+                            runtime.ui().map(), updated));
+                    runtime.rebuildTotemWithCurrentSize();
+                    rebuildSettings();
+                }).style(trim ? ButtonWidget.Style.PRIMARY : ButtonWidget.Style.SECONDARY));
+                y += ROW_HEIGHT + 2;
+                settingsWidgets.add(new FixedText(tr("silkvis.totems.trim.desc"),
+                        new Rect(area.x(), y, width, 22)));
+                y += 26;
+
                 // ASSET-04: a picture in a folder becomes a real resource pack. No file
                 // dialog (a mod cannot open one without native code) and no typed paths.
                 settingsWidgets.add(new FixedText(tr("silkvis.totems.hint"),
@@ -897,6 +980,54 @@ public final class SilkVisScreen extends Screen {
             }
         }
         return null;
+    }
+
+    /**
+     * A "selected module" pane for the ported modules: the list row selects, this switch
+     * turns it on. Without it the module list was read-only and the only switch lived on a
+     * screen the player had to know about.
+     */
+    private int addSoupModuleSwitch(Rect area, int y, int width) {
+        String id = runtime.screenModel().selectedModuleId();
+        if (id == null || !id.startsWith("soup.")) {
+            return y;
+        }
+        ModuleRegistry.Entry entry = runtime.modules().get(id).orElse(null);
+        if (entry == null) {
+            return y;
+        }
+        boolean enabled = entry.state() == silkvis.core.ModuleState.ENABLED;
+        String key = id.substring("soup.".length());
+        String label = tr(entry.descriptor().displayKey());
+        settingsWidgets.add(new ButtonWidget(
+                new Rect(area.x(), y, Math.min(width, 260), ROW_HEIGHT),
+                tr("silkvis.soup.power") + ": " + label + " ("
+                        + tr(enabled ? "silkvis.soup.on" : "silkvis.soup.off") + ")", () -> {
+            if (enabled) {
+                runtime.modules().disable(id);
+            } else {
+                runtime.modules().enable(id);
+            }
+            rebuildSettings();
+        }).style(enabled ? ButtonWidget.Style.PRIMARY : ButtonWidget.Style.SECONDARY));
+        y += ROW_HEIGHT + 6;
+        // The per-setting menu is reachable from the row too: selecting a module and then
+        // hunting for its settings in a different tab was the reason the whole port looked
+        // unfinished.
+        settingsWidgets.add(new ButtonWidget(new Rect(area.x(), y, Math.min(width, 260),
+                ROW_HEIGHT), tr("silkvis.soup.open"), () -> {
+            if (client != null) {
+                client.setScreen(new SoupSettingsScreen(this));
+            }
+        }));
+        y += ROW_HEIGHT + 10;
+        String hintKey = "module." + key + ".desc";
+        String hint = tr(hintKey);
+        if (!hint.equals(hintKey)) {
+            settingsWidgets.add(new FixedText(hint, new Rect(area.x(), y, width, 24)));
+            y += 28;
+        }
+        return y;
     }
 
     @Override
