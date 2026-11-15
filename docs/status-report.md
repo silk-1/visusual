@@ -867,3 +867,28 @@ SHA-256 другой → `hash_mismatch` → провайдер не запус�
 
 `parsed=138 failed=0`.
 
+---
+
+## 0.1.14-p2 — краш `ClassNotFoundException: silkvis.client.SilkVisClient`
+
+Сборка прошла, игра упала на `Initializing game`. В отчёте о краше два признака:
+`silkvis: SilkVis ${version}` (неразвёрнутая версия) и `ClassNotFoundException` на класс
+входной точки.
+
+### Причина
+
+В `mods` лежал **sources-jar**, а не мод. `withSourcesJar()` публиковал второй файл
+`silkvis-<версия>+mc1.21.10-sources.jar`, и он же содержит `fabric.mod.json` — но
+неразвёрнутый (`${version}` подставляется только в `processResources` для основного jar) и
+без единого `.class`. Fabric читает манифест, находит entrypoint и не находит класс.
+
+### Правка
+
+| Что | Почему |
+|---|---|
+| `withSourcesJar()` убран из `build.gradle` | в `build\libs` должен оставаться один файл — ошибиться при копировании нечем |
+| `build.bat` ставит jar сам | удаляет `silkvis-*.jar` из `%appdata%\.minecraft\mods` и копирует собранный; `-sources` отфильтрован, имя установленного файла печатается |
+| `docs/build.md` | раздел «какой файл кидать в mods» |
+
+Версия `0.1.14-p2`, чтобы отличить от сборки, которая лежала в `mods` рядом с sources-jar.
+

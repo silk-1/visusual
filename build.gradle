@@ -27,7 +27,10 @@ java {
     // So: no toolchain pin - Gradle runs on JDK 25, bytecode is released at 21.
     sourceCompatibility = JavaVersion.VERSION_21
     targetCompatibility = JavaVersion.VERSION_21
-    withSourcesJar()
+    // No sources jar on purpose: build/libs must contain exactly one file to copy into
+    // mods. The sources jar has fabric.mod.json with an unexpanded ${version} and no
+    // classes, and loading it gives "ClassNotFoundException: silkvis.client.SilkVisClient"
+    // (owner crash, 2026-11-15).
 }
 
 tasks.withType(JavaCompile).configureEach {
