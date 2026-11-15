@@ -83,6 +83,30 @@ C++/WinRT, кладётся рядом с `manifest.properties` (SHA-256). В э
 собран**, поэтому музыкальный провайдер при запуске честно сообщает
 `ERROR: helper_missing` вместо фиктивных данных.
 
+## Обновление и сборка: команды для PowerShell
+
+Окно **Windows PowerShell** не понимает `cd /d` — это команда `cmd.exe`, отсюда ошибка
+`Set-Location : Не удается найти позиционный параметр, принимающий аргумент "F:\silkvis"`,
+а следом `fatal: not a git repository`, потому что папка так и не сменилась.
+
+Правильный порядок (PowerShell):
+
+```powershell
+Set-Location F:\silkvis      # то же самое: cd F:\silkvis   (без /d!)
+git pull
+.\build.bat
+```
+
+`cmd.exe`, если удобнее он:
+
+```bat
+cd /d F:\silkvis && git pull && build.bat
+```
+
+Проверка, что вы в нужной папке: `Get-ChildItem build.bat` находит файл, а `git status`
+отвечает. `build.bat` можно запустить и из любой папки по полному пути —
+`& F:\silkvis\build.bat` — он сам переходит к своим `gradlew.bat` и `build\libs`.
+
 ## Какой файл кидать в mods
 
 `build\libs` содержит **ровно один** jar: `silkvis-<версия>+mc1.21.10.jar`. Sources-jar
