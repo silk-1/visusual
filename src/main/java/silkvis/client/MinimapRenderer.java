@@ -30,10 +30,11 @@ public final class MinimapRenderer {
 
     public static void render(VanillaPainter painter, Rect bounds, ThemeTokens theme,
                               MapService mapService, MapIdentity identity, MapSettings settings,
-                              MinecraftClient client) {
-        painter.fill(bounds, Color.argb(theme.surface().withAlpha(0.72f)));
+                              MinecraftClient client, String emptyLabel) {
+        painter.roundPanel(bounds, theme.radiusControl(),
+                Color.argb(theme.surface().withAlpha(0.72f)), Color.argb(theme.border()));
         if (client.player == null || mapService == null) {
-            drawPlaceholder(painter, bounds, theme);
+            drawPlaceholder(painter, bounds, theme, emptyLabel);
             return;
         }
         int centerX = client.player.getBlockX();
@@ -62,23 +63,28 @@ public final class MinimapRenderer {
             }
         }
         if (drawn == 0) {
-            drawPlaceholder(painter, bounds, theme);
+            drawPlaceholder(painter, bounds, theme, emptyLabel);
         }
         // Player heading marker (depth-aware by construction: it is the player position).
         int cx = bounds.x() + bounds.width() / 2;
         int cy = bounds.y() + bounds.height() / 2;
         painter.fill(new Rect(cx - 1, cy - 1, 3, 3), Color.argb(theme.accent()));
         if (settings.showCardinals()) {
-            painter.text("N", bounds.centerX() - painter.textWidth("N") / 2, bounds.y() + 2,
+            painter.text("N", bounds.centerX() - painter.textWidth("N") / 2, bounds.y() + 4,
                     Color.argb(theme.textPrimary()), true);
         }
-        painter.outline(bounds, Color.argb(theme.border()), 1);
     }
 
-    private static void drawPlaceholder(VanillaPainter painter, Rect bounds, ThemeTokens theme) {
-        painter.fill(bounds, Color.argb(theme.surface().withAlpha(0.85f)));
-        String text = "map";
-        painter.text(text, bounds.centerX() - painter.textWidth(text) / 2,
+    /**
+     * No tiles yet (the GPU upload path is still pending, docs/known-limitations.md). The
+     * old placeholder printed the literal word "map", which read like a bug; the caller now
+     * passes a localized line instead.
+     */
+    private static void drawPlaceholder(VanillaPainter painter, Rect bounds, ThemeTokens theme, String label) {
+        if (label == null || label.isEmpty()) {
+            return;
+        }
+        painter.text(label, bounds.centerX() - painter.textWidth(label) / 2,
                 bounds.centerY() - painter.lineHeight() / 2, Color.argb(theme.textSecondary()), false);
     }
 }
