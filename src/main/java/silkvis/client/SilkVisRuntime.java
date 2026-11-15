@@ -190,7 +190,28 @@ public final class SilkVisRuntime {
                 MapIdentity.FORMAT_VERSION, ui.map().mode(), ui.map().sliceY());
         this.token = WorldSessionToken.mint(identity.profileId());
         startMapService();
+        enforceExternalMapPolicy();
         updateMediaCapability();
+    }
+
+    /**
+     * Re-applies the ADR-0007 decision after a profile is loaded. Necessary because the
+     * policy first runs during client init, when there is no profile yet and therefore no
+     * {@code hud.json}; a minimap that the user enabled earlier would otherwise come back
+     * and paint over the external map.
+     */
+    private void enforceExternalMapPolicy() {
+        if (externalMapId.isEmpty()) {
+            return;
+        }
+        HudWidgetConfig minimap = hudLayout().get(HudWidgetId.MINIMAP);
+        if (minimap.enabled()) {
+            setHudLayout(hudLayout().with(minimap.withEnabled(false)));
+            log.log("MAP_MINIMAP_DISABLED_EXTERNAL", externalMapId);
+        }
+        if (map != null) {
+            map.setPaused(true);
+        }
     }
 
     private void startMapService() {
