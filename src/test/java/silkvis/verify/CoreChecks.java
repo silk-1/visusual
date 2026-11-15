@@ -276,7 +276,7 @@ final class CoreChecks {
             }
         });
 
-        check("totem builder writes a 16x16 texture and a loadable pack", () -> {
+        check("totem builder writes a 128x128 texture and a loadable pack", () -> {
             Path dir = Files.createTempDirectory("silkvis-totem");
             try {
                 Path source = dir.resolve("source.png");
@@ -290,8 +290,25 @@ final class CoreChecks {
                         .resolve(TotemPackBuilder.TEXTURE_PATH);
                 assertTrue(Files.isRegularFile(texture), "texture written");
                 java.awt.image.BufferedImage decoded = javax.imageio.ImageIO.read(texture.toFile());
-                assertEquals(16, decoded.getWidth(), "texture width");
-                assertEquals(16, decoded.getHeight(), "texture height");
+                // 128 is the default edge: the vanilla 16x16 made any real picture a blur.
+                assertEquals(128, decoded.getWidth(), "texture width");
+                assertEquals(128, decoded.getHeight(), "texture height");
+                // Every offered edge is honoured, and an unsupported one falls back instead of
+                // silently producing an odd-sized texture.
+                for (int edge : silkvis.visual.VisualSettings.TOTEM_TEXTURE_SIZES) {
+                    TotemPackBuilder.Result sized = TotemPackBuilder.apply(source, packs, edge);
+                    assertTrue(sized.ok(), "size " + edge + " built: " + sized.reason());
+                    java.awt.image.BufferedImage out =
+                            javax.imageio.ImageIO.read(texture.toFile());
+                    assertEquals(edge, out.getWidth(), "texture width at " + edge);
+                    assertEquals(edge, out.getHeight(), "texture height at " + edge);
+                }
+                // An unsupported edge is normalised down, never written as-is.
+                assertTrue(TotemPackBuilder.apply(source, packs, 200).ok(),
+                        "unsupported size still builds");
+                assertEquals(128,
+                        javax.imageio.ImageIO.read(texture.toFile()).getWidth(),
+                        "unsupported size normalised");
                 String meta = Files.readString(packs.resolve(TotemPackBuilder.PACK_DIR_NAME)
                         .resolve("pack.mcmeta"), StandardCharsets.UTF_8);
                 assertTrue(meta.contains("supported_formats"), "format range keeps it loadable");

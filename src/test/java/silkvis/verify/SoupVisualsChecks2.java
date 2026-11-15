@@ -36,6 +36,58 @@ final class SoupVisualsChecks2 {
     private SoupVisualsChecks2() {
     }
 
+    /**
+     * The settings file is the only thing that makes the menu survive a restart; a silent
+     * mismatch between key generation and lookup would write ten modules to one key and lose
+     * every value. Checked end to end: save -> wipe the modules -> load -> values are back.
+     */
+    private static void settingsFileRoundTrip() {
+        SelfCheck.check("soup: settings file round trip and unique module ids", () -> {
+            java.nio.file.Path dir = java.nio.file.Files.createTempDirectory("silkvis-soup");
+            java.nio.file.Path file = dir.resolve("soupvisuals.json");
+            List<silkvis.visual.soup.module.SoupModule> modules = List.of(
+                    new Hitboxes(), new JumpCircles(), new JumpCircles());
+            // Distinct ids: the file keys modules by id, so a duplicate would overwrite every
+            // value of the module it collided with. Two of the three modules here are the same
+            // type on purpose: the id must come from the module name, not from a counter.
+            Set<String> ids = new HashSet<>();
+            for (silkvis.visual.soup.module.SoupModule module : modules) {
+                ids.add(silkvis.visual.soup.setting.SoupSettingsFile.keyOf(module));
+            }
+            SelfCheck.assertEquals(2, ids.size(), "ids come from the module name");
+            modules.get(0).setEnabled(true);
+            ValueSetting first = SettingRepository
+                    .byConfigKey(modules.get(0).getRootSettings()).values().stream()
+                    .filter(setting -> setting instanceof ValueSetting)
+                    .map(setting -> (ValueSetting) setting)
+                    .findFirst().orElseThrow();
+            first.setValue(first.getMin());
+            silkvis.visual.soup.setting.SoupSettingsFile.save(file, modules);
+            assertTrue(java.nio.file.Files.isRegularFile(file), "file written");
+
+            modules.get(0).setEnabled(false);
+            first.setValue(first.getMax());
+            assertTrue(silkvis.visual.soup.setting.SoupSettingsFile.load(file, modules),
+                    "file loaded");
+            assertTrue(modules.get(0).isEnabled(), "module state restored");
+            SelfCheck.assertEquals((double) first.getMin(), (double) first.getValue(), 1.0E-4,
+                    "value restored");
+            // Every module keeps its own key (checked above, before the file is damaged):
+            // a collision would have written the same values under the same names and the
+            // file would still parse, so only the presence of both ids proves it.
+
+            String text = java.nio.file.Files.readString(file);
+            assertTrue(text.contains("\"hitboxes\"") && text.contains("\"jumpcircles\""),
+                    "both module ids present in the file");
+
+            // A damaged file must not throw and must not half-apply.
+            java.nio.file.Files.writeString(file, "{ not json");
+            assertTrue(!silkvis.visual.soup.setting.SoupSettingsFile.load(file, modules),
+                    "broken file rejected");
+            assertTrue(modules.get(0).isEnabled(), "state kept after a broken file");
+        });
+    }
+
     static void run() {
         hitboxesDefaults();
         jumpCirclesDefaults();
@@ -54,6 +106,7 @@ final class SoupVisualsChecks2 {
         trailLifetime();
         friendList();
         killEffectBookkeeping();
+        settingsFileRoundTrip();
     }
 
     private static void hitboxesDefaults() {

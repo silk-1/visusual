@@ -17,6 +17,11 @@ public final class ConfigPaths {
         this.dataDir = dataDir;
     }
 
+    /** On/off state and settings of the ported SoupVisuals modules. */
+    public Path soupFile() {
+        return configDir.resolve(ROOT).resolve("soupvisuals.json");
+    }
+
     public Path globalFile() {
         return configDir.resolve(ROOT).resolve("global.json");
     }

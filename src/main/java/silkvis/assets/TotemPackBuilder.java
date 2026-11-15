@@ -26,12 +26,24 @@ import java.util.Locale;
 public final class TotemPackBuilder {
     public static final String PACK_DIR_NAME = "silkvis-totem";
     public static final String TEXTURE_PATH = "assets/minecraft/textures/item/totem_of_undying.png";
-    /** Vanilla totem texture is 16x16; anything larger is downscaled, not upscaled. */
-    public static final int TEXTURE_SIZE = 16;
-    /** A 4 MiB picture is already absurd for a 16x16 icon; beyond that it is a mistake. */
-    public static final long MAX_FILE_BYTES = 4L * 1024 * 1024;
+    /**
+     * Edge of the generated totem texture.
+     *
+     * <p>Vanilla ships 16x16 and the mod used to downscale every picture to that size, which
+     * is why a photo turned into a blurry 16-pixel smear («как будто там 16 на 16, чёткости
+     * нет»). Minecraft does not require the vanilla size: a resource pack can ship a larger
+     * image and it is sampled at full resolution, so 128 is used here. 16, 32, 64 and 128 are
+     * the supported sizes; {@link #TEXTURE_SIZE} is the default.</p>
+     */
+    public static final int[] TEXTURE_SIZES = {16, 32, 64, 128};
+    public static final int TEXTURE_SIZE = 128;
+    /**
+     * Largest picture that is still accepted after the size upgrade. A 128x128 texture is
+     * 64 KiB raw, so the file limit guards against absurd inputs, not against quality.
+     */
+    public static final long MAX_FILE_BYTES = 16L * 1024 * 1024;
     /** Refuse to decode something that would eat hundreds of megabytes of heap. */
-    public static final int MAX_SOURCE_EDGE = 4096;
+    public static final int MAX_SOURCE_EDGE = 8192;
 
     private TotemPackBuilder() {
     }
@@ -59,6 +71,12 @@ public final class TotemPackBuilder {
      * @param resourcePacksDir the instance {@code resourcepacks} directory
      */
     public static Result apply(Path source, Path resourcePacksDir) {
+        return apply(source, resourcePacksDir, TEXTURE_SIZE);
+    }
+
+    /** Same, with an explicit edge length (must be one of {@link #TEXTURE_SIZES}). */
+    public static Result apply(Path source, Path resourcePacksDir, int edge) {
+        int size = normaliseSize(edge);
         if (source == null || resourcePacksDir == null || !Files.isRegularFile(source)) {
             return Result.failure("file_missing");
         }
@@ -93,7 +111,7 @@ public final class TotemPackBuilder {
             if (parent != null) {
                 Files.createDirectories(parent);
             }
-            BufferedImage scaled = scaleToIcon(decoded, width, height);
+            BufferedImage scaled = scaleToIcon(decoded, width, height, size);
             if (!ImageIO.write(scaled, "png", texture.toFile())) {
                 return Result.failure("write_failed");
             }
@@ -105,26 +123,77 @@ public final class TotemPackBuilder {
         }
     }
 
-    /**
-     * Pixel art stays pixel art: a source whose sides are multiples of 16 is downscaled with
-     * nearest neighbour (no colour bleeding between blocks), everything else with bilinear
-     * filtering so a photo does not turn into noise.
-     */
+    /** Rounds a requested edge to a supported size, so a bad config cannot ship 1000x1000. */
+    public static int normaliseSize(int edge) {
+        int best = TEXTURE_SIZES[0];
+        for (int candidate : TEXTURE_SIZES) {
+            if (edge >= candidate) {
+                best = candidate;
+            }
+        }
+        return best;
+    }
+
+    /** Default scale call kept for the older checks and callers. */
     static BufferedImage scaleToIcon(BufferedImage source, int width, int height) {
-        BufferedImage target = new BufferedImage(TEXTURE_SIZE, TEXTURE_SIZE, BufferedImage.TYPE_INT_ARGB);
+        return scaleToIcon(source, width, height, TEXTURE_SIZE);
+    }
+
+    /**
+     * Downsamples to {@code edge}x{@code edge}.
+     *
+     * <p>Two cases, because they want opposite filters: pixel art (both sides are multiples
+     * of the target edge) is resized with nearest neighbour so blocks stay crisp and no colour
+     * bleeds between them; a photo gets a progressive bilinear/area downscale, which is what
+     * Java2D's multi-step {@code drawImage} with {@code SCALE_AREA_AVERAGING} does best. A
+     * single-step bilinear shrink of a 4000 px photo to 128 px aliases badly, so the source is
+     * halved repeatedly first.</p>
+     */
+    static BufferedImage scaleToIcon(BufferedImage source, int width, int height, int edge) {
+        int size = normaliseSize(edge);
+        BufferedImage target = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
+        boolean pixelArt = width % size == 0 && height % size == 0;
+        BufferedImage step = pixelArt ? source : halveUntilClose(source, size);
         Graphics2D graphics = target.createGraphics();
         try {
-            boolean pixelArt = width % TEXTURE_SIZE == 0 && height % TEXTURE_SIZE == 0;
             graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
                     pixelArt ? RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR
                             : RenderingHints.VALUE_INTERPOLATION_BILINEAR);
             graphics.setRenderingHint(RenderingHints.KEY_RENDERING,
                     RenderingHints.VALUE_RENDER_QUALITY);
-            graphics.drawImage(source, 0, 0, TEXTURE_SIZE, TEXTURE_SIZE, null);
+            graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
+                    pixelArt ? RenderingHints.VALUE_ANTIALIAS_OFF
+                            : RenderingHints.VALUE_ANTIALIAS_ON);
+            graphics.drawImage(step, 0, 0, size, size, null);
         } finally {
             graphics.dispose();
         }
         return target;
+    }
+
+    /**
+     * Halves the picture (keeping the aspect ratio) until it is at most twice the target, so
+     * the final bilinear step only removes detail instead of inventing it.
+     */
+    private static BufferedImage halveUntilClose(BufferedImage source, int size) {
+        BufferedImage current = source;
+        int width = source.getWidth();
+        int height = source.getHeight();
+        while (width > size * 2 || height > size * 2) {
+            width = Math.max(size, width / 2);
+            height = Math.max(size, height / 2);
+            BufferedImage next = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+            Graphics2D graphics = next.createGraphics();
+            try {
+                graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+                        RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                graphics.drawImage(current, 0, 0, width, height, null);
+            } finally {
+                graphics.dispose();
+            }
+            current = next;
+        }
+        return current;
     }
 
     /**
