@@ -65,12 +65,18 @@ public final class HudOverlayRenderer {
                 enabled.add(cfg);
             }
         }
-        enabled.sort(Comparator.comparingInt(HudWidgetConfig::zIndex));
+        // Top-down instead of z-order: with no overlap the z-order stops mattering, and a
+        // widget higher on the screen keeps its slot while the ones below shift down. Saved
+        // layouts from before 2026-11-15 carry single-line offsets, so coordinates used to
+        // paint on top of FPS; this repairs existing configs without a migration.
+        enabled.sort(Comparator.comparingInt(HudWidgetConfig::offsetY)
+                .thenComparingInt(HudWidgetConfig::zIndex));
 
+        List<Rect> occupied = new ArrayList<>();
         for (HudWidgetConfig cfg : enabled) {
             List<String> lines = model.lines(cfg.id());
             if (cfg.id() == HudWidgetId.NOW_PLAYING) {
-                renderNowPlaying(painter, theme, screen, safe, cfg, runtime);
+                renderNowPlaying(painter, theme, screen, safe, cfg, runtime, occupied);
                 continue;
             }
             if (cfg.id() == HudWidgetId.MINIMAP) {
@@ -80,7 +86,9 @@ public final class HudOverlayRenderer {
                     continue;
                 }
                 int size = Math.min(128, Math.min(screen.width(), screen.height()) / 3);
-                Rect box = HudLayoutEngine.resolve(screen, safe, cfg, size, size);
+                Rect box = avoidOverlap(HudLayoutEngine.resolve(screen, safe, cfg, size, size),
+                        occupied, screen);
+                occupied.add(box);
                 MinimapRenderer.render(painter, box, theme, map.get(), identity.get(),
                         runtime.ui().map(), client,
                         net.minecraft.text.Text.translatable("silkvis.map.no_tiles").getString());
@@ -89,18 +97,50 @@ public final class HudOverlayRenderer {
             if (lines.isEmpty()) {
                 continue;
             }
-            renderPanel(painter, theme, screen, safe, cfg, lines);
+            renderPanel(painter, theme, screen, safe, cfg, lines, occupied);
         }
     }
 
+    /**
+     * Pushes a widget down until it no longer intersects one already placed. Bounded: after
+     * a few attempts (or when it would leave the screen) the original box is returned, so a
+     * dense layout can never make widgets run away or disappear entirely.
+     */
+    private static Rect avoidOverlap(Rect box, List<Rect> occupied, Rect screen) {
+        Rect current = box;
+        for (int guard = 0; guard < 8; guard++) {
+            Rect hit = null;
+            for (Rect other : occupied) {
+                if (current.intersects(other)) {
+                    hit = other;
+                    break;
+                }
+            }
+            if (hit == null) {
+                return current;
+            }
+            int shift = hit.bottom() + 2 - current.y();
+            if (shift <= 0) {
+                return current;
+            }
+            current = current.translate(0, shift);
+            if (current.bottom() > screen.bottom()) {
+                return box;
+            }
+        }
+        return current;
+    }
+
     private static void renderPanel(VanillaPainter painter, ThemeTokens theme, Rect screen, Rect safe,
-                                    HudWidgetConfig cfg, List<String> lines) {
+                                    HudWidgetConfig cfg, List<String> lines, List<Rect> occupied) {
         int width = 0;
         for (String line : lines) {
             width = Math.max(width, painter.textWidth(line));
         }
         int height = lines.size() * painter.lineHeight() + Math.max(0, lines.size() - 1) * 2;
-        Rect box = HudLayoutEngine.resolve(screen, safe, cfg, width + 8, height + 6);
+        Rect box = avoidOverlap(HudLayoutEngine.resolve(screen, safe, cfg, width + 8, height + 6),
+                occupied, screen);
+        occupied.add(box);
         painter.roundRect(box, theme.radiusControl(),
                 Color.argb(theme.surface().withAlpha(theme.surface().alpha() * 0.55f * cfg.alpha())));
         int y = box.y() + 3;
@@ -111,7 +151,7 @@ public final class HudOverlayRenderer {
     }
 
     private static void renderNowPlaying(VanillaPainter painter, ThemeTokens theme, Rect screen, Rect safe,
-                                         HudWidgetConfig cfg, SilkVisRuntime runtime) {
+                                         HudWidgetConfig cfg, SilkVisRuntime runtime, List<Rect> occupied) {
         Optional<MediaService> service = runtime.mediaService();
         if (service.isEmpty()) {
             return;
@@ -123,7 +163,8 @@ public final class HudOverlayRenderer {
         MediaSnapshot snapshot = snapshotOpt.get();
         int width = 240;
         int height = 56;
-        Rect box = HudLayoutEngine.resolve(screen, safe, cfg, width, height);
+        Rect box = avoidOverlap(HudLayoutEngine.resolve(screen, safe, cfg, width, height), occupied, screen);
+        occupied.add(box);
         painter.roundPanel(box, theme.radiusControl(),
                 Color.argb(theme.surface().withAlpha(theme.surface().alpha() * 0.7f * cfg.alpha())),
                 Color.argb(theme.border()));

@@ -43,13 +43,15 @@ public final class ButtonWidget extends Widget {
                 : hovered ? theme.surfaceHover()
                 : style == Style.PRIMARY ? theme.accent().withAlpha(0.22f)
                 : theme.surface();
-        // Border and fill are two rounded shapes: the outer one is the 1-unit border
-        // colour (UI-02 corner radius was defined but never drawn before).
+        // Border and fill are two rounded shapes (UI-02 radius). The fill is inset by one
+        // unit so the border stays a ring; drawing both on the same rect made a translucent
+        // PRIMARY fill sit on top of an opaque accent border, i.e. a solid accent plate.
         int radius = theme.radiusControl();
-        Rect borderRect = focused ? bounds.inset(-1, -1) : bounds;
-        painter.roundRect(borderRect, focused ? radius + 1 : radius,
+        Rect outer = focused ? bounds.inset(-1, -1) : bounds;
+        int outerRadius = focused ? radius + 1 : radius;
+        painter.roundRect(outer, outerRadius,
                 Color.argb(style == Style.PRIMARY || focused ? theme.accent() : theme.border()));
-        painter.roundRect(bounds, radius, Color.argb(fill));
+        painter.roundRect(outer.inset(1, 1), Math.max(0, outerRadius - 1), Color.argb(fill));
         int textColor = Color.argb(!enabled ? theme.textSecondary()
                 : style == Style.DANGER ? theme.error() : theme.textPrimary());
         int width = painter.textWidth(label);

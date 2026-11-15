@@ -31,6 +31,13 @@ public final class HudDataCollector {
     private final RateLimiter positionLimiter;
     private final RateLimiter fallbackLimiter;
     private volatile HudViewModel model = HudViewModel.empty();
+    /**
+     * Last known lines per widget. Rate-limited sections are merged into this map instead of
+     * rebuilding the model from scratch: rebuilding dropped every key that was not refreshed
+     * on this tick, so coordinates blinked at 10 Hz and effects/armor/tool blinked at 1 Hz
+     * (reported after the first in-game run, 2026-11-15).
+     */
+    private final EnumMap<HudWidgetId, List<String>> cached = new EnumMap<>(HudWidgetId.class);
 
     public HudDataCollector(Clock clock) {
         this.clock = clock;
@@ -50,27 +57,28 @@ public final class HudDataCollector {
     /** Called from the client tick; never from the render phase. */
     public void tick(MinecraftClient client) {
         if (client == null || client.player == null || client.world == null) {
+            cached.clear();
             model = HudViewModel.empty();
             return;
         }
-        Map<HudWidgetId, List<String>> lines = new EnumMap<>(HudWidgetId.class);
         ClientPlayerEntity player = client.player;
         if (positionLimiter.tryAcquire()) {
             BlockPos pos = player.getBlockPos();
-            lines.put(HudWidgetId.COORDINATES, List.of(
+            cached.put(HudWidgetId.COORDINATES, List.of(
                     "XYZ " + pos.getX() + " " + pos.getY() + " " + pos.getZ(),
                     dimensionName(player.getEntityWorld().getRegistryKey())));
-            lines.put(HudWidgetId.DIRECTION, List.of(direction(player.getYaw())));
-            lines.put(HudWidgetId.BIOME, List.of(biomeName(player)));
-            lines.put(HudWidgetId.WORLD_TIME, List.of(worldTime(player.getEntityWorld())));
+            cached.put(HudWidgetId.DIRECTION, List.of(direction(player.getYaw())));
+            cached.put(HudWidgetId.BIOME, List.of(biomeName(player)));
+            cached.put(HudWidgetId.WORLD_TIME, List.of(worldTime(player.getEntityWorld())));
         }
-        lines.put(HudWidgetId.FPS, List.of(fps.fps() + " FPS  " + String.format(Locale.ROOT, "%.1f ms", fps.frameTimeMs())));
+        cached.put(HudWidgetId.FPS, List.of(fps.fps() + " FPS  "
+                + String.format(Locale.ROOT, "%.1f ms", fps.frameTimeMs())));
         if (fallbackLimiter.tryAcquire()) {
-            lines.put(HudWidgetId.EFFECTS, effects(player));
-            lines.put(HudWidgetId.ARMOR, armor(player));
-            lines.put(HudWidgetId.ACTIVE_TOOL, tool(player));
+            cached.put(HudWidgetId.EFFECTS, effects(player));
+            cached.put(HudWidgetId.ARMOR, armor(player));
+            cached.put(HudWidgetId.ACTIVE_TOOL, tool(player));
         }
-        model = new HudViewModel(lines, clock.monotonicNanos());
+        model = new HudViewModel(cached, clock.monotonicNanos());
     }
 
     private static String direction(float yaw) {
