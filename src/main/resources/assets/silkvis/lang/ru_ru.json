@@ -230,5 +230,20 @@
   "silkvis.media.playback.playing": "играет",
   "silkvis.media.playback.paused": "пауза",
   "silkvis.media.playback.stopped": "остановлено",
-  "silkvis.hud.editor.reset": "Сбросить"
+  "silkvis.hud.editor.reset": "Сбросить",
+  "silkvis.tab.totems": "Тотемы",
+  "silkvis.totems.hint": "Положите картинку (PNG или JPG) в папку ниже и нажмите на имя файла: SilkVis соберёт набор ресурсов с вашим тотемом бессмертия.",
+  "silkvis.totems.folder": "Папка с картинками",
+  "silkvis.totems.empty": "В папке пока нет картинок.",
+  "silkvis.totems.refresh": "Обновить список",
+  "silkvis.totems.enable": "После сборки включите набор ресурсов «silkvis-totem» в Настройки → Наборы ресурсов. Перезапускать игру не нужно; если набор уже включён — нажмите F3+T, чтобы перечитать текстуры.",
+  "silkvis.totems.status.none": "Ещё ничего не собрано",
+  "silkvis.totems.status.busy": "Собираю набор…",
+  "silkvis.totems.status.ok": "Готово: %s. Включите «silkvis-totem» в Наборах ресурсов; если он уже включён — F3+T.",
+  "silkvis.totems.status.failed": "Не вышло: %s",
+  "silkvis.totems.reason.file_missing": "файл не найден",
+  "silkvis.totems.reason.file_too_large": "файл больше 4 МБ",
+  "silkvis.totems.reason.image_unreadable": "это не картинка, которую можно прочитать (нужен PNG или JPG)",
+  "silkvis.totems.reason.image_too_large": "картинка больше 4096 пикселей по стороне",
+  "silkvis.totems.reason.write_failed": "не удалось записать набор ресурсов"
 }

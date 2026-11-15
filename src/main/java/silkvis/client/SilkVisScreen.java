@@ -100,8 +100,13 @@ public final class SilkVisScreen extends Screen {
         Rect nav = layout.navigation();
         int navY = nav.y() + 4;
         int navItemWidth = Math.max(0, nav.width() - 8);
+        // Nine tabs do not fit at a fixed 28 px stride on a 1080p screen at GUI scale 4:
+        // the rows shrink to the panel instead of the last tabs falling out of the window.
+        int[] rows = MainScreenLayout.navRows(nav, tabs.size());
+        int itemHeight = rows[0];
+        int stride = rows[1];
         for (ModuleCategory tab : tabs) {
-            Rect row = new Rect(nav.x() + 4, navY, navItemWidth, 24);
+            Rect row = new Rect(nav.x() + 4, navY, navItemWidth, itemHeight);
             ButtonWidget button = new ButtonWidget(row, tr(tab.langKey()), () -> {
                 runtime.screenModel().select(tab);
                 settingsScroll.setOffset(0);
@@ -113,7 +118,7 @@ public final class SilkVisScreen extends Screen {
             button.setEnabled(navItemWidth >= 40);
             chrome.add(button);
             navButtons.add(button);
-            navY += 28;
+            navY += stride;
         }
 
         Rect closeBounds = layout.closeButton();
@@ -332,6 +337,42 @@ public final class SilkVisScreen extends Screen {
                     settingsWidgets.add(button);
                 }
             }
+            case TOTEMS -> {
+                // ASSET-04: a picture in a folder becomes a real resource pack. No file
+                // dialog (a mod cannot open one without native code) and no typed paths.
+                settingsWidgets.add(new FixedText(tr("silkvis.totems.hint"),
+                        new Rect(area.x(), y + 2, width, 34)));
+                y += 38;
+                settingsWidgets.add(new DynamicTextWidget(new Rect(area.x(), y, width, 12),
+                        this::totemFolderText));
+                y += 18;
+                List<TotemLibrary.Entry> entries = runtime.totemEntries();
+                if (entries.isEmpty()) {
+                    settingsWidgets.add(new FixedText(tr("silkvis.totems.empty"),
+                            new Rect(area.x(), y + 2, width, 30)));
+                    y += 34;
+                } else {
+                    for (TotemLibrary.Entry entry : entries) {
+                        String label = entry.displayName() + "   " + (entry.bytes() / 1024L) + " KiB";
+                        settingsWidgets.add(new ButtonWidget(
+                                new Rect(area.x(), y, Math.min(width, 280), ROW_HEIGHT),
+                                label, () -> runtime.applyTotem(entry)));
+                        y += ROW_HEIGHT + 4;
+                    }
+                }
+                settingsWidgets.add(new ButtonWidget(
+                        new Rect(area.x(), y + 4, Math.min(width, 200), ROW_HEIGHT),
+                        tr("silkvis.totems.refresh"), () -> {
+                    runtime.refreshTotems();
+                    rebuildSettings();
+                }));
+                y += ROW_HEIGHT + 14;
+                settingsWidgets.add(new DynamicTextWidget(new Rect(area.x(), y, width, 12),
+                        runtime::totemStatusLine));
+                y += 18;
+                settingsWidgets.add(new FixedText(tr("silkvis.totems.enable"),
+                        new Rect(area.x(), y, width, 34)));
+            }
             case SETTINGS -> {
                 ButtonWidget editor = new ButtonWidget(new Rect(area.x(), y + 6, Math.min(width, 200), 22),
                         tr("silkvis.hud.editor.open"), () -> {
@@ -398,7 +439,12 @@ public final class SilkVisScreen extends Screen {
         focus.setScope(collectFocusable());
     }
 
-    /** «Очередь 3 · тайлов 12 · 480 KiB · попаданий 82 %» — built from localized words. */
+    /** Where the pictures go; the absolute path is what the player has to open. */
+    private String totemFolderText() {
+        var dir = runtime.totemSourceDir();
+        return tr("silkvis.totems.folder") + ": " + (dir == null ? "silkvis-data/totems" : dir);
+    }
+
     /** One line: title — artist, position / length. Unknown values are shown, not invented. */
     private String nowPlayingLine() {
         var service = runtime.mediaService();
@@ -450,6 +496,7 @@ public final class SilkVisScreen extends Screen {
         }
     }
 
+    /** «Очередь 3 · тайлов 12 · 480 KiB · попаданий 82 %» — built from localized words. */
     private String mapStatsText() {
         return runtime.mapService().map(service -> {
             silkvis.map.MapService.Stats stats = service.stats();

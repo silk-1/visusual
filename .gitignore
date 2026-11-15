@@ -18,3 +18,6 @@ silkvis-data/
 # OS noise
 .DS_Store
 Thumbs.db
+
+# Local java-parser harness for syntax checks (node_modules, not tracked)
+.tmp-parse/

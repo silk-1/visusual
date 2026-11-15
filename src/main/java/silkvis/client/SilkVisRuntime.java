@@ -1,6 +1,8 @@
 package silkvis.client;
 
 import net.fabricmc.loader.api.FabricLoader;
+import silkvis.assets.TotemLibrary;
+import silkvis.assets.TotemPackBuilder;
 import silkvis.config.ConfigException;
 import silkvis.config.ConfigPaths;
 import silkvis.config.Debouncer;
@@ -38,6 +40,7 @@ import silkvis.ui.hud.HudWidgetId;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Supplier;
@@ -78,6 +81,13 @@ public final class SilkVisRuntime {
     private String externalMapLabel = "";
     /** Why the media back end was refused, e.g. {@code powershell_missing}; empty if none. */
     private String mediaUnavailableReason = "";
+    /** Custom totem (ASSET-04): drop folder, pack destination and the last result. */
+    private Path totemSourceDir;
+    private Path resourcePacksDir;
+    private volatile List<TotemLibrary.Entry> totemEntries = List.of();
+    private volatile String totemReason = "";
+    private volatile String totemAppliedName = "";
+    private volatile boolean totemBusy;
     /** SilkVis' own translation table for the configured language (see LangTable). */
     private silkvis.ui.LangTable langTable = silkvis.ui.LangTable.empty();
 
@@ -491,6 +501,69 @@ public final class SilkVisRuntime {
             mediaService().ifPresent(service ->
                     service.setSelection(after.selection(), after.pinnedAppId()));
         }
+    }
+
+    // ---------------------------------------------------------------- totems
+
+    /** Called once at client init with the instance paths. */
+    public void setTotemPaths(Path sourceDir, Path resourcePacksDir) {
+        this.totemSourceDir = sourceDir;
+        this.resourcePacksDir = resourcePacksDir;
+        refreshTotems();
+    }
+
+    /** Re-lists the drop folder; also called by the refresh button on the tab. */
+    public void refreshTotems() {
+        if (totemSourceDir == null) {
+            totemEntries = List.of();
+            return;
+        }
+        TotemLibrary.ensureDirectory(totemSourceDir);
+        totemEntries = TotemLibrary.scan(totemSourceDir);
+    }
+
+    public List<TotemLibrary.Entry> totemEntries() {
+        return totemEntries;
+    }
+
+    public Path totemSourceDir() {
+        return totemSourceDir;
+    }
+
+    /**
+     * Builds the resource pack off the client thread: decoding a 4 MB picture must never
+     * stall a frame, and the pack is plain files on disk (no mixin, no texture injection).
+     */
+    public void applyTotem(TotemLibrary.Entry entry) {
+        if (entry == null || resourcePacksDir == null) {
+            return;
+        }
+        totemBusy = true;
+        totemReason = "";
+        totemAppliedName = entry.displayName();
+        executors.io().execute(() -> {
+            TotemPackBuilder.Result result = TotemPackBuilder.apply(entry.path(), resourcePacksDir);
+            totemReason = result.reason();
+            totemBusy = false;
+            log.log("TOTEM_PACK", entry.name() + ":" + TotemPackBuilder.describe(result));
+        });
+    }
+
+    /** One localized line for the tab; reason codes never reach the screen. */
+    public String totemStatusLine() {
+        Localizer l = localizer();
+        if (totemBusy) {
+            return l.get("silkvis.totems.status.busy");
+        }
+        if (totemReason.isEmpty()) {
+            return l.get("silkvis.totems.status.none");
+        }
+        if ("ok".equals(totemReason)) {
+            return l.get("silkvis.totems.status.ok", totemAppliedName);
+        }
+        String key = "silkvis.totems.reason." + totemReason;
+        String text = l.get(key);
+        return l.get("silkvis.totems.status.failed", text.equals(key) ? totemReason : text);
     }
 
     // ---------------------------------------------------------------- accessors
