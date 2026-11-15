@@ -18,6 +18,9 @@ import silkvis.visual.soup.util.EntitySnapshot;
 import silkvis.visual.soup.util.FriendList;
 import silkvis.visual.soup.util.SoupSounds;
 
+import static silkvis.verify.SelfCheck.assertClose;
+import static silkvis.verify.SelfCheck.assertTrue;
+
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;

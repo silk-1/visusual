@@ -40,6 +40,10 @@ public final class SilkVisClient implements ClientModInitializer {
     private static KeyBinding hudInteraction;
     private static KeyBinding bugReport;
     private static KeyBinding openMap;
+    /** Panic: release everything the automation pressed. Unbound until the player binds it. */
+    private static KeyBinding automationStop;
+    /** "Do the obvious thing": danger > loot > the block you are looking at. */
+    private static KeyBinding automationGo;
     /** Direct shortcut to the ported module settings; the same screen is on the VISUAL tab. */
     private static KeyBinding openSoupModules;
     private static final MapPrefetcher MAP_PREFETCH = new MapPrefetcher();
@@ -118,6 +122,14 @@ public final class SilkVisClient implements ClientModInitializer {
                 "key.silkvis.soup_visuals", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN, CATEGORY));
         openMap = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                 "key.silkvis.open_map", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN, CATEGORY));
+        // Both unbound by default: an automation key that collides with a movement key would
+        // fight the player on every keypress, which is the one thing rule 7 forbids.
+        automationStop = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+                "key.silkvis.automation_stop", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN,
+                CATEGORY));
+        automationGo = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+                "key.silkvis.automation_go", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN,
+                CATEGORY));
 
         // One line in latest.log that names the running jar. A failed `build.bat` leaves the
         // previous jar in mods/, so "the fix did nothing" is usually "the old build is still
@@ -175,6 +187,7 @@ public final class SilkVisClient implements ClientModInitializer {
             collector.tick(client);
         }
         runtime.tick();
+        tickAutomation(runtime, client);
         MAP_PREFETCH.tick(runtime, client);
         if (client.world != null) {
             String dimension = client.world.getRegistryKey().getValue().toString();
@@ -212,6 +225,58 @@ public final class SilkVisClient implements ClientModInitializer {
         if (bugReport != null) {
             while (bugReport.wasPressed()) {
                 BugReportService.createAndNotify(client);
+            }
+        }
+        tickAutomationKeys(runtime, client);
+    }
+
+    /**
+     * One automation tick: capture the world once, hand it to the engine, and let the engine
+     * decide. The executor is wired here (and only here), because this is the class that owns the
+     * client instance.
+     *
+     * <p>"Player is busy" is read from the real key state rather than from a screen flag: a player
+     * who starts walking must get control back on the next tick, not after opening a menu.</p>
+     */
+    private static void tickAutomation(SilkVisRuntime runtime, MinecraftClient client) {
+        if (!runtime.automation().settings().enabled()) {
+            return;
+        }
+        if (runtime.automationExecutor() == null) {
+            runtime.setAutomationExecutor(new AutomationExecutor(client));
+        }
+        Snapshot snapshot = AutomationSnapshot.capture(client, client.world == null
+                ? 0L : client.world.getTime(), runtime.automation().settings().reachRadius());
+        boolean busy = false;
+        if (client.options != null) {
+            busy = client.options.forwardKey.isPressed() || client.options.backKey.isPressed()
+                    || client.options.leftKey.isPressed() || client.options.rightKey.isPressed()
+                    || client.options.jumpKey.isPressed() || client.options.sneakKey.isPressed()
+                    || client.options.attackKey.isPressed() || client.options.useKey.isPressed();
+        }
+        runtime.tickAutomation(snapshot, busy);
+    }
+
+    /**
+     * The two automation keys. Both are no-ops when automation is off, and both log what they did:
+     * a key that silently does nothing is indistinguishable from a broken key in {@code latest.log}.
+     */
+    private static void tickAutomationKeys(SilkVisRuntime runtime, MinecraftClient client) {
+        if (automationStop != null) {
+            while (automationStop.wasPressed()) {
+                runtime.stopAutomation(silkvis.automation.StopReason.BY_PLAYER);
+            }
+        }
+        if (automationGo != null) {
+            while (automationGo.wasPressed()) {
+                if (!runtime.automation().settings().enabled()) {
+                    runtime.log().event("AUTOMATION_KEY", "ignored: mode off");
+                    continue;
+                }
+                AutomationSelector.Decision decision = new AutomationSelector(runtime)
+                        .pickAndStart(client, runtime.automationSnapshot(client));
+                runtime.log().event("AUTOMATION_KEY", decision.started()
+                        ? "start " + decision.goalId() : "nothing: " + decision.refusal().code());
             }
         }
     }

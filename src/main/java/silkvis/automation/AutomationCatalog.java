@@ -1,13 +1,16 @@
 package silkvis.automation;
 
 import java.util.List;
+import java.util.Set;
 
 /**
- * Approved P2 automation catalogue (section 10).
+ * The automation catalogue: the 22 approved task types.
  *
- * <p>In the P1 build every entry is PLANNED: no scheduler, no bots and no fake toggles
- * are exposed (0.2). The ids are stable and already used for config/log keys so the P2
- * work does not need a rename.</p>
+ * <p>The ids are stable and are used as config and log keys, so they never get renamed. The
+ * status is not decoration: {@link #canStart} is what the Automation tab asks before it offers a
+ * start button, and an entry is READY only when a goal for it exists in {@link GoalRegistry}. That
+ * keeps the two lists from drifting: the check {@code catalogMatchesRegistry} in the self checks
+ * fails the build when they disagree.</p>
  */
 public final class AutomationCatalog {
     public enum Status {
@@ -17,6 +20,18 @@ public final class AutomationCatalog {
 
     public record Entry(String id, String titleKey, String descriptionKey, Status status) {
     }
+
+    /**
+     * Task types that have a working goal in this build. Everything else stays PLANNED and the
+     * tab says so instead of offering a button that would do nothing.
+     */
+    private static final Set<String> IMPLEMENTED = Set.of(
+            "A01", // ore mining (MineGoal)
+            "A03", // tree farm (TreeFarmGoal)
+            "A04", // crop farm (FarmGoal)
+            "A19", // navigate to a point (GotoGoal)
+            "A21", // pick up dropped items (CollectGoal)
+            "A22"); // emergency exit (SafetyGoal)
 
     private static final List<Entry> ENTRIES = List.of(
             planned("A01", "ore_mining"),
@@ -47,7 +62,7 @@ public final class AutomationCatalog {
 
     private static Entry planned(String id, String slug) {
         return new Entry(id, "silkvis.automation." + slug, "silkvis.automation." + slug + ".desc",
-                Status.PLANNED);
+                IMPLEMENTED.contains(id) ? Status.READY : Status.PLANNED);
     }
 
     public static List<Entry> entries() {
@@ -58,10 +73,7 @@ public final class AutomationCatalog {
         return ENTRIES.stream().anyMatch(e -> e.status() == Status.READY);
     }
 
-    /**
-     * Guard used by the UI: a task type can only be started when it is READY. In P1 this
-     * always returns false, which is the intended visible behaviour.
-     */
+    /** Guard used by the UI: a task type can only be started when it is READY. */
     public static boolean canStart(String id) {
         return ENTRIES.stream().anyMatch(e -> e.id().equals(id) && e.status() == Status.READY);
     }

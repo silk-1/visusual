@@ -19,7 +19,11 @@ public enum HudWidgetId {
      */
     MINIMAP,
     NOW_PLAYING,
-    /** Reserved for P2; must stay unavailable in the P1 build (0.2). */
+    /**
+     * The automation run status: goal, current step, progress, stop reason. Reserved in 0.2 and
+     * enabled in 0.3 together with the engine, because a run with no visible status is the one
+     * thing that makes automation untrustworthy.
+     */
     TASK_STATUS;
 
     public String id() {
@@ -31,7 +35,7 @@ public enum HudWidgetId {
     }
 
     public boolean p1() {
-        return this != TASK_STATUS;
+        return true;
     }
 
     /** Rendered and editable in this build. {@code MINIMAP} was removed in 0.1.14. */

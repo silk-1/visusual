@@ -34,6 +34,11 @@ public final class ConfigPaths {
         return profileDir(profileId).resolve("ui.json");
     }
 
+    /** Automation switches of the profile (AUTO-01); off by default. */
+    public Path profileAutomationFile(String profileId) {
+        return profileDir(profileId).resolve("automation.json");
+    }
+
     public Path profileDestinationsFile(String profileId) {
         return profileDir(profileId).resolve("destinations.json");
     }

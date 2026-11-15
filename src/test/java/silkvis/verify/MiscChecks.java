@@ -1,6 +1,7 @@
 package silkvis.verify;
 
 import silkvis.automation.AutomationCatalog;
+import silkvis.automation.GoalRegistry;
 import silkvis.core.BoundedExecutors;
 import silkvis.core.Capability;
 import silkvis.core.ErrorCode;
@@ -27,12 +28,17 @@ final class MiscChecks {
     }
 
     static void run() {
-        check("automation catalogue is entirely planned in this build", () -> {
+        check("automation catalogue has stable ids and only offers what exists", () -> {
             assertEquals(22, AutomationCatalog.entries().size(), "A01..A22 present");
-            assertTrue(!AutomationCatalog.anyReady(), "nothing ready");
-            assertTrue(!AutomationCatalog.canStart("A01"), "cannot start");
+            // 0.2 promised no automation; 0.3 turns on the six goals that are implemented, and
+            // this check is the contract that nothing else becomes startable by accident.
+            assertTrue(AutomationCatalog.canStart("A01"), "mining is implemented");
+            assertTrue(!AutomationCatalog.canStart("A17"), "schematic build is not");
+            GoalRegistry registry = new GoalRegistry();
             for (AutomationCatalog.Entry entry : AutomationCatalog.entries()) {
                 assertTrue(entry.id().startsWith("A"), "id format");
+                assertEquals(entry.status() == AutomationCatalog.Status.READY,
+                        registry.ids().contains(entry.id()), "status mirrors the registry: " + entry.id());
             }
         });
 

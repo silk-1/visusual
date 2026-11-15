@@ -10,8 +10,20 @@ import silkvis.visual.VisualSettings;
  * Per-profile UI settings: HUD layout, map settings and visual effects. Kept separate from
  * {@link GlobalConfig} so two worlds on one installation do not share HUD positions.
  */
-public record UiConfig(HudLayoutConfig hud, MapSettings map, VisualSettings visual) {
+public record UiConfig(HudLayoutConfig hud, MapSettings map, VisualSettings visual,
+                       silkvis.automation.AutomationSettings automation) {
+    /**
+     * Three-component form kept for every existing call site (screens, checks, presets). The
+     * automation settings default to "off", which is exactly rule 7.
+     */
+    public UiConfig(HudLayoutConfig hud, MapSettings map, VisualSettings visual) {
+        this(hud, map, visual, silkvis.automation.AutomationSettings.defaults());
+    }
+
     public UiConfig {
+        if (automation == null) {
+            automation = silkvis.automation.AutomationSettings.defaults();
+        }
         if (hud == null) {
             hud = HudLayoutConfig.defaults();
         }
@@ -24,7 +36,8 @@ public record UiConfig(HudLayoutConfig hud, MapSettings map, VisualSettings visu
     }
 
     public static UiConfig defaults() {
-        return new UiConfig(HudLayoutConfig.defaults(), MapSettings.defaults(), VisualSettings.defaults());
+        return new UiConfig(HudLayoutConfig.defaults(), MapSettings.defaults(),
+                VisualSettings.defaults(), silkvis.automation.AutomationSettings.defaults());
     }
 
     public static final class Codec implements ConfigCodec<UiConfig> {
@@ -48,7 +61,12 @@ public record UiConfig(HudLayoutConfig hud, MapSettings map, VisualSettings visu
             VisualSettings visual = root.has("visual")
                     ? VisualSettings.decode(root.get("visual").object())
                     : d.visual();
-            return new UiConfig(hud, map, visual);
+            silkvis.automation.AutomationSettings automation = d.automation();
+            if (root.has("automation")) {
+                automation = silkvis.automation.AutomationSettings.decode(
+                        root.get("automation").object());
+            }
+            return new UiConfig(hud, map, visual, automation);
         }
 
         @Override
@@ -56,7 +74,8 @@ public record UiConfig(HudLayoutConfig hud, MapSettings map, VisualSettings visu
             return JsonValue.newObject()
                     .put("hud", value.hud().encode())
                     .put("map", value.map().encode())
-                    .put("visual", value.visual().encode());
+                    .put("visual", value.visual().encode())
+                    .put("automation", value.automation().encode());
         }
 
         @Override
@@ -64,6 +83,7 @@ public record UiConfig(HudLayoutConfig hud, MapSettings map, VisualSettings visu
             value.hud().validate();
             value.map().validate();
             value.visual().validate();
+            value.automation().validate();
         }
     }
 }

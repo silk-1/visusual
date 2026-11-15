@@ -1,7 +1,16 @@
 package silkvis.client;
 
 import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.client.MinecraftClient;
 import silkvis.assets.TotemDownloader;
+import silkvis.automation.AutomationEngine;
+import silkvis.automation.AutomationFile;
+import silkvis.automation.AutomationSettings;
+import silkvis.automation.BlockPos;
+import silkvis.automation.GoalRegistry;
+import silkvis.automation.GoalState;
+import silkvis.automation.Snapshot;
+import silkvis.automation.StopReason;
 import silkvis.assets.TotemLibrary;
 import silkvis.assets.TotemPackBuilder;
 import silkvis.config.ConfigException;
@@ -71,6 +80,14 @@ public final class SilkVisRuntime {
     private final Debouncer<UiConfig> uiDebouncer;
 
     private final MainScreenModel screenModel;
+    /** Automation: the engine and its own file, next to ui.json in the profile folder. */
+    private final GoalRegistry automationGoals = new GoalRegistry();
+    private final AutomationEngine automation;
+    private AutomationFile automationFile;
+    /** Steps are executed on the client thread only; set by the client entrypoint. */
+    private AutomationEngine.Executor automationExecutor;
+    /** Last stop reason that was written to the log, so one stop is logged once. */
+    private String automationLoggedStop = "";
     private ThemeTokens theme = ThemeTokens.graphiteTurquoise();
 
     private GlobalConfig global = GlobalConfig.defaults();
@@ -136,6 +153,7 @@ public final class SilkVisRuntime {
         this.globalDebouncer = new Debouncer<>(500, clock, this::saveGlobalAsync);
         this.uiDebouncer = new Debouncer<>(500, clock, this::saveUiAsync);
         this.screenModel = new MainScreenModel(modules);
+        this.automation = new AutomationEngine(this.automationGoals, this.clock);
         registerModules();
         loadGlobal();
         // The ported modules keep their own file: it is a verbatim port of the original
@@ -289,6 +307,12 @@ public final class SilkVisRuntime {
         JsonConfigFile<MarkerSet> markersFile = new JsonConfigFile<>(paths.profileMarkersFile(profileId),
                 new MarkerSet.Codec(), clock);
         this.markers = markersFile.load().value();
+
+        this.automationFile = new AutomationFile(paths.profileAutomationFile(profileId), clock);
+        AutomationSettings loadedAutomation = automationFile.load();
+        this.automation.applySettings(loadedAutomation);
+        this.ui = new UiConfig(ui.hud(), ui.map(), ui.visual(), loadedAutomation);
+        this.automationLoggedStop = "";
 
         this.tileCache = new BoundedTileCache(ui.map().terrainCacheBytes());
         this.tileStore = new TileStore(paths.mapDir(identity.profileId()), clock);
@@ -827,6 +851,145 @@ public final class SilkVisRuntime {
     }
 
     // ---------------------------------------------------------------- accessors
+
+
+    // ---------------------------------------------------------------- automation
+
+    public AutomationEngine automation() {
+        return this.automation;
+    }
+
+    public GoalRegistry automationGoals() {
+        return this.automationGoals;
+    }
+
+    /**
+     * Reads the game into the planner's snapshot, or returns null when there is nothing to read.
+     *
+     * <p>Deliberately here and not in the client entrypoint: {@code AutomationSelector} needs the
+     * same capture, and two captures would be two lists of entities per tick. Only this method
+     * references the Minecraft adapter, and it is called from the tick loop, never from a screen.</p>
+     */
+    public Snapshot automationSnapshot(MinecraftClient client) {
+        if (client == null) {
+            return null;
+        }
+        long tick = client.world == null ? 0L : client.world.getTime();
+        return AutomationSnapshot.capture(client, tick, this.automation.settings().reachRadius());
+    }
+
+    /** The block the run would aim at: what the camera looks at, else the block under the feet. */
+    public BlockPos automationTarget(MinecraftClient client) {
+        if (client == null || client.player == null || client.world == null) {
+            return GoalRegistry.NO_TARGET;
+        }
+        var eye = client.player.getEyePos();
+        java.util.Optional<BlockPos> looked = silkvis.automation.Aim.firstSolid(
+                eye.x, eye.y, eye.z, client.player.getYaw(), client.player.getPitch(), 5.0,
+                cell -> !client.world.getBlockState(
+                        new net.minecraft.util.math.BlockPos(cell.x(), cell.y(), cell.z())).isAir());
+        if (looked.isPresent()) {
+            return looked.get();
+        }
+        net.minecraft.util.math.BlockPos feet = client.player.getBlockPos();
+        return new BlockPos(feet.getX(), feet.getY(), feet.getZ());
+    }
+
+    /** Wired by the client entrypoint to the only class that may press keys. */
+    public void setAutomationExecutor(AutomationEngine.Executor executor) {
+        this.automationExecutor = executor;
+    }
+
+    public AutomationEngine.Executor automationExecutor() {
+        return this.automationExecutor;
+    }
+
+    /**
+     * Applies new automation settings and saves them next to the profile's {@code ui.json}.
+     *
+     * <p>Saving is immediate and not debounced like the HUD layout: the automation switches are
+     * the thing a player changes in a hurry, and a switch that is still in memory when the game
+     * closes is exactly the "I turned it off and it was on again" bug.</p>
+     */
+    public void setAutomationSettings(AutomationSettings next) {
+        AutomationSettings applied = next == null ? AutomationSettings.defaults() : next;
+        this.automation.applySettings(applied);
+        this.ui = new UiConfig(this.ui.hud(), this.ui.map(), this.ui.visual(), applied);
+        if (this.automationFile != null) {
+            try {
+                this.automationFile.save(applied);
+            } catch (ConfigException | IOException e) {
+                this.log.log("AUTOMATION_SAVE_FAILED", e.getClass().getSimpleName());
+            }
+        }
+        this.log.event("AUTOMATION_SETTINGS", applied.mode().name().toLowerCase(java.util.Locale.ROOT));
+    }
+
+    /** Starts a goal by catalogue id on the block the player is looking at (or the player). */
+    public boolean startAutomation(String id, BlockPos target) {
+        boolean started = this.automation.start(id, target);
+        this.automationLoggedStop = "";
+        this.log.event("AUTOMATION_START", id + (started ? "" : " refused"));
+        return started;
+    }
+
+    /** The panic path: the screen button, the keybind and the safety gate all end up here. */
+    public void stopAutomation(StopReason why) {
+        this.automation.stop(why == null ? StopReason.BY_PLAYER : why);
+        if (this.automationExecutor != null) {
+            this.automationExecutor.abort();
+        }
+        this.logStop(why == null ? StopReason.BY_PLAYER : why);
+    }
+
+    /**
+     * Logs a stop exactly once. The engine keeps its last reason as status, so a screen rebuild or
+     * a second query would otherwise write the same line on every tick.
+     */
+    private void logStop(StopReason why) {
+        String key = why.code() + "/" + this.automation.status().goalId();
+        if (key.equals(this.automationLoggedStop)) {
+            return;
+        }
+        this.automationLoggedStop = key;
+        this.log.event("AUTOMATION_STOP", why.code());
+    }
+
+    /**
+     * One automation tick. Kept out of the client entrypoint so the entrypoint stays a thin
+     * composition layer and so the tick has exactly one input: the current game state.
+     *
+     * @param playerBusy true when the player is holding a movement key or the mouse
+     */
+    public void tickAutomation(Snapshot snapshot, boolean playerBusy) {
+        AutomationSettings settings = this.automation.settings();
+        if (!settings.enabled()) {
+            return;
+        }
+        this.automation.tick(snapshot, this.automationExecutor, playerBusy);
+        if (!this.automation.active()) {
+            StopReason reason = this.automation.status().reason();
+            if (reason != StopReason.NONE) {
+                this.logStop(reason);
+            }
+            if (this.automationExecutor != null) {
+                this.automationExecutor.abort();
+            }
+        }
+    }
+
+    /** One line for the HUD and the tab: what is running, what step, why it stopped. */
+    public String automationStatusLine() {
+        AutomationEngine.Status status = this.automation.status();
+        if (status.state() == GoalState.IDLE && status.reason() == StopReason.NONE) {
+            return "";
+        }
+        String goal = status.goalId().isEmpty() ? "-" : status.goalId();
+        String step = status.step().isEmpty() ? "-" : status.step();
+        String reason = status.reason() == StopReason.NONE ? "" : "  " + status.reason().code();
+        String progress = status.progress().isEmpty() ? "" : "  " + status.progress();
+        return goal + "  " + step + progress + reason;
+    }
 
     public Clock clock() {
         return clock;

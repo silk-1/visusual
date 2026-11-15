@@ -96,11 +96,6 @@ public final class MainScreenModel {
         return out;
     }
 
-    /** Automation tab is P2: it reports "planned" and must not fake execution (0.2). */
-    public boolean showsAutomationPlaceholder() {
-        return selected == ModuleCategory.AUTOMATION_P2;
-    }
-
     public String statusKeyFor(ModuleRegistry.Entry entry) {
         if (!entry.available()) {
             return "silkvis.status." + entry.reasonCode().map(c -> c.name().toLowerCase(Locale.ROOT))
