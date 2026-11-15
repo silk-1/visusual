@@ -857,3 +857,13 @@ SHA-256 другой → `hash_mismatch` → провайдер не запус�
 `parsed=139 failed=0`. В игре не проверялось: запуск моста после нормализации концов строк,
 отсутствие миникарты, русские измерения/стороны света.
 
+### 0.1.14-p0 не собралась: исправлено в 0.1.14-p1
+
+`SilkVisClient.java:49: incompatible types: invalid method reference` — `runtime::localizer`
+указывает на **фабрику** `localizer()`, которая возвращает `Localizer`, а целевой тип
+`Localizer` — функциональный интерфейс `String get(String)`, поэтому javac искал
+`localizer(String)`. Замена: `key -> runtime.localizer().get(key)`
+(`runtime::dimensionLabel` корректен — там метод уже принимает `String`).
+
+`parsed=138 failed=0`.
+
