@@ -35,6 +35,7 @@ public final class SilkVisClient implements ClientModInitializer {
     private static KeyBinding openMenu;
     private static KeyBinding hudInteraction;
     private static KeyBinding bugReport;
+    private static final MinimapPrefetcher MINIMAP_PREFETCH = new MinimapPrefetcher();
     private static HudDataCollector collector;
     private static String lastDimension = "";
 
@@ -80,6 +81,7 @@ public final class SilkVisClient implements ClientModInitializer {
             collector.tick(client);
         }
         runtime.tick();
+        MINIMAP_PREFETCH.tick(runtime, client);
         if (client.world != null) {
             String dimension = client.world.getRegistryKey().getValue().toString();
             if (!dimension.equals(lastDimension)) {

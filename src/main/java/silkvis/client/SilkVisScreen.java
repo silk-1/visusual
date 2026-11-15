@@ -29,6 +29,7 @@ import silkvis.ui.hud.HudLayoutConfig;
 import silkvis.ui.hud.HudWidgetConfig;
 import silkvis.ui.hud.HudWidgetId;
 import silkvis.ui.widget.ButtonWidget;
+import silkvis.ui.widget.DynamicTextWidget;
 import silkvis.ui.widget.Keys;
 import silkvis.ui.widget.SliderWidget;
 import silkvis.ui.widget.TextInputModel;
@@ -165,6 +166,12 @@ public final class SilkVisScreen extends Screen {
                             runtime.requestUiSave(new silkvis.config.UiConfig(runtime.hudLayout(), updated,
                                     runtime.ui().visual()));
                         });
+                // Live tile pipeline state: otherwise "нет тайлов" looks like a broken
+                // widget instead of work in progress (MAP-06 diagnostics).
+                y += 8;
+                settingsWidgets.add(new DynamicTextWidget(
+                        new Rect(area.x(), y, width, 12),
+                        () -> runtime.mapService().map(s -> s.describe()).orElse("map: inactive")));
             }
             case MUSIC -> {
                 GlobalConfig global = runtime.global();
