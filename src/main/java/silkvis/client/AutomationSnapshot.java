@@ -10,6 +10,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.registry.Registries;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.client.world.ClientWorld;
+import silkvis.automation.Movement;
 import silkvis.automation.Snapshot;
 
 import java.util.ArrayList;
@@ -46,7 +47,7 @@ public final class AutomationSnapshot implements Snapshot {
     private final String[] hotbar;
     private final int selectedSlot;
     private final long tick;
-    private final Grid grid;
+    private final Movement.Grid grid;
 
     private AutomationSnapshot(ClientWorld world, ClientPlayerEntity player, long tick,
                                double entityRadius) {
@@ -100,7 +101,7 @@ public final class AutomationSnapshot implements Snapshot {
         // ClientWorld exposes its entity list directly; the distance filter below is what makes
         // this a "radar" and not a dump of everything loaded.
         // ClientWorld declares the list as a raw Iterable, so the element type has to be named.
-        for (Entity entity : (Iterable<Entity>) world.getEntities()) {
+        for (Entity entity : world.getEntities()) {
             if (entity == player || !entity.isAlive()) {
                 continue;
             }
@@ -225,15 +226,13 @@ public final class AutomationSnapshot implements Snapshot {
             return false;
         }
         BlockState state = this.world.getBlockState(pos);
-        // Age is the one property every crop has; a block without it is not a crop at all.
-        if (!(state.getBlock() instanceof net.minecraft.block.CropBlock crop)) {
-            return false;
-        }
-        return state.get(crop.getAgeProperty()) >= crop.getMaxAge();
+        // "Grown" is exactly what the crop itself reports; reading the age property by name
+        // would need the protected accessor and one table per crop family.
+        return net.minecraft.block.CropBlock.isMature(state);
     }
 
     /** The live grid: answers only from loaded chunks and prices nothing. */
-    private static final class LiveGrid implements silkvis.automation.Movement.Grid {
+    private static final class LiveGrid implements Movement.Grid {
         private final ClientWorld world;
 
         LiveGrid(ClientWorld world) {

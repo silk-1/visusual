@@ -15,25 +15,25 @@ import silkvis.config.json.JsonValue;
  */
 public record AutomationSettings(
         AutomationMode mode,
-        /** Blocks of search radius around the player for "what can I reach". */
+        // Blocks of search radius around the player for "what can I reach".
         int reachRadius,
-        /** Hard cap of A* nodes per tick-slice, so one search cannot eat the frame. */
+        // Hard cap of A* nodes per tick-slice, so one search cannot eat the frame.
         int searchNodes,
-        /** Stop everything below this health (half a heart = 1.0). */
+        // Stop everything below this health (half a heart = 1.0).
         float healthFloor,
-        /** Stop everything below this food level. */
+        // Stop everything below this food level.
         int foodFloor,
-        /** Hand control back when a hostile mob is this close, in blocks (0 = never). */
+        // Hand control back when a hostile mob is this close, in blocks (0 = never).
         double dangerRadius,
-        /** Re-plan when the player drifts more than this many blocks from the plan. */
+        // Re-plan when the player drifts more than this many blocks from the plan.
         double replanDistance,
-        /** Break blocks that are in the way (only for goals that allow it). */
+        // Break blocks that are in the way (only for goals that allow it).
         boolean allowBreak,
-        /** Place blocks (bridging/build goals). */
+        // Place blocks (bridging/build goals).
         boolean allowPlace,
-        /** Show the current plan in the world (a line through the steps). */
+        // Show the current plan in the world (a line through the steps).
         boolean showPath,
-        /** Limit the engine to the hotbar: no inventory swapping while walking. */
+        // Limit the engine to the hotbar: no inventory swapping while walking.
         boolean hotbarOnly
 ) {
     public static final int MIN_RADIUS = 8;

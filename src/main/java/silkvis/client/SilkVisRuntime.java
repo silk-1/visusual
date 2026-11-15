@@ -62,7 +62,7 @@ import java.util.function.Supplier;
  * services. No screen is referenced from here beyond the factory injected by the
  * entrypoint, and no service knows about concrete screens.</p>
  */
-public final class SilkVisRuntime {
+public final class SilkVisRuntime implements AutomationHost {
     private static SilkVisRuntime instance;
 
     private final Clock clock = Clock.system();
