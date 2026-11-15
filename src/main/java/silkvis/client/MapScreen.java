@@ -13,6 +13,7 @@ import silkvis.map.TileKey;
 import silkvis.map.TileMath;
 import silkvis.map.Waypoint;
 import silkvis.render.VanillaPainter;
+import silkvis.ui.Animation;
 import silkvis.ui.Color;
 import silkvis.ui.Painter;
 import silkvis.ui.Rect;
@@ -51,6 +52,7 @@ public final class MapScreen extends Screen {
 
     private final SilkVisRuntime runtime = SilkVisRuntime.get();
     private final List<Widget> chrome = new ArrayList<>();
+    private final long openedAtNanos = System.nanoTime();
 
     private Rect window;
     private Rect map;
@@ -163,8 +165,9 @@ public final class MapScreen extends Screen {
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
         Painter painter = new VanillaPainter(context);
         ThemeTokens theme = runtime.theme();
+        float open = Animation.progress(openedAtNanos, theme.motionMs());
         painter.fill(new Rect(0, 0, width, height),
-                Color.argb(theme.background().withAlpha(0.55f)));
+                theme.background().withAlpha(0.55f * open).argb());
         for (int layer = 3; layer >= 1; layer--) {
             painter.roundRect(window.inset(-layer * 2, -layer * 2),
                     theme.radiusPanel() + layer * 2,

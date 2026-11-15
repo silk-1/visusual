@@ -36,7 +36,7 @@
 | UI-05 button/toggle/slider/text/search/scroll/tooltip | `ui/widget/*`, `ui/TooltipController.java`, `ui/ScrollModel.java` | `UiChecks`; **запуск 2026-11-12**: кнопки, тумблеры, слайдер (перетаскивание, значение меняется 4000↔5100) | IMPLEMENTED_TESTED (scroll/tooltip в игре не проверялись) |
 | UI-05 color/keybind/file picker, modal, toast UI | `ToastManager` модель | — | PLANNED |
 | UI-06 focus/modal/input routing | `ui/FocusManager.java`, `SilkVisScreen.keyPressed` | `UiChecks` | IMPLEMENTED_NOT_TESTED |
-| UI-07 120–180 ms, reduced motion, tooltip 350 ms | `ThemeTokens.motionDuration`, `TooltipController` | `UiChecks` | IMPLEMENTED_NOT_TESTED |
+| UI-07 120–180 ms, reduced motion, tooltip 350 ms | `ui/Animation.java`, `ThemeTokens.motionMs`, `TooltipController` | `UiChecks`; **раунд 11**: hover-фейд кнопок и тумблера, слайд ручки, fade-in подложки; при «Меньше движения» `motionMs = 0` и всё переключение мгновенное | IMPLEMENTED_NOT_TESTED |
 | UI-08 blur, fallback opaque | `GlobalConfig.effectiveBlur`, `ThemeTokens.opaqueFallback` | — | PLANNED (эффект не рисуется) |
 | UI-09 RU/EN, plurals, glyphs | lang-файлы | сверка ключей | IMPLEMENTED_NOT_TESTED |
 | HUD-01 10 P1-виджетов + независимые настройки | `ui/hud/HudWidgetId.java`, `HudWidgetConfig.java` | **запуск 2026-11-12**: в мире рисуются панель FPS и миникарта-заглушка; FPS показывал `0 FPS 0.0 ms` (агрегатор не вызывался) — исправлено | IMPLEMENTED_TESTED (рендер виджетов; карта — заглушка) |
