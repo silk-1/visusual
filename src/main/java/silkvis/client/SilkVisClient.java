@@ -105,6 +105,10 @@ public final class SilkVisClient implements ClientModInitializer {
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> runtime.onWorldLeft());
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> runtime.shutdown());
         HudHook.register();
+        // Ported SoupVisuals particle modules (HitBubbles / TotemParticles / AmbientParticles).
+        // Off by default like every other SilkVis feature: the modules are built here, their
+        // settings are off until the player enables them in the settings tab.
+        SoupVisualsClient.get().register();
 
         startMedia(runtime);
     }

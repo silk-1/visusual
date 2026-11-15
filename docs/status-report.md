@@ -1179,3 +1179,56 @@ if ($size -gt 8 -and $buffer[0] -eq 0x89 -and $buffer[1] -eq 0x50) { ... }
 В игре не проверялось: сам редактор (выбор, стрелки, Ctrl+Z, скрытие) и новое положение
 центрированных виджетов.
 
+## Раунд 19: порт SoupVisuals -- HitBubbles, TotemParticles, AmbientParticles
+
+Источник: `SoupVisuals-1.21.11-3.2.0.jar` (автор Padej_, лицензия SOUP-1.0, порт с
+письменного разрешения автора). Подробности соответствия классов и версийной работы:
+`docs/port/soupvisuals.md`, лицензия и атрибуция: `THIRD_PARTY_NOTICES.md`.
+
+### Что портировано
+
+| Модуль | Состав |
+|---|---|
+| HitBubbles | пузырь в точке удара, крит-правило ванильного крита, 3-стадийная анимация (Bounce/Smooth по умолчанию), режимы цвета Sync/Custom (1-4 цвета, Wave/Vertex), 4 стиля текстуры, Fade/Scale/Both |
+| TotemParticles | всплеск при попе тотема + эмиттер (`count / duration` частиц за тик), режим цвета Vanilla с оригинальным распределением зелёный/жёлтый, физика Fall/Fly, сеть Network со spatial grid |
+| AmbientParticles | 3 пула (обычные, геометрия, сеть), фильтры режимов, коробка спавна (радиус/высота/Emerge), отсечение по фрустуму, связи Network |
+
+Каркас настроек перенесён целиком (`Setting`, `BooleanSetting`, `SelectSetting`,
+`ValueSetting`, `MultiSelectSetting`, `MultiColorSetting`, `ColorSetting`, `GroupSetting`,
+`BindSetting`, `ButtonSetting`, `TextSetting`, `SettingRepository`), поэтому имена, порядок и
+значения по умолчанию совпадают с оригиналом; ключи `module.*`, `group.*`, `setting.*`
+добавлены в оба lang-файла (паритет 410/410).
+
+### Версийная работа (1.21.11 -> 1.21.10)
+
+* Рендер: вместо `BufferBuilder` + `BufferRenderer.drawWithGlobalProgram` и ручного GL-состояния
+  — `WorldRenderEvents.END_MAIN` (Fabric API) и `RenderLayer.getEntityTranslucentEmissive` /
+  `getLines`. Модель «накопить за кадр, отрисовать одним проходом» сохранена.
+* События: `EventAttack` -> `AttackEntityCallback`, `TickEvent` -> `ClientTickEvents`, `WorldRenderEvent`
+  -> `WorldRenderEvents.END_MAIN`, миксин на поп тотема -> детектор потери тотема в руках.
+* Текстуры: `assets/minecraft/textures/...` -> `assets/silkvis/textures/soup/...`, чтобы не
+  перекрывать ванильные и чужие ресурсы.
+
+### Проверено
+
+* `SoupVisualsChecks` — 9 новых self-check (анимация, настройки, ключи конфига, крит-правило,
+  цвета, spatial grid, stopwatch): `passed=9 failed=0` при прогоне только этих проверок.
+* Компиляция всего портированного пакета и `client/SoupVisualsClient.java` компилятором
+  Eclipse JDT против API-стабов 1.21.10 и JOML: 0 ошибок (89 классов).
+* ANTLR java-parser: 34/34 файла без синтаксических ошибок, ASCII-only.
+
+### Не проверено
+
+* Полная сборка `gradlew clean build` и `selfCheck` в этой среде: Gradle и Minecraft-артефакты
+  здесь недоступны (нет сети к maven.fabricmc.net), поэтому проверялся только портированный
+  пакет против стабов. Существующие 60 проверок в этой среде не прогонялись.
+* В игре ничего не запускалось: модули **выключены по умолчанию** (правило 7), у них пока нет
+  экрана настроек.
+
+### Известные ограничения
+
+* Режимы `Cube` / `Pyramid` / `Text` рендерятся пусто: для них нужен `ParticleBatchRenderer`
+  оригинала (свой VBO-батч с bloom-проходом).
+* Пул `Firefly` в AmbientParticles пуст: нужен `FireFlyParticle` с буфером следа.
+* Ширина линий Network в оригинале настраивалась 1..3 px; в 1.21.10 линии идут через
+  `RenderLayer.getLines()` (1 px).
