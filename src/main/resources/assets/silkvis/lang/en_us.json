@@ -140,5 +140,9 @@
   "silkvis.tab.theme.hint": "Reduced motion, blur and presets.",
   "silkvis.tab.integrations.hint": "Detects neighbouring mods; nothing is downloaded.",
   "silkvis.tab.settings.hint": "HUD editor and layout reset.",
-  "silkvis.tab.automation.hint": "P2: tasks arrive later, none run today."
+  "silkvis.tab.automation.hint": "P2: tasks arrive later, none run today.",
+  "key.silkvis.bug_report": "Create bug report",
+  "silkvis.settings.bug_report": "Create bug report",
+  "silkvis.bug_report.saved": "SilkVis report saved: %s",
+  "silkvis.bug_report.failed": "Could not save the SilkVis report - see latest.log"
 }

@@ -59,12 +59,14 @@ if not exist "%~dp0gradlew.bat" (
   exit /b 1
 )
 
+echo [SilkVis] START %DATE% %TIME%
 if "%~1"=="" (
   call "%~dp0gradlew.bat" clean build
 ) else (
   call "%~dp0gradlew.bat" %*
 )
 set "CODE=%ERRORLEVEL%"
+echo [SilkVis] END   %DATE% %TIME%
 
 echo.
 if "%CODE%"=="0" (

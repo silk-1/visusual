@@ -339,6 +339,11 @@ public final class SilkVisRuntime {
         return clock;
     }
 
+    /** Paths of this profile's config/data files; used by the bug report and diagnostics. */
+    public ConfigPaths paths() {
+        return paths;
+    }
+
     public BoundedExecutors executors() {
         return executors;
     }

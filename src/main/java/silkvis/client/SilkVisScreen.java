@@ -243,6 +243,13 @@ public final class SilkVisScreen extends Screen {
                 ButtonWidget reset = new ButtonWidget(new Rect(area.x(), y + 6, Math.min(width, 200), 22),
                         tr("silkvis.hud.reset"), () -> runtime.setHudLayout(HudLayoutConfig.defaults()));
                 settingsWidgets.add(reset);
+                y += 34;
+                // Support flow: one file with versions, environment, module states and the
+                // log tail, written to the desktop.
+                ButtonWidget report = new ButtonWidget(new Rect(area.x(), y + 6, Math.min(width, 200), 22),
+                        tr("silkvis.settings.bug_report"),
+                        () -> BugReportService.createAndNotify(MinecraftClient.getInstance()));
+                settingsWidgets.add(report);
             }
             case INTEGRATIONS -> {
                 String mode = runtime.integrations()
