@@ -14,6 +14,7 @@ import silkvis.hud.FpsAggregator;
 import silkvis.hud.HudViewModel;
 import silkvis.hud.RateLimiter;
 import silkvis.core.Clock;
+import silkvis.ui.Localizer;
 import silkvis.ui.hud.HudWidgetId;
 
 import java.util.ArrayList;
@@ -21,6 +22,7 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.function.Function;
 
 /**
  * Collects HUD values on the client thread and publishes an immutable view model
@@ -29,6 +31,13 @@ import java.util.Map;
  */
 public final class HudDataCollector {
     private final Clock clock;
+    /**
+     * Everything the HUD prints goes through the language table (round 15 rule: no English
+     * in the interface). The dimension name is a separate function because the runtime
+     * already owns the {@code silkvis.dimension.*} mapping.
+     */
+    private final Localizer tr;
+    private final Function<String, String> dimensionLabel;
     private final FpsAggregator fps;
     private final RateLimiter positionLimiter;
     private final RateLimiter fallbackLimiter;
@@ -47,8 +56,10 @@ public final class HudDataCollector {
      */
     private volatile ArmorSnapshot armorSnapshot = ArmorSnapshot.EMPTY;
 
-    public HudDataCollector(Clock clock) {
+    public HudDataCollector(Clock clock, Localizer tr, Function<String, String> dimensionLabel) {
         this.clock = clock;
+        this.tr = tr;
+        this.dimensionLabel = dimensionLabel;
         this.fps = new FpsAggregator(clock, 2);
         this.positionLimiter = new RateLimiter(clock, 10);
         this.fallbackLimiter = new RateLimiter(clock, 1);
@@ -92,28 +103,61 @@ public final class HudDataCollector {
         model = new HudViewModel(cached, clock.monotonicNanos());
     }
 
-    private static String direction(float yaw) {
+    /** Compass letters follow the selected interface language (C / ЮЗ instead of S / SW). */
+    private String direction(float yaw) {
         float normalized = ((yaw % 360f) + 360f) % 360f;
-        String[] names = {"S", "SW", "W", "NW", "N", "NE", "E", "SE"};
+        String[] codes = {"s", "sw", "w", "nw", "n", "ne", "e", "se"};
+        String[] latin = {"S", "SW", "W", "NW", "N", "NE", "E", "SE"};
         int idx = Math.round(normalized / 45f) % 8;
-        return names[idx] + "  " + Math.round(normalized) + "°";
+        String key = "silkvis.hud.dir." + codes[idx];
+        String text = tr.get(key);
+        if (text == null || text.equals(key)) {
+            text = latin[idx];
+        }
+        return text + "  " + Math.round(normalized) + "°";
     }
 
-    private static String dimensionName(RegistryKey<World> key) {
+    /**
+     * The registry path alone printed "Overworld" in a Russian interface (owner screenshot,
+     * 2026-11-15); the runtime owns the translated names, so it answers here.
+     */
+    private String dimensionName(RegistryKey<World> key) {
+        String label = dimensionLabel.apply(key.getValue().toString());
+        if (label != null && !label.isBlank()) {
+            return label;
+        }
         String path = key.getValue().getPath();
         return path.substring(0, 1).toUpperCase(Locale.ROOT) + path.substring(1);
     }
 
+    /**
+     * Biome name through the game's own lang table: the raw registry path printed "plains"
+     * in a Russian interface. A modded biome without a translation falls back to its id.
+     */
     private static String biomeName(ClientPlayerEntity player) {
         var entry = player.getEntityWorld().getBiome(player.getBlockPos());
-        return entry.getKey().map(k -> k.getValue().getPath().replace('_', ' ')).orElse("unknown");
+        var key = entry.getKey();
+        if (key.isEmpty()) {
+            return "—";
+        }
+        String id = key.get().getValue().toString();
+        String langKey = "biome." + id.replace(':', '.').replace('/', '.');
+        String text = net.minecraft.text.Text.translatable(langKey).getString();
+        if (!text.equals(langKey)) {
+            return text;
+        }
+        return id.substring(id.indexOf(':') + 1).replace('_', ' ');
     }
 
-    private static String worldTime(World world) {
+    private String worldTime(World world) {
         long dayTime = world.getTimeOfDay() % 24000L;
         long hours = (dayTime / 1000L + 6L) % 24L;
         long minutes = (dayTime % 1000L) * 60L / 1000L;
-        return String.format(Locale.ROOT, "Day %d %02d:%02d", world.getTimeOfDay() / 24000L, hours, minutes);
+        String day = tr.get("silkvis.hud.day");
+        if (day == null || day.equals("silkvis.hud.day")) {
+            day = "Day";
+        }
+        return day + " " + (world.getTimeOfDay() / 24000L) + String.format(Locale.ROOT, " %02d:%02d", hours, minutes);
     }
 
     private static List<String> effects(ClientPlayerEntity player) {

@@ -46,7 +46,7 @@ public final class SilkVisClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         SilkVisRuntime runtime = SilkVisRuntime.get();
-        collector = new HudDataCollector(runtime.clock());
+        collector = new HudDataCollector(runtime.clock(), runtime::localizer, runtime::dimensionLabel);
         collector.tick(MinecraftClient.getInstance());
 
         // ADR-0007: presence-only detection of a third-party map. No class of that mod is

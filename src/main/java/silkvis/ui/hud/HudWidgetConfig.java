@@ -48,7 +48,8 @@ public record HudWidgetConfig(
                     VisibilityPolicy.defaults());
             case ACTIVE_TOOL -> new HudWidgetConfig(id, false, Anchor.BOTTOM_RIGHT, 6, 60, 1f, 0.95f, 9,
                     VisibilityPolicy.defaults());
-            case MINIMAP -> new HudWidgetConfig(id, true, Anchor.TOP_RIGHT, 6, 90, 1f, 0.9f, 20,
+            // Removed in 0.1.14: AtlasMap owns the minimap. Kept (disabled) for old configs.
+            case MINIMAP -> new HudWidgetConfig(id, false, Anchor.TOP_RIGHT, 6, 90, 1f, 0.9f, 20,
                     VisibilityPolicy.defaults());
             case NOW_PLAYING -> new HudWidgetConfig(id, true, Anchor.BOTTOM_RIGHT, 6, 6, 1f, 0.95f, 21,
                     VisibilityPolicy.defaults());

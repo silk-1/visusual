@@ -1,0 +1,14 @@
+# Line endings are part of the product here: the PowerShell bridge is verified against a
+# SHA-256 manifest, so a CRLF checkout on Windows changed the hash and the provider was
+# refused with "hash_mismatch" (reported 2026-11-15). The runtime normalises CRLF as well;
+# this file keeps new clones byte-identical to the manifest in the first place.
+*.ps1           text eol=lf
+*.properties    text eol=lf
+*.json          text eol=lf
+*.java          text eol=lf
+*.md            text eol=lf
+*.gradle        text eol=lf
+gradlew         text eol=lf
+*.bat           text eol=crlf
+*.png           binary
+*.jar           binary

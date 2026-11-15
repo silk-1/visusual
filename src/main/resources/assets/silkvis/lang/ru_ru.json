@@ -209,5 +209,14 @@
   "silkvis.language.en": "English",
   "silkvis.media.restart": "Перезапустить мост",
   "silkvis.media.restart.desc": "Пересоздать подключение к медиа-сессиям Windows без перезапуска игры",
-  "silkvis.media.hud.status": "Музыка: %s"
+  "silkvis.media.hud.status": "Музыка: %s",
+  "silkvis.hud.day": "День",
+  "silkvis.hud.dir.n": "С",
+  "silkvis.hud.dir.ne": "СВ",
+  "silkvis.hud.dir.e": "В",
+  "silkvis.hud.dir.se": "ЮВ",
+  "silkvis.hud.dir.s": "Ю",
+  "silkvis.hud.dir.sw": "ЮЗ",
+  "silkvis.hud.dir.w": "З",
+  "silkvis.hud.dir.nw": "СЗ"
 }

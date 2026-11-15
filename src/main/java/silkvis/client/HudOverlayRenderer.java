@@ -4,8 +4,6 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.render.RenderTickCounter;
 import silkvis.hud.HudViewModel;
-import silkvis.map.MapIdentity;
-import silkvis.map.MapService;
 import silkvis.media.MediaService;
 import silkvis.media.MediaSnapshot;
 import silkvis.media.ProviderStatus;
@@ -68,7 +66,7 @@ public final class HudOverlayRenderer {
         for (HudWidgetConfig cfg : layout.byId().values()) {
             boolean on = cfg.enabled()
                     || (cfg.id() == HudWidgetId.NOW_PLAYING && nowPlayingOnHud);
-            if (on && cfg.id().p1() && cfg.visibility().permits(visibility)) {
+            if (on && cfg.id().available() && cfg.visibility().permits(visibility)) {
                 enabled.add(cfg);
             }
         }
@@ -88,22 +86,6 @@ public final class HudOverlayRenderer {
             }
             if (cfg.id() == HudWidgetId.ARMOR) {
                 renderArmor(painter, context, theme, screen, safe, cfg, runtime, occupied);
-                continue;
-            }
-            if (cfg.id() == HudWidgetId.MINIMAP) {
-                Optional<MapIdentity> identity = runtime.mapIdentity();
-                Optional<MapService> map = runtime.mapService();
-                if (identity.isEmpty() || map.isEmpty()) {
-                    continue;
-                }
-                int size = Math.min(128, Math.min(screen.width(), screen.height()) / 3);
-                Rect box = avoidOverlap(HudLayoutEngine.resolve(screen, safe, cfg, size, size),
-                        occupied, screen);
-                occupied.add(box);
-                MinimapRenderer.render(painter, box, theme, map.get(), identity.get(),
-                        runtime.ui().map(), client,
-                        runtime.localizer().get("silkvis.map.no_tiles"),
-                        runtime.localizer().get("silkvis.map.cardinal.north"));
                 continue;
             }
             if (lines.isEmpty()) {
