@@ -25,6 +25,7 @@ public final class SelfCheck {
         MediaChecks.run();
         DestinationChecks.run();
         MiscChecks.run();
+        HudExtraChecks.run();
 
         System.out.println();
         System.out.println("passed=" + passed + " failed=" + failures.size());
