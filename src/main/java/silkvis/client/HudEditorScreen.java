@@ -125,8 +125,10 @@ public final class HudEditorScreen extends Screen {
             HudWidgetId id = entry.getKey();
             Rect box = entry.getValue();
             boolean warning = HudLayoutEngine.overlapsProtected(box, screen);
-            int border = warning ? theme.warning() : id == dragging ? theme.accent() : theme.border();
-            painter.outline(box, Color.argb(border), id == dragging ? 2 : 1);
+            // Theme accessors return silkvis.ui.Color; the painter wants an ARGB int. Mixing
+            // the two was a compile break (owner build, 2026-11-15).
+            Color border = warning ? theme.warning() : id == dragging ? theme.accent() : theme.border();
+            painter.outline(box, border.argb(), id == dragging ? 2 : 1);
             String label = localizer().get(id.langKey());
             int labelY = Math.max(14, box.y() - painter.lineHeight() - 2);
             int labelWidth = painter.textWidth(label) + 6;
