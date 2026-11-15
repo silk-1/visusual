@@ -195,7 +195,8 @@ public final class MapScreen extends Screen {
         String status = centerX + " / " + centerZ + "  ·  ×" + bpp;
         painter.text(status, window.x() + 12 + painter.textWidth(title) + 12, window.y() + 9,
                 Color.argb(theme.textSecondary()), false);
-        String dimension = runtime.mapIdentity().map(MapIdentity::dimensionId).orElse("—");
+        String dimension = runtime.dimensionLabel(
+                runtime.mapIdentity().map(MapIdentity::dimensionId).orElse(""));
         painter.text(dimension, window.right() - 40 - painter.textWidth(dimension),
                 window.y() + 9, Color.argb(theme.textPrimary()), false);
     }

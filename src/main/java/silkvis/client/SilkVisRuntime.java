@@ -72,6 +72,8 @@ public final class SilkVisRuntime {
     private String externalMapLabel = "";
     /** Why the media back end was refused, e.g. {@code powershell_missing}; empty if none. */
     private String mediaUnavailableReason = "";
+    /** SilkVis' own translation table for the configured language (see LangTable). */
+    private silkvis.ui.LangTable langTable = silkvis.ui.LangTable.empty();
 
     private String profileId = "default";
     private WorldSessionToken token = WorldSessionToken.none();
@@ -164,6 +166,17 @@ public final class SilkVisRuntime {
     private void loadGlobal() {
         LoadOutcome<GlobalConfig> outcome = globalFile.load();
         global = outcome.value();
+        if (outcome.status() == LoadOutcome.Status.FRESH) {
+            // Fresh install: start in the language of the system, not in English. The user
+            // asked for Russian and "the UI is half English" was the complaint.
+            String detected = detectLanguage();
+            if (!detected.equals(global.language())) {
+                global = new GlobalConfig(detected, global.preset(), global.reducedMotion(),
+                        global.blurEnabled(), global.verboseDiagnostics(), global.media());
+            }
+        }
+        alignLanguageOnce();
+        langTable = silkvis.ui.LangTable.load(effectiveLanguage());
         if (outcome.status() != LoadOutcome.Status.LOADED && outcome.status() != LoadOutcome.Status.FRESH) {
             outcome.error().ifPresent(e -> log.log(e.code().name(), e.fieldPath()));
         }
@@ -258,6 +271,10 @@ public final class SilkVisRuntime {
     }
 
     public void requestGlobalSave(GlobalConfig updated) {
+        if (!updated.language().equals(global.language())) {
+            langTable = silkvis.ui.LangTable.load(
+                    "auto".equals(updated.language()) ? detectLanguage() : updated.language());
+        }
         this.global = updated;
         applyTheme();
         globalDebouncer.submit(updated);
@@ -462,16 +479,110 @@ public final class SilkVisRuntime {
      * One-line media state for the Music tab: provider status and, when the provider never
      * started, the reason it was refused (helper_missing, powershell_missing, ...).
      */
+    /**
+     * Before 0.1.12 the language field was written to the config and never read: the UI always
+     * followed Minecraft's own language. Such a stored value is not a choice, so it is aligned
+     * with the system language exactly once, guarded by a marker file.
+     */
+    private void alignLanguageOnce() {
+        try {
+            Path marker = paths.languageAlignedMarker();
+            if (java.nio.file.Files.exists(marker)) {
+                return;
+            }
+            String detected = detectLanguage();
+            if (!"auto".equals(global.language()) && !detected.equals(global.language())) {
+                global = new GlobalConfig(detected, global.preset(), global.reducedMotion(),
+                        global.blurEnabled(), global.verboseDiagnostics(), global.media());
+                saveGlobalQuietly();
+                log.log("LANGUAGE_ALIGNED", detected);
+            }
+            if (marker.getParent() != null) {
+                java.nio.file.Files.createDirectories(marker.getParent());
+            }
+            java.nio.file.Files.writeString(marker, "v1");
+        } catch (java.io.IOException | RuntimeException e) {
+            log.log("LANGUAGE_ALIGN_MARKER_FAILED", e.getClass().getSimpleName());
+        }
+    }
+
+    /** Language actually used by the UI: {@code auto} resolves against the OS locale. */
+    public String effectiveLanguage() {
+        String configured = global.language();
+        return "auto".equals(configured) ? detectLanguage() : configured;
+    }
+
+    private void saveGlobalQuietly() {
+        try {
+            globalFile.save(global);
+        } catch (ConfigException | IOException e) {
+            log.log("CONFIG_SAVE_FAILED", e.getClass().getSimpleName());
+        }
+    }
+
+    /** Bottleneck-free language detection: system locale first, never the game object. */
+    public static String detectLanguage() {
+        try {
+            String tag = java.util.Locale.getDefault().getLanguage();
+            return "ru".equalsIgnoreCase(tag) ? "ru" : "en";
+        } catch (RuntimeException e) {
+            return "en";
+        }
+    }
+
+    /** Human-readable dimension name for the map header and the HUD. */
+    /** Applies a language choice from the settings tab and reloads the table immediately. */
+    public void setLanguage(String language) {
+        langTable = silkvis.ui.LangTable.load("auto".equals(language) ? detectLanguage() : language);
+        requestGlobalSave(new GlobalConfig(language, global.preset(), global.reducedMotion(),
+                global.blurEnabled(), global.verboseDiagnostics(), global.media()));
+    }
+
+    public String dimensionLabel(String dimensionId) {
+        if (dimensionId == null || dimensionId.isBlank()) {
+            return "—";
+        }
+        String code = dimensionId.substring(dimensionId.indexOf(':') + 1);
+        String key = "silkvis.dimension." + code;
+        String label = localizer().get(key);
+        return label.equals(key) ? code : label;
+    }
+
     public String mediaStatusLine() {
+        Localizer l = localizer();
         return mediaService()
-                .map(service -> service.status().name()
-                        + (service.statusReason().isEmpty() ? "" : " / " + service.statusReason()))
+                .map(service -> {
+                    String status = localizedStatus(l, service.status());
+                    String reason = service.statusReason();
+                    return reason.isEmpty() ? status
+                            : status + " · " + localizedReason(l, reason);
+                })
                 .orElseGet(() -> {
                     if (!mediaUnavailableReason.isEmpty()) {
-                        return "unavailable / " + mediaUnavailableReason;
+                        return l.get("silkvis.media.state.unavailable") + " · "
+                                + localizedReason(l, mediaUnavailableReason);
                     }
-                    return global.media().enabled() ? "not started" : "disabled";
+                    return global.media().enabled()
+                            ? l.get("silkvis.media.state.not_started")
+                            : l.get("silkvis.media.state.disabled");
                 });
+    }
+
+    private static String localizedStatus(Localizer localizer, ProviderStatus status) {
+        String key = "silkvis.media.status." + status.name().toLowerCase(java.util.Locale.ROOT);
+        String text = localizer.get(key);
+        return text.equals(key) ? status.name() : text;
+    }
+
+    /** Reason codes are ours, so they have translations; unknown codes are shown verbatim. */
+    public static String localizedReason(Localizer localizer, String reason) {
+        if (reason == null || reason.isBlank()) {
+            return "";
+        }
+        String code = reason.trim().toLowerCase(java.util.Locale.ROOT);
+        String key = "silkvis.media.reason." + code;
+        String text = localizer.get(key);
+        return text.equals(key) ? reason : text;
     }
 
     public boolean externalMapPresent() {
@@ -524,8 +635,22 @@ public final class SilkVisRuntime {
         this.hudInteractionMode = value;
     }
 
+    /**
+     * Resolves keys against the language chosen in the settings tab, falling back to the
+     * game language. Before this, "Язык" only wrote a string into the config: the UI always
+     * followed Minecraft's language, so switching it changed nothing.
+     */
     public Localizer localizer() {
-        return key -> net.minecraft.text.Text.translatable(key).getString();
+        return new Localizer() {
+            @Override
+            public String get(String key) {
+                String own = langTable.get(key);
+                if (own != null && !own.isBlank()) {
+                    return own;
+                }
+                return net.minecraft.text.Text.translatable(key).getString();
+            }
+        };
     }
 
     /**

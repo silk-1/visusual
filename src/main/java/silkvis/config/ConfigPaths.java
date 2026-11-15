@@ -41,6 +41,14 @@ public final class ConfigPaths {
         return dataDir.resolve("maps").resolve(safeSegment(profileId));
     }
 
+    /**
+     * Marker for the one-time language alignment (0.1.12). Settings written before that
+     * build carry the inert default and must not be treated as an explicit choice.
+     */
+    public Path languageAlignedMarker() {
+        return dataDir.resolve("language-aligned.flag");
+    }
+
     public Path diagnosticsDir() {
         return dataDir.resolve("diagnostics");
     }

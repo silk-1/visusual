@@ -167,6 +167,19 @@ public final class MapService {
         return token.matches(other);
     }
 
+    /**
+     * Structured counters. The UI must not parse {@link #describe()}: that string is for logs
+     * and the acceptance report, and it is English by design.
+     */
+    public record Stats(int pendingJobs, long sampledLastTick, long staleDropped,
+                        long failedSamples, int cachedTiles, long cacheBytes, double hitRate) {
+    }
+
+    public synchronized Stats stats() {
+        return new Stats(dirty.size(), sampledThisTick, droppedStale, failedSamples,
+                cache.size(), cache.bytes(), cache.hitRate());
+    }
+
     /** Diagnostics counters for the performance overlay and the acceptance report. */
     public synchronized String describe() {
         return "map jobs=" + dirty.size() + " sampledTick=" + sampledThisTick

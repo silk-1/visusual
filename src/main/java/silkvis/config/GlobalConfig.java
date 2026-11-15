@@ -19,11 +19,12 @@ public record GlobalConfig(
         boolean verboseDiagnostics,
         MediaConfig media
 ) {
-    public static final Set<String> LANGUAGES = Set.of("en", "ru");
+    /** {@code auto} follows the operating system language, which is what a Russian user expects. */
+    public static final Set<String> LANGUAGES = Set.of("en", "ru", "auto");
 
     public GlobalConfig {
         if (language == null || !LANGUAGES.contains(language)) {
-            language = "en";
+            language = "auto";
         }
         if (preset == null) {
             preset = VisualPreset.BALANCED;
@@ -34,7 +35,8 @@ public record GlobalConfig(
     }
 
     public static GlobalConfig defaults() {
-        return new GlobalConfig("en", VisualPreset.BALANCED, false, false, false, MediaConfig.defaults());
+        return new GlobalConfig("auto", VisualPreset.BALANCED, false, false, false,
+                MediaConfig.defaults());
     }
 
     /** Blur is an expensive effect and is also suppressed when reduced motion is on. */
