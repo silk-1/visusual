@@ -145,5 +145,6 @@
   "silkvis.map.external_found": "AtlasMap обнаружен",
   "silkvis.map.external_hint": "Миникарта и построение тайлов SilkVis отключены; карта — Atlas (по умолчанию клавиша M, переназначается в управлении).",
   "silkvis.map.external_missing": "AtlasMap не установлен",
-  "silkvis.map.external_why": "При установленном AtlasMap SilkVis не строит и не рисует свою карту: один конвейер тайлов, одна миникарта (ADR-0007)."
+  "silkvis.map.external_why": "При установленном AtlasMap SilkVis не строит и не рисует свою карту: один конвейер тайлов, одна миникарта (ADR-0007).",
+  "silkvis.media.status": "Источник"
 }

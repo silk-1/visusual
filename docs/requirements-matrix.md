@@ -57,11 +57,11 @@
 | MAP-08 версионированный формат + CRC + atomic | `TileCodec.java`, `TileStore.java`, `map/MarkerSet.java` | `MapChecks` (corruption); маркеры — отдельный файл, кэш их не вытесняет (раунд 10: UI создаёт/удаляет точки) | IMPLEMENTED_NOT_TESTED |
 | MAP-09 Дом/База/Спавн вручную | `destinations/*` | `DestinationChecks` | IMPLEMENTED_NOT_TESTED |
 | MEDIA-01/02/03 GSMTC, Windows, NO_SESSION | `media/WindowsMediaProvider.java`, `MediaHelperBinary.java` | — | BLOCKED (helper не собран) |
-| MEDIA-04/05/06 дочерний процесс, hash, watchdog | `WindowsMediaProvider`, ADR-0003 | — | IMPLEMENTED_NOT_TESTED |
-| MEDIA-07 IPC NDJSON/лимиты | `media/IpcCodec.java`, `IpcProtocol.java` | `MediaChecks` | IMPLEMENTED_NOT_TESTED |
+| MEDIA-04/05/06 дочерний процесс, hash, watchdog | `WindowsMediaProvider`, `MediaHelperLauncher`, `ExeHelperLauncher`, `PowerShellHelperLauncher`, ADR-0003/0008 | **раунд 13**: появился бэкенд (PowerShell-мост), до этого `helper_missing` при любой конфигурации; watchdog/рестарты общие | IMPLEMENTED_NOT_TESTED |
+| MEDIA-07 IPC NDJSON/лимиты | `media/IpcCodec.java`, `IpcProtocol.java` | `MediaChecks`; **раунд 13**: добавлен `SNAPSHOT_REQUEST` для ленивого моста | IMPLEMENTED_NOT_TESTED |
 | MEDIA-08 events/reconciliation | провайдер + `MediaService.tick` | — | IMPLEMENTED_NOT_TESTED |
 | MEDIA-09 AUTO/PINNED | `MediaService.onSnapshot` | `MediaChecks` | IMPLEMENTED_NOT_TESTED |
-| MEDIA-10/11/12 поля, capabilities, Try* | `MediaSnapshot`, `MediaCapabilities`, контракты | — | IMPLEMENTED_NOT_TESTED (helper) |
+| MEDIA-10/11/12 поля, capabilities, Try* | `MediaSnapshot`, `MediaCapabilities`, `silkvis-media-helper.ps1` | **раунд 13**: capabilities из `Controls`, команды `Try*` реализованы в скрипте | IMPLEMENTED_NOT_TESTED (helper) |
 | MEDIA-13 timeline/LIVE/seek | `media/MediaTimeline.java` | `MediaChecks` | IMPLEMENTED_NOT_TESTED |
 | MEDIA-14 сброс прогресса, pending seek, timeout | `MediaService` | `MediaChecks` | IMPLEMENTED_NOT_TESTED |
 | MEDIA-15 keybinds не назначены, ellipsis | `SilkVisClient`, `HudOverlayRenderer` | — | IMPLEMENTED_NOT_TESTED |

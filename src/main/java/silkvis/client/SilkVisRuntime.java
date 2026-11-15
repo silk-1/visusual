@@ -70,6 +70,8 @@ public final class SilkVisRuntime {
     /** Empty unless a third-party map is installed (ADR-0007). */
     private String externalMapId = "";
     private String externalMapLabel = "";
+    /** Why the media back end was refused, e.g. {@code powershell_missing}; empty if none. */
+    private String mediaUnavailableReason = "";
 
     private String profileId = "default";
     private WorldSessionToken token = WorldSessionToken.none();
@@ -354,7 +356,10 @@ public final class SilkVisRuntime {
         try {
             provider = factory.get();
         } catch (RuntimeException | LinkageError e) {
-            log.log("PROVIDER_UNAVAILABLE", e.getClass().getSimpleName());
+            // Keep the reason: "music does nothing" is not an acceptable status message.
+            mediaUnavailableReason = e.getMessage() == null
+                    ? e.getClass().getSimpleName() : e.getMessage();
+            log.log("PROVIDER_UNAVAILABLE", mediaUnavailableReason);
             return;
         }
         media = new MediaService(provider, clock, snapshot -> { }, result -> { });
@@ -451,6 +456,22 @@ public final class SilkVisRuntime {
             setHudLayout(hudLayout().with(minimap.withEnabled(false)));
             log.log("MAP_MINIMAP_DISABLED_EXTERNAL", info.modId());
         }
+    }
+
+    /**
+     * One-line media state for the Music tab: provider status and, when the provider never
+     * started, the reason it was refused (helper_missing, powershell_missing, ...).
+     */
+    public String mediaStatusLine() {
+        return mediaService()
+                .map(service -> service.status().name()
+                        + (service.statusReason().isEmpty() ? "" : " / " + service.statusReason()))
+                .orElseGet(() -> {
+                    if (!mediaUnavailableReason.isEmpty()) {
+                        return "unavailable / " + mediaUnavailableReason;
+                    }
+                    return global.media().enabled() ? "not started" : "disabled";
+                });
     }
 
     public boolean externalMapPresent() {

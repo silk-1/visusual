@@ -160,5 +160,6 @@
   "silkvis.map.external_found": "AtlasMap detected",
   "silkvis.map.external_hint": "SilkVis minimap and tile builder are off; use the Atlas map (key M by default, rebindable in Controls).",
   "silkvis.map.external_missing": "AtlasMap not installed",
-  "silkvis.map.external_why": "With AtlasMap installed SilkVis does not build or draw its own map: one terrain pipeline, one minimap (ADR-0007)."
+  "silkvis.map.external_why": "With AtlasMap installed SilkVis does not build or draw its own map: one terrain pipeline, one minimap (ADR-0007).",
+  "silkvis.media.status": "Provider"
 }
