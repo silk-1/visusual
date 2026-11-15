@@ -10,6 +10,8 @@ public final class IpcProtocol {
     public static final String COMMAND_RESULT = "COMMAND_RESULT";
     public static final String ARTWORK = "ARTWORK";
     public static final String ARTWORK_REQUEST = "ARTWORK_REQUEST";
+    /** Request/response pairs for line-oriented bridges (ADR-0008); push helpers ignore it. */
+    public static final String SNAPSHOT_REQUEST = "SNAPSHOT_REQUEST";
     public static final String SELECT_SESSION = "SELECT_SESSION";
     public static final String ERROR = "ERROR";
     public static final String SHUTDOWN = "SHUTDOWN";

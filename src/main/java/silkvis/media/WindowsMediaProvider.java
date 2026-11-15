@@ -37,7 +37,10 @@ public final class WindowsMediaProvider implements MediaProvider {
     private static final int STDERR_MAX_LINES = 64;
     private static final long SHUTDOWN_TIMEOUT_MS = 2000L;
 
-    private final MediaHelperBinary binary;
+    /** Poll interval for line-oriented bridges; push helpers never see this. */
+    private static final long POLL_INTERVAL_MS = 500L;
+
+    private final MediaHelperLauncher launcher;
     private final Clock clock;
     private final int protocolVersion;
 
@@ -52,18 +55,19 @@ public final class WindowsMediaProvider implements MediaProvider {
     private volatile Writer stdin;
     private volatile Thread stdoutThread;
     private volatile Thread stderrThread;
+    private volatile Thread pollThread;
     private volatile MediaProviderListener listener;
     private ExecutorService dispatcher;
 
-    public WindowsMediaProvider(MediaHelperBinary binary, Clock clock) {
-        this.binary = binary;
+    public WindowsMediaProvider(MediaHelperLauncher launcher, Clock clock) {
+        this.launcher = launcher;
         this.clock = clock;
         this.protocolVersion = IpcProtocol.PROTOCOL_VERSION;
     }
 
     @Override
     public String id() {
-        return "windows-gsmtc";
+        return launcher.providerId();
     }
 
     @Override
@@ -74,7 +78,7 @@ public final class WindowsMediaProvider implements MediaProvider {
     @Override
     public void start(MediaProviderListener newListener) {
         this.listener = newListener;
-        String problem = binary.verify();
+        String problem = launcher.verify();
         if (problem != null) {
             status = problem.equals("unsupported_platform") ? ProviderStatus.UNSUPPORTED : ProviderStatus.ERROR;
             statusReason = problem;
@@ -92,12 +96,10 @@ public final class WindowsMediaProvider implements MediaProvider {
 
     private void spawnAndHandshake() {
         try {
-            ProcessBuilder builder = new ProcessBuilder(binary.binaryPath().toString(), "--protocol", "1");
+            // The launcher owns the command line: the executable gets --protocol 1, the
+            // PowerShell bridge gets -NoProfile -NonInteractive -ExecutionPolicy Bypass -File.
+            ProcessBuilder builder = launcher.newProcessBuilder();
             builder.redirectErrorStream(false);
-            Path dir = binary.binaryPath().getParent();
-            if (dir != null) {
-                builder.directory(dir.toFile());
-            }
             Process proc = builder.start();
             process = proc;
             stdin = new OutputStreamWriter(proc.getOutputStream(), StandardCharsets.UTF_8);
@@ -165,6 +167,7 @@ public final class WindowsMediaProvider implements MediaProvider {
                 status = ProviderStatus.READY;
                 statusReason = "";
                 emitStatus();
+                startPolling();
             }
             case IpcProtocol.SESSIONS -> applySessions(envelope.payload());
             case IpcProtocol.SNAPSHOT -> {
@@ -202,6 +205,17 @@ public final class WindowsMediaProvider implements MediaProvider {
     }
 
     private void applySessions(JsonObject payload) {
+        try {
+            applySessionsInner(payload);
+        } catch (RuntimeException e) {
+            // A malformed session list must not kill the pump thread; degrade instead.
+            status = ProviderStatus.ERROR;
+            statusReason = "bad_sessions";
+            emitStatus();
+        }
+    }
+
+    private void applySessionsInner(JsonObject payload) {
         sessions.clear();
         if (payload.has("sessions")) {
             for (var entry : payload.get("sessions").array().asList()) {
@@ -220,6 +234,29 @@ public final class WindowsMediaProvider implements MediaProvider {
             status = ProviderStatus.NO_SESSION;
         }
         emitStatus();
+    }
+
+    /**
+     * Drives a line-oriented bridge: a script that blocks on stdin cannot run its own timer,
+     * so the Java side asks for a snapshot at a fixed interval (ADR-0008).
+     */
+    private void startPolling() {
+        if (!launcher.polling() || pollThread != null) {
+            return;
+        }
+        pollThread = new Thread(() -> {
+            while (running.get() && process != null) {
+                send(IpcEnvelope.of(IpcProtocol.SNAPSHOT_REQUEST, JsonValue.newObject()));
+                try {
+                    Thread.sleep(POLL_INTERVAL_MS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+            }
+        }, "silkvis-media-poll");
+        pollThread.setDaemon(true);
+        pollThread.start();
     }
 
     private MediaSnapshot parseSnapshot(JsonObject p) {

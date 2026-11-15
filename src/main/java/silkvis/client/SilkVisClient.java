@@ -15,7 +15,10 @@ import net.minecraft.util.Identifier;
 import org.lwjgl.glfw.GLFW;
 import silkvis.config.ProfileIdentity;
 import silkvis.hud.HudViewModel;
+import silkvis.media.ExeHelperLauncher;
 import silkvis.media.MediaHelperBinary;
+import silkvis.media.MediaHelperLauncher;
+import silkvis.media.PowerShellHelperLauncher;
 import silkvis.media.WindowsMediaProvider;
 import silkvis.render.HudHook;
 
@@ -83,11 +86,27 @@ public final class SilkVisClient implements ClientModInitializer {
         startMedia(runtime);
     }
 
+    /**
+     * Picks a media back end (ADR-0008): the native helper when it verifies, otherwise the
+     * PowerShell bridge, which needs no compiled artifact at all. The reason a back end was
+     * refused is handed to the runtime so the Music tab can show it instead of "nothing
+     * happens".
+     */
     private void startMedia(SilkVisRuntime runtime) {
         Path helperDir = FabricLoader.getInstance().getGameDir()
                 .resolve("silkvis-data").resolve("native").resolve("media-helper-1");
-        runtime.startMediaIfEnabled(() -> new WindowsMediaProvider(
-                MediaHelperBinary.system(helperDir), runtime.clock()));
+        runtime.startMediaIfEnabled(() -> {
+            MediaHelperLauncher exe = new ExeHelperLauncher(MediaHelperBinary.system(helperDir));
+            if (exe.verify() == null) {
+                return new WindowsMediaProvider(exe, runtime.clock());
+            }
+            MediaHelperLauncher powershell = new PowerShellHelperLauncher(helperDir);
+            String problem = powershell.verify();
+            if (problem == null) {
+                return new WindowsMediaProvider(powershell, runtime.clock());
+            }
+            throw new IllegalStateException(problem);
+        });
     }
 
     private void onClientTick(MinecraftClient client) {

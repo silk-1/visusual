@@ -199,6 +199,9 @@ public final class SilkVisScreen extends Screen {
             }
             case MUSIC -> {
                 GlobalConfig global = runtime.global();
+                settingsWidgets.add(new DynamicTextWidget(new Rect(area.x(), y, width, 12),
+                        () -> tr("silkvis.media.status") + ": " + runtime.mediaStatusLine()));
+                y += 18;
                 y = addToggle(area, y, width, tr("silkvis.media.enabled"), tr("silkvis.media.enabled.desc"),
                         global.media().enabled(), value -> {
                             var media = global.media();

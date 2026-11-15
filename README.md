@@ -86,10 +86,11 @@ docs/                           матрицы, ADR, отчёт, огранич�
 - `docs/dependency-matrix.md` — версии, лицензии, fallback, статусы
 - `docs/install.md` — установка в игру, зависимости игрока, диагностика запуска
 - `docs/support.md` — отчёт об ошибке: что создаётся, куда, что внутри, приватность
+- `docs/media-helper.md` — проверка музыкального моста одной командой
 - `docs/performance/startup.md` — почему запуск долгий и как это измерить
 - `docs/agent-prompts/` — самодостаточные задачи для второго агента (параллельная работа)
 - `docs/build.md` — сборка, wrapper, артефакты
-- `docs/adr/` — ADR-0001…0007 (build, render adapter, media bridge, config, map, внешние интеграции, карта Atlas)
+- `docs/adr/` — ADR-0001…0008 (build, render adapter, media bridge, config, map, внешние интеграции, карта Atlas, PowerShell-мост музыки)
 
 ## Границы
 
