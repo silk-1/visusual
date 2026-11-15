@@ -740,5 +740,9 @@
   "silkvis.totems.size.64": "64 px",
   "silkvis.totems.size.128": "128 px",
   "silkvis.soup.power": "Модуль",
-  "silkvis.soup.settings_only": "только настройки"
+  "silkvis.soup.settings_only": "только настройки",
+  "silkvis.totems.trim": "Обрезать фон",
+  "silkvis.totems.trim.desc": "Убирает однотонный фон (белый, чёрный, серый) и обрезает по рисунку. Работает, когда все четыре угла одного цвета; у фотографии фон останется.",
+  "silkvis.soup.status.on": "вкл",
+  "silkvis.soup.status.off": "выкл"
 }

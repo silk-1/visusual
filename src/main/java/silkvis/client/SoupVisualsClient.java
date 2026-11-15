@@ -108,6 +108,10 @@ public final class SoupVisualsClient {
     private long lastAttackNanos;
     /** Previous tick's on-ground state of the player, for the jump detector. */
     private boolean wasOnGround = true;
+    private static final java.util.logging.Logger LOGGER =
+            java.util.logging.Logger.getLogger("silkvis");
+    /** Timestamp of the last debug line, see {@link #renderWorld}. */
+    private long lastDebugNanos;
     /** Reused snapshots of the current frame (render thread only). */
     private List<EntitySnapshot> frameEntities = List.of();
 
@@ -567,7 +571,25 @@ public final class SoupVisualsClient {
         }
         matrices.pop();
 
+        int queued = SoupRender.pending();
         SoupRender.flush(matrices, context.consumers());
+
+        // One debug line per ~5 s while something is actually on. "Эффекты не работают" is
+        // impossible to answer otherwise: it tells whether the module is enabled at all, how
+        // many entities the pass saw, and whether quads were handed to the buffer.
+        if (System.nanoTime() - this.lastDebugNanos > 5_000_000_000L) {
+            this.lastDebugNanos = System.nanoTime();
+            int enabled = 0;
+            for (SoupModule module : this.modules()) {
+                if (module.isEnabled()) {
+                    enabled++;
+                }
+            }
+            if (enabled > 0) {
+                LOGGER.info("soupvisuals: enabled=" + enabled + " entities=" + entities.size()
+                        + " quads=" + queued + " thirdPerson=" + thirdPerson);
+            }
+        }
     }
 
     /** The tick pass already built the list; rebuild it only when nothing was collected. */

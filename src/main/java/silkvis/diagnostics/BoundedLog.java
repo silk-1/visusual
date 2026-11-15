@@ -23,6 +23,13 @@ public final class BoundedLog {
     private final Deque<Entry> entries = new ArrayDeque<>();
     private final Map<String, Long> lastSeen = new HashMap<>();
     private long suppressed;
+    /**
+     * Mirror to stdout. The in-game log is only reachable inside the mod, and the lines that
+     * matter when something looks wrong ("this build loaded N modules", "this module is on")
+     * have to be visible in {@code latest.log} as well.
+     */
+    private static final java.util.logging.Logger LOGGER =
+            java.util.logging.Logger.getLogger("silkvis");
 
     public BoundedLog(Clock clock, int maxEntries, long minIntervalMs) {
         this.clock = clock;
@@ -42,6 +49,20 @@ public final class BoundedLog {
         while (entries.size() > maxEntries) {
             entries.removeFirst();
         }
+    }
+
+    /**
+     * Non-repeating message: always stored, never suppressed by the rate limiter. Seeding and
+     * start-up summaries use this — a summary that is dropped because a similar line was
+     * logged five seconds earlier is worse than no summary at all.
+     */
+    public synchronized void event(String code, String detail) {
+        long now = clock.epochMillis();
+        entries.addLast(new Entry(now, code, detail, 1));
+        while (entries.size() > maxEntries) {
+            entries.removeFirst();
+        }
+        LOGGER.info(() -> code + ": " + detail);
     }
 
     public synchronized List<Entry> entries() {

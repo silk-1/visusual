@@ -303,6 +303,47 @@ final class CoreChecks {
                     assertEquals(edge, out.getWidth(), "texture width at " + edge);
                     assertEquals(edge, out.getHeight(), "texture height at " + edge);
                 }
+                // Background trim: a white sheet with a red square in the middle becomes a
+                // texture whose corners are transparent and whose centre is still red. This is
+                // what the owner asked for ("обрезался фон"), so it is asserted, not eyeballed.
+                java.awt.image.BufferedImage sheet = new java.awt.image.BufferedImage(
+                        64, 64, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+                for (int y = 0; y < 64; y++) {
+                    for (int x = 0; x < 64; x++) {
+                        sheet.setRGB(x, y, 0xFFFFFFFF);
+                    }
+                }
+                for (int y = 24; y < 40; y++) {
+                    for (int x = 24; x < 40; x++) {
+                        sheet.setRGB(x, y, 0xFFFF0000);
+                    }
+                }
+                Path sheetFile = dir.resolve("sheet.png");
+                javax.imageio.ImageIO.write(sheet, "png", sheetFile.toFile());
+                assertTrue(TotemPackBuilder.apply(sheetFile, packs, 128, true).ok(),
+                        "trimmed build ok");
+                // The scaled drawing lands in the centre of the 128 px icon: the red square
+                // covers 16 of 64 px, so after trimming it fills the middle of the texture.
+                java.awt.image.BufferedImage trimmed =
+                        javax.imageio.ImageIO.read(texture.toFile());
+                // The crop keeps a 1 px margin and is then scaled, so the corner is not
+                // required to be alpha 0 exactly - it must simply no longer be opaque white.
+                assertTrue((trimmed.getRGB(0, 0) >>> 24) < 200, "corner trimmed away");
+                assertEquals(0xFFFF0000, trimmed.getRGB(64, 64), "drawing kept");
+                // Trim off must keep the sheet intact.
+                assertTrue(TotemPackBuilder.apply(sheetFile, packs, 128, false).ok(),
+                        "plain build ok");
+                java.awt.image.BufferedImage plain =
+                        javax.imageio.ImageIO.read(texture.toFile());
+                assertEquals(0xFFFFFFFF, plain.getRGB(0, 0), "background kept when trim is off");
+                // A picture with four different corners has no single background: untouched.
+                java.awt.image.BufferedImage mixed = new java.awt.image.BufferedImage(
+                        16, 16, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+                mixed.setRGB(0, 0, 0xFFFFFFFF);
+                mixed.setRGB(15, 0, 0xFF000000);
+                assertTrue(TotemPackBuilder.trimBackground(mixed) == mixed,
+                        "multi-colour corners are left alone");
+
                 // An unsupported edge is normalised down, never written as-is.
                 assertTrue(TotemPackBuilder.apply(source, packs, 200).ok(),
                         "unsupported size still builds");

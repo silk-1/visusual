@@ -43,8 +43,11 @@ public final class SilkVisClient implements ClientModInitializer {
     /** Direct shortcut to the ported module settings; the same screen is on the VISUAL tab. */
     private static KeyBinding openSoupModules;
     private static final MapPrefetcher MAP_PREFETCH = new MapPrefetcher();
-    private static final org.slf4j.Logger LOGGER =
-            org.slf4j.LoggerFactory.getLogger("silkvis");
+    // java.util.logging on purpose: slf4j is not a declared dependency of this build (the mod
+    // compiles against Minecraft and Fabric Loader only). On Fabric the JDK logger's output
+    // still lands in latest.log.
+    private static final java.util.logging.Logger LOGGER =
+            java.util.logging.Logger.getLogger("silkvis");
     private static HudDataCollector collector;
     private static String lastDimension = "";
 
@@ -55,6 +58,10 @@ public final class SilkVisClient implements ClientModInitializer {
         // state the registry shows and the module state start out in agreement: whatever the
         // settings file said on load is pushed into the registry once.
         runtime.syncSoupModulesIntoRegistry();
+        // Module objects are the part that actually draws: switch them on explicitly instead of
+        // trusting whoever read the config earlier.
+        runtime.startSoupModules();
+        runtime.logStartupSummary();
         // Localizer is a functional interface (String -> String), so the reference has to go
         // through the method, not to the factory method that returns it.
         collector = new HudDataCollector(runtime.clock(),
@@ -115,10 +122,13 @@ public final class SilkVisClient implements ClientModInitializer {
         // One line in latest.log that names the running jar. A failed `build.bat` leaves the
         // previous jar in mods/, so "the fix did nothing" is usually "the old build is still
         // installed": this line answers that without guessing.
-        LOGGER.info("SilkVis {} initialised", FabricLoader.getInstance()
-                .getModContainer("silkvis")
-                .map(container -> container.getMetadata().getVersion().getFriendlyString())
-                .orElse("unknown"));
+        LOGGER.info("SilkVis {} initialised ({})", FabricLoader.getInstance()
+                        .getModContainer("silkvis")
+                        .map(container -> container.getMetadata().getVersion().getFriendlyString())
+                        .orElse("unknown"),
+                FabricLoader.getInstance().getModContainer("silkvis")
+                        .map(container -> container.getMetadata().getVersion().toString())
+                        .orElse("no jar metadata"));
         ClientTickEvents.END_CLIENT_TICK.register(this::onClientTick);
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> onJoin(client));
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> runtime.onWorldLeft());

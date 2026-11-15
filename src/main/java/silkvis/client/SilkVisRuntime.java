@@ -88,6 +88,8 @@ public final class SilkVisRuntime {
     private volatile List<TotemLibrary.Entry> totemEntries = List.of();
     private volatile String totemReason = "";
     private volatile String totemAppliedName = "";
+    /** The entry that produced the current pack, so a rebuild does not have to re-resolve it. */
+    private volatile TotemLibrary.Entry totemAppliedEntry;
     private volatile boolean totemBusy;
     /** Which "working" line to show: building a local file or downloading a link. */
     private volatile String totemBusyKey = "silkvis.totems.status.busy";
@@ -437,6 +439,44 @@ public final class SilkVisRuntime {
     }
 
     /**
+     * One line with what this build actually loaded: the module count, how many ported modules
+     * are on, and where their config lives. Logged at start-up, because "the fix did nothing"
+     * is almost always the previous jar still sitting in {@code mods/} after a failed build.
+     */
+    public void logStartupSummary() {
+        int soupOn = 0;
+        for (silkvis.visual.soup.module.SoupModule module : SoupVisualsClient.get().modules()) {
+            if (module.isEnabled()) {
+                soupOn++;
+            }
+        }
+        String summary = "modules=" + modules.size()
+                + " soupvisuals=" + soupOn + "/" + SoupVisualsClient.get().modules().size()
+                + " soupfile=" + paths.soupFile();
+        log.event("STARTUP", summary);
+        // Also on stdout: the diagnostics log is only visible inside the mod, and this line is
+        // what a player is asked to check in latest.log when something looks stale.
+        java.util.logging.Logger.getLogger("silkvis").info("SilkVis start-up: " + summary);
+    }
+
+    /**
+     * Turns the modules the player had switched on back on at start-up.
+     *
+     * <p>It has to happen here and not only in the screen: modules are the thing that draws, and
+     * "the effect does not work after a restart" is exactly what happens when only the config is
+     * read and the registry is left thinking everything is off. Also re-runs the mod load, so a
+     * jar swapped under the same mods folder picks up the change.</p>
+     */
+    public void startSoupModules() {
+        for (silkvis.visual.soup.module.SoupModule module : SoupVisualsClient.get().modules()) {
+            if (module.isEnabled()) {
+                module.setEnabled(true);
+                log.event("SOUP_MODULE", "enabled at start: " + module.getNameKey());
+            }
+        }
+    }
+
+    /**
      * Pushes the state loaded from {@code soupvisuals.json} into the module registry, so the
      * list and the module objects agree from the first frame. Registered modules are the only
      * ones the list can switch, so an unregistered id is skipped instead of throwing.
@@ -630,34 +670,48 @@ public final class SilkVisRuntime {
         totemBusyKey = "silkvis.totems.status.busy";
         totemReason = "";
         totemAppliedName = entry.displayName();
+        totemAppliedEntry = entry;
         executors.io().execute(() -> {
             TotemPackBuilder.Result result = TotemPackBuilder.apply(entry.path(), resourcePacksDir,
-                    ui().visual().totemTextureSize());
+                    ui().visual().totemTextureSize(), ui().visual().totemTrimBackground());
             totemReason = result.reason();
             totemBusy = false;
-            log.log("TOTEM_PACK", entry.name() + ":" + TotemPackBuilder.describe(result));
+            log.event("TOTEM_PACK", entry.name() + " size=" + ui().visual().totemTextureSize()
+                    + " trim=" + ui().visual().totemTrimBackground() + " reason=" + result.reason()
+                    + " src=" + result.sourceWidth() + "x" + result.sourceHeight()
+                    + " -> " + totemAppliedSize(result));
             if (result.ok()) {
                 notifyTotemPack();
             }
         });
     }
 
+    /** Size of the texture that was actually written, read back from disk. */
+    private static String totemAppliedSize(TotemPackBuilder.Result result) {
+        if (result == null || !result.ok() || result.texture() == null) {
+            return "no texture";
+        }
+        try {
+            java.awt.image.BufferedImage written =
+                    javax.imageio.ImageIO.read(result.texture().toFile());
+            return written == null ? "unreadable"
+                    : written.getWidth() + "x" + written.getHeight();
+        } catch (java.io.IOException e) {
+            return "unreadable";
+        }
+    }
+
     /**
      * Rebuilds the generated pack from the entry that was applied last, so a change of the
-     * texture size takes effect on the picture already in use instead of waiting for the
-     * player to pick it again.
+     * texture size or of the background trimming takes effect on the picture already in use
+     * instead of waiting for the player to pick it again.
      */
     public void rebuildTotemWithCurrentSize() {
-        String name = totemAppliedName;
-        if (name == null || name.isEmpty() || totemEntries.isEmpty()) {
+        TotemLibrary.Entry entry = totemAppliedEntry;
+        if (entry == null || !java.nio.file.Files.isRegularFile(entry.path())) {
             return;
         }
-        for (TotemLibrary.Entry entry : totemEntries) {
-            if (name.equals(entry.displayName())) {
-                applyTotem(entry);
-                return;
-            }
-        }
+        applyTotem(entry);
     }
 
     public long totemVersion() {
@@ -729,7 +783,7 @@ public final class SilkVisRuntime {
             }
             refreshTotems();
             TotemPackBuilder.Result pack = TotemPackBuilder.apply(download.file(), resourcePacksDir,
-                    ui().visual().totemTextureSize());
+                    ui().visual().totemTextureSize(), ui().visual().totemTrimBackground());
             totemAppliedName = download.file().getFileName().toString();
             totemReason = pack.reason();
             totemBusy = false;

@@ -740,5 +740,9 @@
   "silkvis.totems.size.64": "64 px",
   "silkvis.totems.size.128": "128 px",
   "silkvis.soup.power": "Module",
-  "silkvis.soup.settings_only": "settings only"
+  "silkvis.soup.settings_only": "settings only",
+  "silkvis.totems.trim": "Cut out the background",
+  "silkvis.totems.trim.desc": "Removes the plain background (white, black, grey) and crops to the drawing. Works when all four corners share one colour; a photo keeps its background.",
+  "silkvis.soup.status.on": "on",
+  "silkvis.soup.status.off": "off"
 }

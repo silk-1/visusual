@@ -414,7 +414,8 @@ public final class SilkVisScreen extends Screen {
                                 current.fogEnabled(), current.fogStartRatio(),
                                 current.fogEndRatio(), current.particleCap(),
                                 current.rainVisualIntensity(), current.cloudsVisible(),
-                                current.entityMarkersEnabled(), current.depthAwareMarkers(), size);
+                                current.entityMarkersEnabled(), current.depthAwareMarkers(), size,
+                                current.totemTrimBackground());
                         runtime.requestUiSave(new silkvis.config.UiConfig(runtime.hudLayout(),
                                 runtime.ui().map(), updated));
                         runtime.rebuildTotemWithCurrentSize();
@@ -428,6 +429,30 @@ public final class SilkVisScreen extends Screen {
                 }
                 y += ROW_HEIGHT + 2;
                 settingsWidgets.add(new FixedText(tr("silkvis.totems.size.desc"),
+                        new Rect(area.x(), y, width, 22)));
+                y += 26;
+                // Background trim: one switch, because the player's complaint was "a white
+                // square instead of my picture" and the fix has to be one click.
+                boolean trim = totemVisual.totemTrimBackground();
+                settingsWidgets.add(new ButtonWidget(
+                        new Rect(area.x(), y, Math.min(width, 320), ROW_HEIGHT),
+                        tr("silkvis.totems.trim") + ": "
+                                + tr(trim ? "silkvis.state.on" : "silkvis.state.off"), () -> {
+                    VisualSettings current = runtime.ui().visual();
+                    VisualSettings updated = new VisualSettings(current.fovEnabled(),
+                            current.fovDegrees(), current.viewBobbing(),
+                            current.hurtCameraIntensity(), current.screenEffectIntensity(),
+                            current.fogEnabled(), current.fogStartRatio(), current.fogEndRatio(),
+                            current.particleCap(), current.rainVisualIntensity(),
+                            current.cloudsVisible(), current.entityMarkersEnabled(),
+                            current.depthAwareMarkers(), current.totemTextureSize(), !trim);
+                    runtime.requestUiSave(new silkvis.config.UiConfig(runtime.hudLayout(),
+                            runtime.ui().map(), updated));
+                    runtime.rebuildTotemWithCurrentSize();
+                    rebuildSettings();
+                }).style(trim ? ButtonWidget.Style.PRIMARY : ButtonWidget.Style.SECONDARY));
+                y += ROW_HEIGHT + 2;
+                settingsWidgets.add(new FixedText(tr("silkvis.totems.trim.desc"),
                         new Rect(area.x(), y, width, 22)));
                 y += 26;
 

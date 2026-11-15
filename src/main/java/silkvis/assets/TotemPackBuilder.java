@@ -44,6 +44,13 @@ public final class TotemPackBuilder {
     public static final long MAX_FILE_BYTES = 16L * 1024 * 1024;
     /** Refuse to decode something that would eat hundreds of megabytes of heap. */
     public static final int MAX_SOURCE_EDGE = 8192;
+    /**
+     * How close a pixel has to be to the corner colour to be treated as background. Wide enough
+     * for JPEG noise around a white sheet, narrow enough to keep a light drawing.
+     */
+    static final int BACKGROUND_TOLERANCE = 24;
+    /** The four corners must agree with each other this closely, or nothing is trimmed. */
+    static final int CORNER_TOLERANCE = 40;
 
     private TotemPackBuilder() {
     }
@@ -71,11 +78,20 @@ public final class TotemPackBuilder {
      * @param resourcePacksDir the instance {@code resourcepacks} directory
      */
     public static Result apply(Path source, Path resourcePacksDir) {
-        return apply(source, resourcePacksDir, TEXTURE_SIZE);
+        return apply(source, resourcePacksDir, TEXTURE_SIZE, true);
     }
 
-    /** Same, with an explicit edge length (must be one of {@link #TEXTURE_SIZES}). */
+    /** Same, with an explicit edge length (rounded to one of {@link #TEXTURE_SIZES}). */
     public static Result apply(Path source, Path resourcePacksDir, int edge) {
+        return apply(source, resourcePacksDir, edge, true);
+    }
+
+    /**
+     * @param trimBackground cut the plain background (white/black/grey and the corners) out of
+     *                       the picture before scaling, so the hotbar slot shows only the
+     *                       drawing instead of a white square
+     */
+    public static Result apply(Path source, Path resourcePacksDir, int edge, boolean trimBackground) {
         int size = normaliseSize(edge);
         if (source == null || resourcePacksDir == null || !Files.isRegularFile(source)) {
             return Result.failure("file_missing");
@@ -111,7 +127,8 @@ public final class TotemPackBuilder {
             if (parent != null) {
                 Files.createDirectories(parent);
             }
-            BufferedImage scaled = scaleToIcon(decoded, width, height, size);
+            BufferedImage prepared = trimBackground ? trimBackground(decoded) : decoded;
+            BufferedImage scaled = scaleToIcon(prepared, prepared.getWidth(), prepared.getHeight(), size);
             if (!ImageIO.write(scaled, "png", texture.toFile())) {
                 return Result.failure("write_failed");
             }
@@ -169,6 +186,99 @@ public final class TotemPackBuilder {
             graphics.dispose();
         }
         return target;
+    }
+
+    /**
+     * Cuts a plain background out of the picture.
+     *
+     * <p>What it does, in order: (1) take the colour of the four corners — if they disagree with
+     * each other there is no single background, so the picture is returned untouched; (2) make
+     * every pixel close to that colour transparent; (3) crop to the remaining drawing, keeping
+     * the aspect ratio, so the shape is not stretched. Step (3) is why the result looks bigger
+     * and clearer in the slot as well.</p>
+     *
+     * <p>Only *plain* backgrounds are removed: a photo's sky is a gradient, not one colour, and
+     * blanket-removing "anything light" would eat the drawing. This is a tool, not a matting
+     * algorithm, and the UI wording says so.</p>
+     */
+    public static BufferedImage trimBackground(BufferedImage source) {
+        int width = source.getWidth();
+        int height = source.getHeight();
+        if (width < 4 || height < 4) {
+            return source;
+        }
+        int[] corners = {
+                source.getRGB(0, 0), source.getRGB(width - 1, 0),
+                source.getRGB(0, height - 1), source.getRGB(width - 1, height - 1)
+        };
+        for (int corner : corners) {
+            if (!within(corner, corners[0], CORNER_TOLERANCE)) {
+                // Four different corners: no single background colour to remove.
+                return source;
+            }
+        }
+        int background = corners[0];
+        BufferedImage out = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+        int minX = width;
+        int minY = height;
+        int maxX = -1;
+        int maxY = -1;
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                int pixel = source.getRGB(x, y);
+                if (within(pixel, background, BACKGROUND_TOLERANCE)) {
+                    continue;
+                }
+                out.setRGB(x, y, pixel);
+                if (x < minX) {
+                    minX = x;
+                }
+                if (y < minY) {
+                    minY = y;
+                }
+                if (x > maxX) {
+                    maxX = x;
+                }
+                if (y > maxY) {
+                    maxY = y;
+                }
+            }
+        }
+        if (maxX < minX || maxY < minY) {
+            // Everything was background: an empty texture is worse than the original picture.
+            return source;
+        }
+        // A 1 px margin keeps the outermost drawing pixels from sitting on the slot border.
+        minX = Math.max(0, minX - 1);
+        minY = Math.max(0, minY - 1);
+        maxX = Math.min(width - 1, maxX + 1);
+        maxY = Math.min(height - 1, maxY + 1);
+        int cropWidth = maxX - minX + 1;
+        int cropHeight = maxY - minY + 1;
+        if (cropWidth == width && cropHeight == height) {
+            return out;
+        }
+        // Square the crop around its centre instead of stretching to a square: the hotbar icon
+        // is square, and stretching would make a tall drawing look squat.
+        int side = Math.max(cropWidth, cropHeight);
+        int centerX = (minX + maxX) / 2;
+        int centerY = (minY + maxY) / 2;
+        BufferedImage square = new BufferedImage(side, side, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D graphics = square.createGraphics();
+        try {
+            graphics.drawImage(out, side / 2 - centerX, side / 2 - centerY, null);
+        } finally {
+            graphics.dispose();
+        }
+        return square;
+    }
+
+    /** Colour distance in RGB; alpha differences are ignored (a PNG may be fully opaque). */
+    private static boolean within(int pixel, int reference, int tolerance) {
+        int dr = Math.abs(((pixel >> 16) & 0xFF) - ((reference >> 16) & 0xFF));
+        int dg = Math.abs(((pixel >> 8) & 0xFF) - ((reference >> 8) & 0xFF));
+        int db = Math.abs((pixel & 0xFF) - (reference & 0xFF));
+        return Math.max(dr, Math.max(dg, db)) <= tolerance;
     }
 
     /**
