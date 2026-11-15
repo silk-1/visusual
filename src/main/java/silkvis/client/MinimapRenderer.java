@@ -41,15 +41,17 @@ public final class MinimapRenderer {
         int centerZ = client.player.getBlockZ();
         MinimapView view = new MinimapView(settings, centerX, centerZ, bounds.width());
         int lod = view.lod();
-        // Map one output pixel to one block-column at the current zoom.
+        // Map one output cell to a block column at the current zoom. Cell edges are placed
+        // proportionally, so 48 cells fill the whole square exactly instead of leaving a
+        // 32 px strip of empty panel on the right and bottom.
         int outputBlocks = view.visibleSpanBlocks();
-        int blocksPerOutput = Math.max(1, outputBlocks / OUTPUT);
-        int cell = Math.max(1, bounds.width() / OUTPUT);
         int drawn = 0;
         for (int oz = 0; oz < OUTPUT; oz++) {
+            int cellY0 = bounds.y() + (oz * bounds.height()) / OUTPUT;
+            int cellY1 = bounds.y() + ((oz + 1) * bounds.height()) / OUTPUT;
+            int blockZ = view.minBlockZ() + (oz * outputBlocks) / OUTPUT;
             for (int ox = 0; ox < OUTPUT; ox++) {
-                int blockX = view.minBlockX() + ox * blocksPerOutput;
-                int blockZ = view.minBlockZ() + oz * blocksPerOutput;
+                int blockX = view.minBlockX() + (ox * outputBlocks) / OUTPUT;
                 TileKey key = TileMath.tileOf(identity, lod, blockX, blockZ);
                 Optional<MapTile> tile = mapService.view(key);
                 if (tile.isEmpty()) {
@@ -58,7 +60,10 @@ public final class MinimapRenderer {
                 int px = TileMath.pixelInTile(blockX, lod);
                 int pz = TileMath.pixelInTile(blockZ, lod);
                 int color = tile.get().colorAt(px, pz);
-                painter.fill(new Rect(bounds.x() + ox * cell, bounds.y() + oz * cell, cell, cell), color);
+                int cellX0 = bounds.x() + (ox * bounds.width()) / OUTPUT;
+                int cellX1 = bounds.x() + ((ox + 1) * bounds.width()) / OUTPUT;
+                painter.fill(new Rect(cellX0, cellY0, Math.max(1, cellX1 - cellX0),
+                        Math.max(1, cellY1 - cellY0)), color);
                 drawn++;
             }
         }
