@@ -34,6 +34,7 @@ public final class SilkVisClient implements ClientModInitializer {
             KeyBinding.Category.create(Identifier.of("silkvis", "main"));
     private static KeyBinding openMenu;
     private static KeyBinding hudInteraction;
+    private static KeyBinding bugReport;
     private static HudDataCollector collector;
     private static String lastDimension = "";
 
@@ -52,6 +53,10 @@ public final class SilkVisClient implements ClientModInitializer {
         // Unbound by default so it cannot collide with vanilla binds (MEDIA-15).
         hudInteraction = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                 "key.silkvis.hud_interaction", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN, CATEGORY));
+        // Also unbound: the same action is offered as a button in the Settings tab, so a
+        // default key is not needed and cannot collide with anything.
+        bugReport = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+                "key.silkvis.bug_report", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN, CATEGORY));
 
         ClientTickEvents.END_CLIENT_TICK.register(this::onClientTick);
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> onJoin(client));
@@ -89,6 +94,11 @@ public final class SilkVisClient implements ClientModInitializer {
         }
         while (hudInteraction.wasPressed()) {
             runtime.setHudInteractionMode(!runtime.hudInteractionMode());
+        }
+        if (bugReport != null) {
+            while (bugReport.wasPressed()) {
+                BugReportService.createAndNotify(client);
+            }
         }
     }
 

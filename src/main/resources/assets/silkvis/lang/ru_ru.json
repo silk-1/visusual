@@ -125,5 +125,9 @@
   "silkvis.tab.theme.hint": "Снижение движения, размытие и пресеты.",
   "silkvis.tab.integrations.hint": "Обнаружение соседних модов; ничего не скачивается.",
   "silkvis.tab.settings.hint": "Редактор HUD и сброс раскладки.",
-  "silkvis.tab.automation.hint": "P2: задачи появятся позже, сейчас не исполняются."
+  "silkvis.tab.automation.hint": "P2: задачи появятся позже, сейчас не исполняются.",
+  "key.silkvis.bug_report": "Создать отчёт об ошибке",
+  "silkvis.settings.bug_report": "Создать отчёт об ошибке",
+  "silkvis.bug_report.saved": "Отчёт SilkVis сохранён: %s",
+  "silkvis.bug_report.failed": "Не удалось сохранить отчёт SilkVis — см. latest.log"
 }

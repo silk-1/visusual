@@ -85,8 +85,11 @@ docs/                           матрицы, ADR, отчёт, огранич�
 - `docs/known-limitations.md` — известные ограничения и пробелы
 - `docs/dependency-matrix.md` — версии, лицензии, fallback, статусы
 - `docs/install.md` — установка в игру, зависимости игрока, диагностика запуска
+- `docs/support.md` — отчёт об ошибке: что создаётся, куда, что внутри, приватность
+- `docs/performance/startup.md` — почему запуск долгий и как это измерить
+- `docs/agent-prompts/` — самодостаточные задачи для второго агента (параллельная работа)
 - `docs/build.md` — сборка, wrapper, артефакты
-- `docs/adr/` — ADR-0001…0005 (build, render adapter, media bridge, config, map)
+- `docs/adr/` — ADR-0001…0006 (build, render adapter, media bridge, config, map, внешние интеграции)
 
 ## Границы
 
