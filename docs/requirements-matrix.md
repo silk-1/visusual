@@ -12,7 +12,7 @@
 | Requirement | Реализация | Evidence | Статус |
 |---|---|---|---|
 | 0.2 приоритеты P0→P1→P2 | `automation/AutomationCatalog.java` (всё PLANNED), вкладка-заглушка в `client/SilkVisScreen.java` | `MiscChecks` (catalog) | IMPLEMENTED_NOT_TESTED |
-| 0.3 тема Graphite/Turquoise, RU/EN | `ui/ThemeTokens.java`, `assets/silkvis/lang/{en_us,ru_ru}.json` | сверка ключей 0 missing | IMPLEMENTED_NOT_TESTED |
+| 0.3 тема Graphite/Turquoise, RU/EN | `ui/ThemeTokens.java`, `ui/LangTable.java`, `assets/silkvis/lang/{en_us,ru_ru}.json` | сверка ключей 0 missing; **раунд 15**: RU по умолчанию (Авто) | IMPLEMENTED_NOT_TESTED |
 | 0.4/0.7 визуал доступен в соло и сети, координаты ≠ телепорт | `destinations/DestinationTarget.java`, `DestinationExecutor` | `DestinationChecks` (walk_only) | IMPLEMENTED_NOT_TESTED |
 | 0.5 все автоматизации выключены | `AutomationCatalog.canStart` всегда false | `MiscChecks` | IMPLEMENTED_NOT_TESTED |
 | 0.6 аварийный выход не убивает процесс | P2, только DTO/каталог | — | PLANNED |
@@ -38,7 +38,7 @@
 | UI-06 focus/modal/input routing | `ui/FocusManager.java`, `SilkVisScreen.keyPressed` | `UiChecks` | IMPLEMENTED_NOT_TESTED |
 | UI-07 120–180 ms, reduced motion, tooltip 350 ms | `ui/Animation.java`, `ThemeTokens.motionMs`, `TooltipController` | `UiChecks`; **раунд 11**: hover-фейд кнопок и тумблера, слайд ручки, fade-in подложки; при «Меньше движения» `motionMs = 0` и всё переключение мгновенное | IMPLEMENTED_NOT_TESTED |
 | UI-08 blur, fallback opaque | `GlobalConfig.effectiveBlur`, `ThemeTokens.opaqueFallback` | — | PLANNED (эффект не рисуется) |
-| UI-09 RU/EN, plurals, glyphs | lang-файлы | сверка ключей | IMPLEMENTED_NOT_TESTED |
+| UI-09 RU/EN, plurals, glyphs | `ui/LangTable.java`, lang-файлы, переключатель на вкладке «Настройки» | **раунд 15**: язык выбирается в UI и не зависит от языка игры; сверка ключей 0 missing, `ru_ru` полностью переведён | IMPLEMENTED_NOT_TESTED |
 | HUD-01 10 P1-виджетов + независимые настройки | `ui/hud/HudWidgetId.java`, `HudWidgetConfig.java` | **запуск 2026-11-12**: в мире рисуются панель FPS и миникарта-заглушка; FPS показывал `0 FPS 0.0 ms` (агрегатор не вызывался) — исправлено | IMPLEMENTED_TESTED (рендер виджетов; карта — заглушка) |
 | HUD-02 anchor/offset, clamp, snap, guides, reset | `ui/hud/HudLayoutEngine.java`, `client/HudEditorScreen.java` | `UiChecks` | IMPLEMENTED_NOT_TESTED |
 | HUD-03 visibility policy, protected areas | `VisibilityPolicy.java`, `HudLayoutEngine.protectedAreas` | `UiChecks`; **F1 в игре ещё не проверялся** | IMPLEMENTED_NOT_TESTED |

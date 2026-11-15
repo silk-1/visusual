@@ -45,6 +45,11 @@ public final class HudEditorScreen extends Screen {
     private int grid = GRID;
     private HudLayoutConfig layout;
 
+    /** Localized text through the language chosen in the settings tab, not the game's. */
+    private silkvis.ui.Localizer localizer() {
+        return runtime.localizer();
+    }
+
     public HudEditorScreen() {
         super(Text.translatable("silkvis.hud.editor.title"));
         this.layout = runtime.hudLayout();
@@ -64,13 +69,13 @@ public final class HudEditorScreen extends Screen {
         }
         int y = height - 28;
         buttons.add(new ButtonWidget(new Rect(8, y, 90, 20),
-                Text.translatable("silkvis.hud.editor.done").getString(), this::close)
+                localizer().get("silkvis.hud.editor.done"), this::close)
                 .style(ButtonWidget.Style.PRIMARY));
         buttons.add(new ButtonWidget(new Rect(104, y, 90, 20),
-                Text.translatable("silkvis.hud.editor.grid").getString() + " " + grid,
+                localizer().get("silkvis.hud.editor.grid") + " " + grid,
                 () -> grid = grid == 4 ? 8 : 4));
         buttons.add(new ButtonWidget(new Rect(200, y, 110, 20),
-                Text.translatable("silkvis.hud.reset").getString(), () -> {
+                localizer().get("silkvis.hud.reset"), () -> {
                     layout = HudLayoutConfig.defaults();
                     init();
                 }));
@@ -85,8 +90,8 @@ public final class HudEditorScreen extends Screen {
 
         Rect header = new Rect(0, 0, width, 24);
         painter.fill(header, Color.argb(theme.background().withAlpha(0.9f)));
-        String title = Text.translatable("silkvis.hud.editor.title").getString()
-                + " — " + Text.translatable("silkvis.hud.editor.preview").getString();
+        String title = localizer().get("silkvis.hud.editor.title")
+                + " — " + localizer().get("silkvis.hud.editor.preview");
         painter.text(title, 8, 8, Color.argb(theme.textPrimary()), true);
 
         for (Map.Entry<HudWidgetId, Rect> entry : boxes.entrySet()) {
@@ -120,7 +125,7 @@ public final class HudEditorScreen extends Screen {
         for (ButtonWidget button : buttons) {
             button.render(painter, theme);
         }
-        painter.text(Text.translatable("silkvis.hud.editor.hint").getString(), 8, height - 42,
+        painter.text(localizer().get("silkvis.hud.editor.hint"), 8, height - 42,
                 Color.argb(theme.textSecondary()), false);
     }
 

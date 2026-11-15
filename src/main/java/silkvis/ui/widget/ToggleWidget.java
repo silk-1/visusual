@@ -16,6 +16,22 @@ public final class ToggleWidget extends Widget {
     private final Animation.Fade switchFade = new Animation.Fade();
     private final Animation.Fade hoverFade = new Animation.Fade();
 
+    /**
+     * Visible state words. Set once by the screen from the language table; English literals
+     * here used to appear in a Russian UI.
+     */
+    private static volatile String onLabel = "on";
+    private static volatile String offLabel = "off";
+
+    public static void setStateLabels(String on, String off) {
+        if (on != null && !on.isBlank()) {
+            onLabel = on;
+        }
+        if (off != null && !off.isBlank()) {
+            offLabel = off;
+        }
+    }
+
     public ToggleWidget(Rect bounds, String label, String descriptionKey, boolean initial, BooleanConsumer onChange) {
         super(bounds);
         this.label = label;
@@ -75,7 +91,7 @@ public final class ToggleWidget extends Widget {
         painter.roundRect(knob, knobSize / 2,
                 Color.argb(enabled ? theme.textPrimary() : theme.textSecondary()));
         // Text state so the meaning does not depend on colour alone (UI-01).
-        String stateKey = !enabled ? "off" : value ? "on" : "off";
+        String stateKey = enabled && value ? onLabel : offLabel;
         int stateWidth = painter.textWidth(stateKey);
         painter.text(stateKey, track.x() - stateWidth - 6, bounds.centerY() - painter.lineHeight() / 2,
                 Color.argb(theme.textSecondary()), false);

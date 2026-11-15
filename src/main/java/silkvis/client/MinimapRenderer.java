@@ -30,7 +30,7 @@ public final class MinimapRenderer {
 
     public static void render(VanillaPainter painter, Rect bounds, ThemeTokens theme,
                               MapService mapService, MapIdentity identity, MapSettings settings,
-                              MinecraftClient client, String emptyLabel) {
+                              MinecraftClient client, String emptyLabel, String northLabel) {
         painter.roundPanel(bounds, theme.radiusControl(),
                 Color.argb(theme.surface().withAlpha(0.72f)), Color.argb(theme.border()));
         if (client.player == null || mapService == null) {
@@ -74,9 +74,9 @@ public final class MinimapRenderer {
         int cx = bounds.x() + bounds.width() / 2;
         int cy = bounds.y() + bounds.height() / 2;
         painter.fill(new Rect(cx - 1, cy - 1, 3, 3), Color.argb(theme.accent()));
-        if (settings.showCardinals()) {
-            painter.text("N", bounds.centerX() - painter.textWidth("N") / 2, bounds.y() + 4,
-                    Color.argb(theme.textPrimary()), true);
+        if (settings.showCardinals() && northLabel != null && !northLabel.isEmpty()) {
+            painter.text(northLabel, bounds.centerX() - painter.textWidth(northLabel) / 2,
+                    bounds.y() + 4, Color.argb(theme.textPrimary()), true);
         }
     }
 

@@ -74,7 +74,8 @@ public final class SilkVisScreen extends Screen {
     }
 
     private Localizer localizer() {
-        return key -> Text.translatable(key).getString();
+        // Was Text.translatable directly, which ignored the language setting entirely.
+        return runtime.localizer();
     }
 
     private String tr(String key) {
@@ -84,6 +85,8 @@ public final class SilkVisScreen extends Screen {
     @Override
     protected void init() {
         MinecraftClient client = MinecraftClient.getInstance();
+        // Toggle state words come from the language table, not from the widget's fallback.
+        ToggleWidget.setStateLabels(tr("silkvis.state.on"), tr("silkvis.state.off"));
         layout = MainScreenLayout.compute(client.getWindow().getScaledWidth(), client.getWindow().getScaledHeight());
         chrome.clear();
         navButtons.clear();
@@ -182,8 +185,7 @@ public final class SilkVisScreen extends Screen {
                 // widget instead of work in progress (MAP-06 diagnostics).
                 y += 8;
                 settingsWidgets.add(new DynamicTextWidget(
-                        new Rect(area.x(), y, width, 12),
-                        () -> runtime.mapService().map(s -> s.describe()).orElse("map: inactive")));
+                        new Rect(area.x(), y, width, 12), this::mapStatsText));
                 if (runtime.externalMapPresent()) {
                     // ADR-0007: the external map wins. Say so instead of hiding the tab.
                     settingsWidgets.add(new FixedText(
@@ -285,6 +287,24 @@ public final class SilkVisScreen extends Screen {
                                 nextPreset(global.preset()), global.reducedMotion(), global.blurEnabled(),
                                 global.verboseDiagnostics(), global.media())));
                 settingsWidgets.add(preset);
+                y += 34;
+                // Language was a config field nobody could change: there was no control at
+                // all. Auto follows the OS language, which is what a Russian user expects.
+                settingsWidgets.add(new FixedText(tr("silkvis.language.title"),
+                        new Rect(area.x(), y + 2, width, 16)));
+                y += 20;
+                String[] languages = {"auto", "ru", "en"};
+                int languageWidth = Math.max(50, width / 3 - 4);
+                for (int i = 0; i < languages.length; i++) {
+                    String code = languages[i];
+                    ButtonWidget button = new ButtonWidget(
+                            new Rect(area.x() + i * (languageWidth + 4), y, languageWidth, 20),
+                            tr("silkvis.language." + code), () -> saveLanguage(code));
+                    if (global.language().equals(code)) {
+                        button.style(ButtonWidget.Style.PRIMARY);
+                    }
+                    settingsWidgets.add(button);
+                }
             }
             case SETTINGS -> {
                 ButtonWidget editor = new ButtonWidget(new Rect(area.x(), y + 6, Math.min(width, 200), 22),
@@ -307,16 +327,20 @@ public final class SilkVisScreen extends Screen {
                 settingsWidgets.add(report);
             }
             case INTEGRATIONS -> {
-                String mode = runtime.integrations()
-                        .shaderMode(false).name().toLowerCase(Locale.ROOT);
+                // English enum names ("iris_no_pack") were leaking straight into the UI.
+                String mode = tr("silkvis.integrations.shader."
+                        + runtime.integrations().shaderMode(false).name().toLowerCase(Locale.ROOT));
                 settingsWidgets.add(new FixedText(tr("silkvis.integrations.mode") + ": " + mode,
                         new Rect(area.x(), y + 6, width, 16)));
+                settingsWidgets.add(new FixedText(integrationLine("sodium"), new Rect(area.x(), y + 24, width, 16)));
+                settingsWidgets.add(new FixedText(integrationLine("iris"), new Rect(area.x(), y + 40, width, 16)));
+                settingsWidgets.add(new FixedText(integrationLine("baritone"), new Rect(area.x(), y + 56, width, 16)));
                 String map = runtime.externalMapPresent()
                         ? tr("silkvis.map.external_found") + ": " + runtime.externalMapLabel()
                         : tr("silkvis.map.external_missing");
-                settingsWidgets.add(new FixedText(map, new Rect(area.x(), y + 26, width, 16)));
+                settingsWidgets.add(new FixedText(map, new Rect(area.x(), y + 76, width, 16)));
                 settingsWidgets.add(new FixedText(tr("silkvis.map.external_why"),
-                        new Rect(area.x(), y + 44, width, 34)));
+                        new Rect(area.x(), y + 94, width, 34)));
             }
             case AUTOMATION_P2 -> settingsWidgets.add(new FixedText(
                     tr("silkvis.automation.planned_note"), new Rect(area.x(), y + 6, width, 32)));
@@ -332,6 +356,37 @@ public final class SilkVisScreen extends Screen {
         }
         settingsScroll.setContentHeight(Math.max(0, contentBottom - contentTop + 8));
         focus.setScope(collectFocusable());
+    }
+
+    /** «Очередь 3 · тайлов 12 · 480 KiB · попаданий 82 %» — built from localized words. */
+    private String mapStatsText() {
+        return runtime.mapService().map(service -> {
+            silkvis.map.MapService.Stats stats = service.stats();
+            return tr("silkvis.map.diag.queued") + " " + stats.pendingJobs()
+                    + " · " + tr("silkvis.map.diag.tiles") + " " + stats.cachedTiles()
+                    + " · " + (stats.cacheBytes() / 1024) + " " + tr("silkvis.map.diag.kib")
+                    + " · " + tr("silkvis.map.diag.hits") + " "
+                    + Math.round(stats.hitRate() * 100) + " %";
+        }).orElse(tr("silkvis.map.inactive"));
+    }
+
+    private String integrationLine(String modId) {
+        String state = runtime.integrations().isPresent(modId)
+                ? tr("silkvis.integrations.present")
+                : tr("silkvis.integrations.absent");
+        return modId + " — " + state;
+    }
+
+    /**
+     * Rebuilding the screen is the honest way to relabel everything: tab names, footer and
+     * captions are created in init(), and a half-relabelled window looks broken.
+     */
+    private void saveLanguage(String code) {
+        runtime.setLanguage(code);
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client != null) {
+            client.setScreen(new SilkVisScreen());
+        }
     }
 
     private void saveMediaVariant(silkvis.config.NowPlayingVariant variant) {

@@ -91,7 +91,8 @@ public final class HudOverlayRenderer {
                 occupied.add(box);
                 MinimapRenderer.render(painter, box, theme, map.get(), identity.get(),
                         runtime.ui().map(), client,
-                        net.minecraft.text.Text.translatable("silkvis.map.no_tiles").getString());
+                        runtime.localizer().get("silkvis.map.no_tiles"),
+                        runtime.localizer().get("silkvis.map.cardinal.north"));
                 continue;
             }
             if (lines.isEmpty()) {
