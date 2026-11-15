@@ -141,5 +141,9 @@
   "silkvis.map.waypoint_default": "Точка",
   "silkvis.map.hint": "Перетаскивание — сдвиг · Колесо — зум · R — к игроку · ПКМ — точка · Esc — закрыть",
   "silkvis.map.building": "Строятся тайлы…",
-  "silkvis.map.inactive": "Карта недоступна (нет мира)"
+  "silkvis.map.inactive": "Карта недоступна (нет мира)",
+  "silkvis.map.external_found": "AtlasMap обнаружен",
+  "silkvis.map.external_hint": "Миникарта и построение тайлов SilkVis отключены; карта — Atlas (по умолчанию клавиша M, переназначается в управлении).",
+  "silkvis.map.external_missing": "AtlasMap не установлен",
+  "silkvis.map.external_why": "При установленном AtlasMap SilkVis не строит и не рисует свою карту: один конвейер тайлов, одна миникарта (ADR-0007)."
 }

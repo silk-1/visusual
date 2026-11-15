@@ -46,6 +46,15 @@ public final class SilkVisClient implements ClientModInitializer {
         collector = new HudDataCollector(runtime.clock());
         collector.tick(MinecraftClient.getInstance());
 
+        // ADR-0007: presence-only detection of a third-party map. No class of that mod is
+        // touched, no artifact is bundled.
+        ExternalMapIntegration.Info externalMap = ExternalMapIntegration.detect().orElse(null);
+        for (String id : new String[]{"atlasmapextended", "atlasmap"}) {
+            boolean present = externalMap != null && externalMap.modId().equals(id);
+            runtime.integrations().probe(id, () -> present);
+        }
+        runtime.applyExternalMapPolicy(externalMap);
+
         runtime.integrations().probe("sodium", () -> FabricLoader.getInstance().isModLoaded("sodium"));
         runtime.integrations().probe("iris", () -> FabricLoader.getInstance().isModLoaded("iris"));
         runtime.integrations().probe("baritone", () -> FabricLoader.getInstance().isModLoaded("baritone"));
@@ -59,10 +68,11 @@ public final class SilkVisClient implements ClientModInitializer {
         // default key is not needed and cannot collide with anything.
         bugReport = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                 "key.silkvis.bug_report", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN, CATEGORY));
-        // M is free in vanilla; the map screen also opens from the Map tab, so removing the
-        // bind never makes the feature unreachable.
+        // Unbound by default: M belongs to AtlasMap (ADR-0007), and our own map is reachable
+        // from the Map tab. A default bind that fires alongside another mod's map is worse
+        // than no bind at all.
         openMap = KeyBindingHelper.registerKeyBinding(new KeyBinding(
-                "key.silkvis.open_map", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_M, CATEGORY));
+                "key.silkvis.open_map", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN, CATEGORY));
 
         ClientTickEvents.END_CLIENT_TICK.register(this::onClientTick);
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> onJoin(client));

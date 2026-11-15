@@ -56,8 +56,9 @@ public final class SilkVisScreen extends Screen {
     private final SilkVisRuntime runtime = SilkVisRuntime.get();
     private final FocusManager focus = new FocusManager();
     private final TooltipController tooltips = new TooltipController(runtime.clock(), 350);
-    private final ScrollModel listScroll = new ScrollModel(0, 24);
-    private final ScrollModel settingsScroll = new ScrollModel(0, 28);
+    /** Recreated in init(): a ScrollModel bakes its viewport height at construction. */
+    private ScrollModel listScroll = new ScrollModel(0, 24);
+    private ScrollModel settingsScroll = new ScrollModel(0, 28);
     private final List<Widget> chrome = new ArrayList<>();
     private final List<Widget> settingsWidgets = new ArrayList<>();
     private final List<ButtonWidget> navButtons = new ArrayList<>();
@@ -96,6 +97,7 @@ public final class SilkVisScreen extends Screen {
             Rect row = new Rect(nav.x() + 4, navY, navItemWidth, 24);
             ButtonWidget button = new ButtonWidget(row, tr(tab.langKey()), () -> {
                 runtime.screenModel().select(tab);
+                settingsScroll.setOffset(0);
                 rebuildSettings();
             });
             if (runtime.screenModel().selectedCategory() == tab) {
@@ -118,7 +120,13 @@ public final class SilkVisScreen extends Screen {
         });
         chrome.add(search);
 
-        listScroll.setContentHeight(0);
+        // Viewport heights come from the layout, not from 0: with a 0-height viewport
+        // maxOffset() equals the whole content height, so the list could scroll past its
+        // end, and the settings pane (whose content height was never set at all) could not
+        // scroll even though its controls were clipped off the panel.
+        listScroll = new ScrollModel(Math.max(0, layout.moduleList().height() - 8), 24);
+        settingsScroll = new ScrollModel(
+                Math.max(0, layout.settings().height() - 54), 28);
         rebuildSettings();
         focus.setScope(collectFocusable());
     }
@@ -134,7 +142,8 @@ public final class SilkVisScreen extends Screen {
         ModuleCategory category = runtime.screenModel().selectedCategory();
         Rect area = layout.settings().inset(8, 8);
         // Below the title, the caption, the accent rule and the hairline (renderSettings).
-        int y = area.y() + 42;
+        int contentTop = area.y() + 42;
+        int y = contentTop - settingsScroll.offset();
         int width = Math.max(80, area.width() - 8);
 
         switch (category) {
@@ -175,9 +184,18 @@ public final class SilkVisScreen extends Screen {
                 settingsWidgets.add(new DynamicTextWidget(
                         new Rect(area.x(), y, width, 12),
                         () -> runtime.mapService().map(s -> s.describe()).orElse("map: inactive")));
-                settingsWidgets.add(new ButtonWidget(new Rect(area.x(), y + 16, width, ROW_HEIGHT),
-                        tr("silkvis.map.open"),
-                        () -> MinecraftClient.getInstance().setScreen(new MapScreen())));
+                if (runtime.externalMapPresent()) {
+                    // ADR-0007: the external map wins. Say so instead of hiding the tab.
+                    settingsWidgets.add(new FixedText(
+                            tr("silkvis.map.external_found") + ": " + runtime.externalMapLabel(),
+                            new Rect(area.x(), y + 16, width, 16)));
+                    settingsWidgets.add(new FixedText(tr("silkvis.map.external_hint"),
+                            new Rect(area.x(), y + 34, width, 34)));
+                } else {
+                    settingsWidgets.add(new ButtonWidget(new Rect(area.x(), y + 16, width, ROW_HEIGHT),
+                            tr("silkvis.map.open"),
+                            () -> MinecraftClient.getInstance().setScreen(new MapScreen())));
+                }
             }
             case MUSIC -> {
                 GlobalConfig global = runtime.global();
@@ -269,6 +287,12 @@ public final class SilkVisScreen extends Screen {
                         .shaderMode(false).name().toLowerCase(Locale.ROOT);
                 settingsWidgets.add(new FixedText(tr("silkvis.integrations.mode") + ": " + mode,
                         new Rect(area.x(), y + 6, width, 16)));
+                String map = runtime.externalMapPresent()
+                        ? tr("silkvis.map.external_found") + ": " + runtime.externalMapLabel()
+                        : tr("silkvis.map.external_missing");
+                settingsWidgets.add(new FixedText(map, new Rect(area.x(), y + 26, width, 16)));
+                settingsWidgets.add(new FixedText(tr("silkvis.map.external_why"),
+                        new Rect(area.x(), y + 44, width, 34)));
             }
             case AUTOMATION_P2 -> settingsWidgets.add(new FixedText(
                     tr("silkvis.automation.planned_note"), new Rect(area.x(), y + 6, width, 32)));
@@ -276,6 +300,13 @@ public final class SilkVisScreen extends Screen {
                 // VISUAL handled above; nothing extra.
             }
         }
+        // Real content height, so the wheel has somewhere to go. Without it the pane
+        // reported an empty content and refused to scroll while clipping its controls.
+        int contentBottom = contentTop - settingsScroll.offset();
+        for (Widget widget : settingsWidgets) {
+            contentBottom = Math.max(contentBottom, widget.bounds().bottom());
+        }
+        settingsScroll.setContentHeight(Math.max(0, contentBottom - contentTop + 8));
         focus.setScope(collectFocusable());
     }
 
@@ -450,6 +481,15 @@ public final class SilkVisScreen extends Screen {
             widget.render(painter, theme);
         }
         painter.popClip();
+        // A scrollable pane without a scrollbar looks broken: nothing tells the user that
+        // controls continue below the fold.
+        if (settingsScroll.needsScrollbar()) {
+            int trackHeight = area.height() - 46;
+            int thumbY = settingsScroll.thumbY(area.y() + 42, trackHeight);
+            painter.fill(new Rect(area.right() - 5, thumbY, 2,
+                    settingsScroll.thumbHeight(trackHeight)),
+                    theme.accent().withAlpha(0.7f).argb());
+        }
     }
 
     /** Truncates with an ellipsis without needing text metrics outside the painter. */
@@ -594,7 +634,14 @@ public final class SilkVisScreen extends Screen {
             return listScroll.scroll(verticalAmount);
         }
         if (layout.settings().contains((int) mouseX, (int) mouseY)) {
-            return settingsScroll.scroll(verticalAmount);
+            if (!settingsScroll.scroll(verticalAmount)) {
+                return false;
+            }
+            // Positions are absolute, so the pane is rebuilt at the new offset. A wheel tick
+            // costs a few dozen allocations; a per-frame translation of every widget would
+            // have to be mirrored in hit testing as well.
+            rebuildSettings();
+            return true;
         }
         return false;
     }
