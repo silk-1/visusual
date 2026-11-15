@@ -16,6 +16,7 @@ public final class Keys {
     public static final int END = 269;
     public static final int A = 65;
     public static final int C = 67;
+    public static final int R = 82;
     public static final int V = 86;
     public static final int X = 88;
     public static final int Z = 90;

@@ -144,5 +144,17 @@
   "key.silkvis.bug_report": "Create bug report",
   "silkvis.settings.bug_report": "Create bug report",
   "silkvis.bug_report.saved": "SilkVis report saved: %s",
-  "silkvis.bug_report.failed": "Could not save the SilkVis report - see latest.log"
+  "silkvis.bug_report.failed": "Could not save the SilkVis report - see latest.log",
+  "key.silkvis.open_map": "Map",
+  "silkvis.map.title": "Map",
+  "silkvis.map.open": "Open full map",
+  "silkvis.map.jump_to_player": "Center on player",
+  "silkvis.map.add_waypoint": "Waypoint here",
+  "silkvis.map.remove_waypoint": "Delete waypoint",
+  "silkvis.map.waypoints": "Waypoints",
+  "silkvis.map.no_waypoints": "No waypoints yet",
+  "silkvis.map.waypoint_default": "Waypoint",
+  "silkvis.map.hint": "Drag to pan · Wheel to zoom · R — player · Right click — waypoint · Esc — close",
+  "silkvis.map.building": "Building tiles…",
+  "silkvis.map.inactive": "Map unavailable (no world)"
 }
