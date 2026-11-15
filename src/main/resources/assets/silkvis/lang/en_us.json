@@ -44,7 +44,7 @@
   "silkvis.hud.editor.preview": "preview",
   "silkvis.hud.editor.done": "Done",
   "silkvis.hud.editor.grid": "Grid",
-  "silkvis.hud.editor.hint": "Drag widgets · position is stored as anchor + offset",
+  "silkvis.hud.editor.hint": "Click to select, drag to move · arrows: 1 px, Shift+arrows: 10 px · Ctrl+Z to undo · Esc to close",
   "silkvis.hud.editor.open": "Open HUD editor",
   "silkvis.hud.reset": "Reset layout",
 
@@ -287,5 +287,15 @@
   "silkvis.media.artwork.reason.not_an_image": "the source sent something that is not a picture",
   "silkvis.media.artwork.reason.empty_stream": "empty answer from the source",
   "silkvis.media.artwork.reason.open_failed": "could not open the picture",
-  "silkvis.media.artwork.reason.exception": "error while reading the picture"
+  "silkvis.media.artwork.reason.exception": "error while reading the picture",
+  "silkvis.hud.editor.undo": "Undo",
+  "silkvis.hud.editor.reset_one": "Reset this widget",
+  "silkvis.hud.editor.hide": "Hide widget",
+  "silkvis.hud.editor.show": "Show widget",
+  "silkvis.hud.editor.hidden": "hidden",
+  "silkvis.hud.editor.none": "No widget selected",
+  "silkvis.hud.editor.none.desc": "Click a frame in the game",
+  "silkvis.hud.editor.scale": "Scale",
+  "silkvis.hud.editor.alpha": "Opacity",
+  "silkvis.hud.editor.reset_all": "Reset all"
 }

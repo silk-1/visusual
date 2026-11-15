@@ -39,7 +39,7 @@
   "silkvis.hud.editor.preview": "предпросмотр",
   "silkvis.hud.editor.done": "Готово",
   "silkvis.hud.editor.grid": "Сетка",
-  "silkvis.hud.editor.hint": "Перетаскивайте виджеты · позиция хранится как привязка + смещение",
+  "silkvis.hud.editor.hint": "Клик — выбрать элемент, тянуть — двигать · стрелки: 1 px, Shift+стрелки: 10 px · Ctrl+Z — отменить · Esc — закрыть",
   "silkvis.hud.editor.open": "Открыть редактор HUD",
   "silkvis.hud.reset": "Сбросить раскладку",
   "silkvis.map.north_up": "Север сверху",
@@ -272,5 +272,15 @@
   "silkvis.media.artwork.reason.not_an_image": "источник отдал не картинку",
   "silkvis.media.artwork.reason.empty_stream": "пустой ответ источника",
   "silkvis.media.artwork.reason.open_failed": "не удалось открыть картинку",
-  "silkvis.media.artwork.reason.exception": "ошибка чтения картинки"
+  "silkvis.media.artwork.reason.exception": "ошибка чтения картинки",
+  "silkvis.hud.editor.undo": "Отменить",
+  "silkvis.hud.editor.reset_one": "Сбросить элемент",
+  "silkvis.hud.editor.hide": "Скрыть элемент",
+  "silkvis.hud.editor.show": "Показать элемент",
+  "silkvis.hud.editor.hidden": "скрыт",
+  "silkvis.hud.editor.none": "Элемент не выбран",
+  "silkvis.hud.editor.none.desc": "Нажмите на рамку в игре",
+  "silkvis.hud.editor.scale": "Масштаб",
+  "silkvis.hud.editor.alpha": "Прозрачность",
+  "silkvis.hud.editor.reset_all": "Сбросить все"
 }

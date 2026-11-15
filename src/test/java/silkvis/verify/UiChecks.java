@@ -70,6 +70,37 @@ final class UiChecks {
             assertEquals(8, HudLayoutEngine.snap(9, 8), "snap to 8");
         });
 
+        check("editor nudges, clamps and keeps centred anchors honest", () -> {
+            Rect screen = new Rect(0, 0, 640, 360);
+            Rect safe = HudLayoutEngine.safeArea(screen);
+            // A centred anchor used to return offsetSign 0, so its offset was multiplied
+            // away and the widget could not be moved at all.
+            HudWidgetConfig centred = new HudWidgetConfig(HudWidgetId.TASK_STATUS, true,
+                    Anchor.BOTTOM_CENTER, 0, 40, 1f, 1f, 22, VisibilityPolicy.defaults());
+            Rect moved = HudLayoutEngine.resolve(screen, safe, centred, 100, 20);
+            HudWidgetConfig flush = new HudWidgetConfig(HudWidgetId.TASK_STATUS, true,
+                    Anchor.BOTTOM_CENTER, 0, 0, 1f, 1f, 22, VisibilityPolicy.defaults());
+            Rect movedNone = HudLayoutEngine.resolve(screen, safe, flush, 100, 20);
+            assertEquals(movedNone.y() - 40, moved.y(), "centred offset is applied upwards");
+
+            Rect box = new Rect(10, 10, 60, 20);
+            Rect nudged = HudLayoutEngine.nudge(box, 5, 3, safe);
+            assertEquals(15, nudged.x(), "nudge x");
+            assertEquals(13, nudged.y(), "nudge y");
+            Rect stuck = HudLayoutEngine.nudge(new Rect(0, 0, 60, 20), -20, -20, safe);
+            assertEquals(safe.x(), stuck.x(), "clamped to the safe area");
+        });
+
+        check("scale and opacity can only leave the editor in range", () -> {
+            HudWidgetConfig cfg = HudWidgetConfig.defaults(HudWidgetId.FPS);
+            assertEquals(HudWidgetConfig.MAX_SCALE, cfg.withScale(9f).scale(), "scale capped high");
+            assertEquals(HudWidgetConfig.MIN_SCALE, cfg.withScale(0.1f).scale(), "scale capped low");
+            assertEquals(1.5f, cfg.withScale(1.5f).scale(), "scale kept in range");
+            assertEquals(0f, cfg.withAlpha(-1f).alpha(), "alpha capped low");
+            assertEquals(1f, cfg.withAlpha(4f).alpha(), "alpha capped high");
+            assertEquals(0.5f, cfg.withAlpha(0.5f).alpha(), "alpha kept in range");
+        });
+
         check("protected vanilla areas are detected", () -> {
             Rect screen = new Rect(0, 0, 640, 360);
             Rect hotbar = HudLayoutEngine.protectedAreas(screen)[0];

@@ -65,4 +65,13 @@ public record HudWidgetConfig(
     public HudWidgetConfig withEnabled(boolean value) {
         return new HudWidgetConfig(id, value, anchor, offsetX, offsetY, scale, alpha, zIndex, visibility);
     }
+
+    /** Scale is clamped by the compact constructor, so the editor cannot leave a range. */
+    public HudWidgetConfig withScale(float value) {
+        return new HudWidgetConfig(id, enabled, anchor, offsetX, offsetY, value, alpha, zIndex, visibility);
+    }
+
+    public HudWidgetConfig withAlpha(float value) {
+        return new HudWidgetConfig(id, enabled, anchor, offsetX, offsetY, scale, value, zIndex, visibility);
+    }
 }
