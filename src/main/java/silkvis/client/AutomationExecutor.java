@@ -44,6 +44,10 @@ public final class AutomationExecutor implements silkvis.automation.AutomationEn
     private int digTicks;
     private int waitTicks;
     private Step current;
+    /** Last position seen while walking, to notice "pushing into a wall" without a stuck timer. */
+    private double lastX;
+    private double lastZ;
+    private int stuckTicks;
 
     public AutomationExecutor(MinecraftClient client) {
         this.client = client;
@@ -115,15 +119,20 @@ public final class AutomationExecutor implements silkvis.automation.AutomationEn
         double horizontal = dx * dx + dz * dz;
         if (horizontal <= ARRIVED_SQUARED && Math.abs(targetY - player.getY()) < 1.2) {
             releaseMovement();
+            this.stuckTicks = 0;
             return Result.DONE;
         }
         // Look where we are going: the input flags are relative to the camera, so steering is
         // "turn first, then push forward".
-        float yaw = (float) (Math.toDegrees(Math.atan2(dz, dx)) - 90.0);
-        player.setYaw(yaw);
-        // Jump only when the next step needs height or something low is in the way.
+        player.setYaw((float) (Math.toDegrees(Math.atan2(dz, dx)) - 90.0));
+        // Jump when the target is a step up, or when pushing forward has stopped moving the
+        // player: the second case is the wall in front, and jumping is how a player climbs it.
+        double moved = Math.abs(player.getX() - this.lastX) + Math.abs(player.getZ() - this.lastZ);
+        this.stuckTicks = moved < 0.01 ? this.stuckTicks + 1 : 0;
+        this.lastX = player.getX();
+        this.lastZ = player.getZ();
         boolean needsJump = player.isOnGround()
-                && (targetY > player.getY() + 0.6 || player.horizontalCollision);
+                && (targetY > player.getY() + 0.6 || this.stuckTicks > 2);
         pressForward(true);
         if (needsJump) {
             pressJump(true);
@@ -157,21 +166,25 @@ public final class AutomationExecutor implements silkvis.automation.AutomationEn
         if (distanceSquared(player, pos) > REACH * REACH) {
             return Result.BLOCKED;
         }
-        if (!pos.equals(this.digging)) {
+        boolean fresh = !pos.equals(this.digging);
+        if (fresh) {
             this.digging = pos;
             this.digTicks = 0;
         }
         player.setYaw(yawTo(player, pos));
         player.setPitch(pitchTo(player, pos));
-        // attackBlock starts the break, updateBlockBreakingProgress continues it. Calling the
-        // second one on the first tick is harmless and saves a branch.
-        boolean started = this.client.interactionManager.attackBlock(pos, faceTowards(player, pos));
-        if (!started) {
-            this.digging = null;
-            return Result.BLOCKED;
+        // attackBlock *starts* a break and resets its progress; updateBlockBreakingProgress
+        // advances it. Calling the first one every tick would restart the block forever, which
+        // is exactly the "it stands there hitting stone" failure.
+        if (fresh) {
+            if (!this.client.interactionManager.attackBlock(pos, faceTowards(player, pos))) {
+                this.digging = null;
+                return Result.BLOCKED;
+            }
+        } else {
+            this.client.interactionManager.updateBlockBreakingProgress(pos,
+                    faceTowards(player, pos));
         }
-        this.client.interactionManager.updateBlockBreakingProgress(pos,
-                faceTowards(player, pos));
         this.digTicks++;
         if (this.digTicks > MAX_DIG_TICKS) {
             this.digging = null;
@@ -222,7 +235,6 @@ public final class AutomationExecutor implements silkvis.automation.AutomationEn
         }
         player.setYaw(yawTo(player, target.getBlockPos()));
         this.client.interactionManager.attackEntity(player, target);
-        player.swingHand(Hand.MAIN_HAND);
         return Result.DONE;
     }
 
@@ -231,7 +243,9 @@ public final class AutomationExecutor implements silkvis.automation.AutomationEn
         if (slot < 0 || slot >= 9) {
             return Result.BLOCKED;
         }
-        player.getInventory().setSelectedSlot(slot);
+        // The field, not the setter: both exist, but the field is what the vanilla hotbar keys
+        // write as well, so the two paths cannot disagree.
+        player.getInventory().selectedSlot = slot;
         return Result.DONE;
     }
 

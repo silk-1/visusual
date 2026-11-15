@@ -35,6 +35,12 @@ final class FakeWorld implements Snapshot, Movement.Grid {
     private int selectedSlot;
     private float yaw;
     private float pitch;
+    private double eyeY = 1.62;
+
+    /** Eye height used by the aim checks; the goals never read it. */
+    double eyeHeight() {
+        return this.eyeY;
+    }
     private long tick;
 
     /** Fills a solid floor of stone at {@code y-1} for the given square around the player. */
@@ -83,6 +89,19 @@ final class FakeWorld implements Snapshot, Movement.Grid {
         double distance = Math.sqrt(player.distanceSquared(new BlockPos(
                 (int) Math.floor(x), (int) Math.floor(y), (int) Math.floor(z))));
         entities.add(new EntityInfo(id, type, x, y, z, 20f, hostile, distance));
+        return this;
+    }
+
+    /** Camera angles, for the aim checks. */
+    FakeWorld looking(float yaw, float pitch) {
+        this.yaw = yaw;
+        this.pitch = pitch;
+        return this;
+    }
+
+    /** Eye height above the feet, so an aim ray starts where a player's eyes are. */
+    FakeWorld withEyeHeight(double value) {
+        this.eyeY = value;
         return this;
     }
 

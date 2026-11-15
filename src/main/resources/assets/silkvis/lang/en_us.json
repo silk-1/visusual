@@ -787,5 +787,10 @@
   "silkvis.automation.navigate.desc": "Walks to the block you are looking at. Goes around walls, uses doors, never digs.",
   "silkvis.automation.pickup.desc": "Walks to dropped items in range and ignores anything lying in lava or fire.",
   "silkvis.automation.emergency_exit.desc": "Leaves the immediate area when something dangerous is next to you.",
-  "silkvis.unit.blocks": "blocks"
+  "silkvis.unit.blocks": "blocks",
+  "key.silkvis.automation_stop": "Automation: stop",
+  "key.silkvis.automation_go": "Automation: do the obvious thing",
+  "silkvis.automation.selector.chosen": "Automation: started %s at %s",
+  "silkvis.automation.selector.refused": "Automation: nothing to do (%s)",
+  "silkvis.automation.selector.none": "Automation: nothing to do"
 }

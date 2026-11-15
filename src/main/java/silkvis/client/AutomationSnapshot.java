@@ -99,7 +99,8 @@ public final class AutomationSnapshot implements Snapshot {
         }
         // ClientWorld exposes its entity list directly; the distance filter below is what makes
         // this a "radar" and not a dump of everything loaded.
-        for (Entity entity : world.getEntities()) {
+        // ClientWorld declares the list as a raw Iterable, so the element type has to be named.
+        for (Entity entity : (Iterable<Entity>) world.getEntities()) {
             if (entity == player || !entity.isAlive()) {
                 continue;
             }

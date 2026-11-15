@@ -175,7 +175,8 @@ public final class SilkVisScreen extends Screen {
         settingsWidgets.add(new FixedText(tr("silkvis.automation.goals"),
                 new Rect(area.x(), y, width, 12)));
         y += 16;
-        BlockPos target = automationTarget();
+        // The target block is resolved at the moment of the click, not when the tab was built:
+        // the player aims, then presses start.
         for (AutomationCatalog.Entry entry : AutomationCatalog.entries()) {
             boolean ready = runtime.automation().allGoals().stream()
                     .anyMatch(goal -> goal.id().equals(entry.id()))
@@ -190,6 +191,7 @@ public final class SilkVisScreen extends Screen {
             ButtonWidget start = new ButtonWidget(
                     new Rect(area.x(), y, Math.min(width, 260), ROW_HEIGHT), label,
                     () -> {
+                        BlockPos target = runtime.automationTarget(client);
                         if (!runtime.startAutomation(entry.id(), target)) {
                             // The start was refused (mode too low or an unknown id): the status
                             // line already carries the reason, but the tab must show it too.
@@ -209,25 +211,6 @@ public final class SilkVisScreen extends Screen {
                 new Rect(area.x(), y + 2, width, 30)));
         y += 34;
         return y;
-    }
-
-    /**
-     * The block the run should aim at: what the player is looking at, else the block they stand
-     * on. Returned to the tab so every start button uses the same rule.
-     */
-    private BlockPos automationTarget() {
-        MinecraftClient client = MinecraftClient.getInstance();
-        if (client == null || client.player == null) {
-            return GoalRegistry.NO_TARGET;
-        }
-        net.minecraft.util.hit.HitResult hit = client.crosshairTarget;
-        if (hit instanceof net.minecraft.util.hit.BlockHitResult block
-                && hit.getType() == net.minecraft.util.hit.HitResult.Type.BLOCK) {
-            net.minecraft.util.math.BlockPos pos = block.getBlockPos();
-            return new BlockPos(pos.getX(), pos.getY(), pos.getZ());
-        }
-        net.minecraft.util.math.BlockPos feet = client.player.getBlockPos();
-        return new BlockPos(feet.getX(), feet.getY(), feet.getZ());
     }
 
     private void applyAutomation(AutomationSettings next) {

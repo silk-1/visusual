@@ -40,6 +40,10 @@ public final class SilkVisClient implements ClientModInitializer {
     private static KeyBinding hudInteraction;
     private static KeyBinding bugReport;
     private static KeyBinding openMap;
+    /** Panic: release everything the automation pressed. Unbound until the player binds it. */
+    private static KeyBinding automationStop;
+    /** "Do the obvious thing": danger > loot > the block you are looking at. */
+    private static KeyBinding automationGo;
     /** Direct shortcut to the ported module settings; the same screen is on the VISUAL tab. */
     private static KeyBinding openSoupModules;
     private static final MapPrefetcher MAP_PREFETCH = new MapPrefetcher();
@@ -118,6 +122,14 @@ public final class SilkVisClient implements ClientModInitializer {
                 "key.silkvis.soup_visuals", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN, CATEGORY));
         openMap = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                 "key.silkvis.open_map", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN, CATEGORY));
+        // Both unbound by default: an automation key that collides with a movement key would
+        // fight the player on every keypress, which is the one thing rule 7 forbids.
+        automationStop = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+                "key.silkvis.automation_stop", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN,
+                CATEGORY));
+        automationGo = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+                "key.silkvis.automation_go", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN,
+                CATEGORY));
 
         // One line in latest.log that names the running jar. A failed `build.bat` leaves the
         // previous jar in mods/, so "the fix did nothing" is usually "the old build is still
@@ -215,6 +227,7 @@ public final class SilkVisClient implements ClientModInitializer {
                 BugReportService.createAndNotify(client);
             }
         }
+        tickAutomationKeys(runtime, client);
     }
 
     /**
@@ -242,6 +255,30 @@ public final class SilkVisClient implements ClientModInitializer {
                     || client.options.attackKey.isPressed() || client.options.useKey.isPressed();
         }
         runtime.tickAutomation(snapshot, busy);
+    }
+
+    /**
+     * The two automation keys. Both are no-ops when automation is off, and both log what they did:
+     * a key that silently does nothing is indistinguishable from a broken key in {@code latest.log}.
+     */
+    private static void tickAutomationKeys(SilkVisRuntime runtime, MinecraftClient client) {
+        if (automationStop != null) {
+            while (automationStop.wasPressed()) {
+                runtime.stopAutomation(silkvis.automation.StopReason.BY_PLAYER);
+            }
+        }
+        if (automationGo != null) {
+            while (automationGo.wasPressed()) {
+                if (!runtime.automation().settings().enabled()) {
+                    runtime.log().event("AUTOMATION_KEY", "ignored: mode off");
+                    continue;
+                }
+                AutomationSelector.Decision decision = new AutomationSelector(runtime)
+                        .pickAndStart(client, runtime.automationSnapshot(client));
+                runtime.log().event("AUTOMATION_KEY", decision.started()
+                        ? "start " + decision.goalId() : "nothing: " + decision.refusal().code());
+            }
+        }
     }
 
     private void onJoin(MinecraftClient client) {

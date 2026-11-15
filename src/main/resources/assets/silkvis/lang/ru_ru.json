@@ -787,5 +787,10 @@
   "silkvis.automation.navigate.desc": "Идёт к блоку, на который вы смотрите. Обходит стены, открывает двери, не копает.",
   "silkvis.automation.pickup.desc": "Подходит к выпавшим предметам рядом и не трогает то, что лежит в лаве или огне.",
   "silkvis.automation.emergency_exit.desc": "Уводит из опасного места, когда рядом что-то угрожает.",
-  "silkvis.unit.blocks": "блоков"
+  "silkvis.unit.blocks": "блоков",
+  "key.silkvis.automation_stop": "Автоматизация: стоп",
+  "key.silkvis.automation_go": "Автоматизация: сделать очевидное",
+  "silkvis.automation.selector.chosen": "Автоматизация: запущена %s в %s",
+  "silkvis.automation.selector.refused": "Автоматизация: делать нечего (%s)",
+  "silkvis.automation.selector.none": "Автоматизация: делать нечего"
 }

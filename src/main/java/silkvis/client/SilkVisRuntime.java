@@ -1,6 +1,7 @@
 package silkvis.client;
 
 import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.client.MinecraftClient;
 import silkvis.assets.TotemDownloader;
 import silkvis.automation.AutomationEngine;
 import silkvis.automation.AutomationFile;
@@ -860,6 +861,38 @@ public final class SilkVisRuntime {
 
     public GoalRegistry automationGoals() {
         return this.automationGoals;
+    }
+
+    /**
+     * Reads the game into the planner's snapshot, or returns null when there is nothing to read.
+     *
+     * <p>Deliberately here and not in the client entrypoint: {@code AutomationSelector} needs the
+     * same capture, and two captures would be two lists of entities per tick. Only this method
+     * references the Minecraft adapter, and it is called from the tick loop, never from a screen.</p>
+     */
+    public Snapshot automationSnapshot(MinecraftClient client) {
+        if (client == null) {
+            return null;
+        }
+        long tick = client.world == null ? 0L : client.world.getTime();
+        return AutomationSnapshot.capture(client, tick, this.automation.settings().reachRadius());
+    }
+
+    /** The block the run would aim at: what the camera looks at, else the block under the feet. */
+    public BlockPos automationTarget(MinecraftClient client) {
+        if (client == null || client.player == null || client.world == null) {
+            return GoalRegistry.NO_TARGET;
+        }
+        var eye = client.player.getEyePos();
+        java.util.Optional<BlockPos> looked = silkvis.automation.Aim.firstSolid(
+                eye.x, eye.y, eye.z, client.player.getYaw(), client.player.getPitch(), 5.0,
+                cell -> !client.world.getBlockState(
+                        new net.minecraft.util.math.BlockPos(cell.x(), cell.y(), cell.z())).isAir());
+        if (looked.isPresent()) {
+            return looked.get();
+        }
+        net.minecraft.util.math.BlockPos feet = client.player.getBlockPos();
+        return new BlockPos(feet.getX(), feet.getY(), feet.getZ());
     }
 
     /** Wired by the client entrypoint to the only class that may press keys. */

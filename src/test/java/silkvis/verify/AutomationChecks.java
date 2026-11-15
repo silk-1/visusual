@@ -54,6 +54,9 @@ final class AutomationChecks {
         engineStopsOnLowHealth();
         engineBacksOffWhenPlayerDrives();
         engineStopsOnWorldChange();
+        aimFindsTheLookedAtBlock();
+        aimRespectsTheLookDirection();
+        aimIgnoresAir();
         registryModeGate();
         catalogMatchesRegistry();
         engineUsesPlannedStepsOnly();
@@ -370,6 +373,54 @@ final class AutomationChecks {
             SelfCheck.assertEquals(StopReason.WORLD_CHANGED, engine.status().reason(),
                     "stopped for the world change");
             SelfCheck.assertTrue(!engine.active(), "no goal after the change");
+        });
+    }
+
+    // ------------------------------------------------------------------ aiming
+
+    private static void aimFindsTheLookedAtBlock() {
+        SelfCheck.check("automation: the aim ray finds the block under the crosshair", () -> {
+            FakeWorld world = new FakeWorld().withFloor(6);
+            // The eye of a player standing at y=64 is at 65.62, so a level ray travels through
+            // the y=65 layer: the block has to be there to be looked at.
+            world.withBlock(4, 65, 0, "minecraft:stone");
+            // Yaw -90 looks east (+X) in Minecraft; pitch 0 is level.
+            java.util.Optional<BlockPos> hit = silkvis.automation.Aim.firstSolid(
+                    0.5, 64.0 + world.eyeHeight(), 0.5, -90f, 0f, 8.0,
+                    pos -> world.solid(pos.x(), pos.y(), pos.z()));
+            SelfCheck.assertTrue(hit.isPresent(), "hit something");
+            SelfCheck.assertEquals(new BlockPos(4, 65, 0), hit.get(), "the block straight ahead");
+        });
+    }
+
+    private static void aimRespectsTheLookDirection() {
+        SelfCheck.check("automation: the aim ray follows yaw, not the nearest block", () -> {
+            FakeWorld world = new FakeWorld().withFloor(6);
+            world.withBlock(4, 65, 0, "minecraft:stone");
+            world.withBlock(0, 65, 4, "minecraft:stone");
+            // Yaw 0 looks south (+Z): the block at +Z must win over the one at +X, which is the
+            // same distance away and would be found by a "nearest block" rule.
+            java.util.Optional<BlockPos> hit = silkvis.automation.Aim.firstSolid(
+                    0.5, 64.0 + world.eyeHeight(), 0.5, 0f, 0f, 8.0,
+                    pos -> world.solid(pos.x(), pos.y(), pos.z()));
+            SelfCheck.assertTrue(hit.isPresent(), "hit something");
+            SelfCheck.assertEquals(new BlockPos(0, 65, 4), hit.get(), "looked south, found south");
+            // Straight down is a legal aim too (pitch -90) and must find the floor.
+            java.util.Optional<BlockPos> down = silkvis.automation.Aim.firstSolid(
+                    0.5, 64.0 + world.eyeHeight(), 0.5, 0f, 90f, 4.0,
+                    pos -> world.solid(pos.x(), pos.y(), pos.z()));
+            SelfCheck.assertTrue(down.isPresent(), "hit the floor");
+            SelfCheck.assertEquals(63, down.get().y(), "the floor is the block below the feet");
+        });
+    }
+
+    private static void aimIgnoresAir() {
+        SelfCheck.check("automation: an aim into open air finds nothing", () -> {
+            FakeWorld world = new FakeWorld().withFloor(2);
+            java.util.Optional<BlockPos> hit = silkvis.automation.Aim.firstSolid(
+                    0.5, 70.0, 0.5, -90f, 0f, 6.0,
+                    pos -> world.solid(pos.x(), pos.y(), pos.z()));
+            SelfCheck.assertTrue(hit.isEmpty(), "nothing to look at");
         });
     }
 
