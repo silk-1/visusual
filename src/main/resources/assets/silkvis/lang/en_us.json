@@ -233,5 +233,17 @@
   "silkvis.hud.dir.s": "S",
   "silkvis.hud.dir.sw": "SW",
   "silkvis.hud.dir.w": "W",
-  "silkvis.hud.dir.nw": "NW"
+  "silkvis.hud.dir.nw": "NW",
+  "silkvis.media.prev": "Previous",
+  "silkvis.media.toggle": "Pause / Play",
+  "silkvis.media.next": "Next",
+  "silkvis.media.now.none": "Nothing is playing",
+  "silkvis.media.now.unknown": "Untitled",
+  "silkvis.media.live": "live",
+  "silkvis.hud.interaction_open": "HUD interaction",
+  "silkvis.hud.interaction_why": "Lets you click the music card buttons. Esc exits. No key is bound so other mods keep theirs.",
+  "silkvis.media.playback.playing": "playing",
+  "silkvis.media.playback.paused": "paused",
+  "silkvis.media.playback.stopped": "stopped",
+  "silkvis.hud.editor.reset": "Reset"
 }

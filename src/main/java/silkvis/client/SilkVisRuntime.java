@@ -60,6 +60,11 @@ public final class SilkVisRuntime {
     private final ConfigPaths paths;
     private final JsonConfigFile<GlobalConfig> globalFile;
     private final Debouncer<GlobalConfig> globalDebouncer;
+    /**
+     * UI saves are debounced too: the HUD editor writes the layout on every mouse move, and
+     * an unbounced save meant one file write per frame (0.1.15).
+     */
+    private final Debouncer<UiConfig> uiDebouncer;
 
     private final MainScreenModel screenModel;
     private ThemeTokens theme = ThemeTokens.graphiteTurquoise();
@@ -92,6 +97,8 @@ public final class SilkVisRuntime {
     private boolean hudInteractionMode;
 
     private final RateLimiter mediaPollLimiter = new RateLimiter(clock, 1);
+    /** Pseudo-profile for HUD/UI edits made before any world is loaded. */
+    private static final String SHARED_UI_PROFILE = "defaults";
 
     private SilkVisRuntime() {
         Path configDir = FabricLoader.getInstance().getConfigDir();
@@ -99,6 +106,7 @@ public final class SilkVisRuntime {
         this.paths = new ConfigPaths(configDir, gameDir.resolve("silkvis-data"));
         this.globalFile = new JsonConfigFile<>(paths.globalFile(), new GlobalConfig.Codec(), clock);
         this.globalDebouncer = new Debouncer<>(500, clock, this::saveGlobalAsync);
+        this.uiDebouncer = new Debouncer<>(500, clock, this::saveUiAsync);
         this.screenModel = new MainScreenModel(modules);
         registerModules();
         loadGlobal();
@@ -190,10 +198,21 @@ public final class SilkVisRuntime {
     }
 
     public void loadProfile(ProfileIdentity identity, String dimensionId) {
+        // Pending UI edits belong to the profile that is being left.
+        uiDebouncer.flush();
         this.profileId = identity.profileId();
         JsonConfigFile<UiConfig> uiFile = new JsonConfigFile<>(paths.profileUiFile(profileId),
                 new UiConfig.Codec(), clock);
         LoadOutcome<UiConfig> outcome = uiFile.load();
+        if (outcome.status() == LoadOutcome.Status.FRESH && !SHARED_UI_PROFILE.equals(profileId)) {
+            // First visit: start from the layout edited in the main menu, if there is one.
+            JsonConfigFile<UiConfig> shared = new JsonConfigFile<>(
+                    paths.profileUiFile(SHARED_UI_PROFILE), new UiConfig.Codec(), clock);
+            LoadOutcome<UiConfig> base = shared.load();
+            if (base.status() == LoadOutcome.Status.LOADED) {
+                outcome = base;
+            }
+        }
         this.ui = outcome.value();
         outcome.error().ifPresent(e -> log.log(e.code().name(), e.fieldPath()));
 
@@ -261,16 +280,13 @@ public final class SilkVisRuntime {
 
     private void applyTheme() {
         ThemeTokens base = ThemeTokens.graphiteTurquoise();
-        if (!global.effectiveBlur()) {
-            theme = base;
-        }
-        if (global.reducedMotion()) {
-            theme = new ThemeTokens(base.id(), base.background(), base.surface(), base.surfaceHover(),
-                    base.border(), base.accent(), base.accentHover(), base.textPrimary(), base.textSecondary(),
-                    base.success(), base.warning(), base.error(), base.spacingXs(), base.spacingSm(),
-                    base.spacingMd(), base.spacingLg(), base.spacingXl(), base.radiusPanel(),
-                    base.radiusControl(), base.controlHeight(), base.minHitSize(), 0, base.tooltipDelayMs());
-        }
+        // Visual presets are density presets: LOW packs the interface, QUALITY gives it air.
+        ThemeTokens preset = switch (global.preset()) {
+            case LOW -> base.withDensity(2, 2, -2);
+            case BALANCED -> base;
+            case QUALITY -> base.withDensity(8, 10, 2);
+        };
+        theme = global.reducedMotion() ? preset.withMotion(0) : preset;
     }
 
     public void requestGlobalSave(GlobalConfig updated) {
@@ -287,18 +303,20 @@ public final class SilkVisRuntime {
 
     public void requestUiSave(UiConfig updated) {
         this.ui = updated;
-        saveUiAsync(updated);
+        uiDebouncer.submit(updated);
     }
 
     private void saveGlobalAsync(GlobalConfig value) {
         executors.io().execute(() -> saveQuietly(globalFile, value));
     }
 
+    /**
+     * Edits made from the main menu have no profile yet; they used to be dropped without a
+     * word. They now go to a shared file that every new profile inherits on first join.
+     */
     private void saveUiAsync(UiConfig value) {
-        if (profileId == null) {
-            return;
-        }
-        JsonConfigFile<UiConfig> file = new JsonConfigFile<>(paths.profileUiFile(profileId),
+        String id = profileId == null ? SHARED_UI_PROFILE : profileId;
+        JsonConfigFile<UiConfig> file = new JsonConfigFile<>(paths.profileUiFile(id),
                 new UiConfig.Codec(), clock);
         executors.io().execute(() -> saveQuietly(file, value));
     }
@@ -328,6 +346,7 @@ public final class SilkVisRuntime {
     /** Called once on the client tick; safe to call when no world is loaded. */
     public void tick() {
         globalDebouncer.tick();
+        uiDebouncer.tick();
         // Retry with a throttle: a refused bridge keeps its reason visible in the Music tab
         // and the HUD instead of silently doing nothing until the next launch.
         tryStartMedia();
@@ -366,6 +385,7 @@ public final class SilkVisRuntime {
 
     public void shutdown() {
         globalDebouncer.flush();
+        uiDebouncer.flush();
         modules.disableAll();
         if (media != null) {
             media.close();

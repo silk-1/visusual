@@ -13,6 +13,10 @@ import silkvis.core.ModuleCategory;
 import silkvis.core.ModuleDescriptor;
 import silkvis.core.ModuleRegistry;
 import silkvis.map.MapSettings;
+import silkvis.media.MediaAction;
+import silkvis.media.MediaCommandResult;
+import silkvis.media.MediaSnapshot;
+import silkvis.media.MediaTimeline;
 import silkvis.render.VanillaPainter;
 import silkvis.ui.Animation;
 import silkvis.ui.Color;
@@ -203,7 +207,24 @@ public final class SilkVisScreen extends Screen {
                 GlobalConfig global = runtime.global();
                 settingsWidgets.add(new DynamicTextWidget(new Rect(area.x(), y, width, 12),
                         () -> tr("silkvis.media.status") + ": " + runtime.mediaStatusLine()));
-                y += 18;
+                y += 14;
+                // What is playing, from the cached snapshot: no provider call in the UI.
+                settingsWidgets.add(new DynamicTextWidget(new Rect(area.x(), y, width, 12),
+                        this::nowPlayingLine));
+                y += 16;
+                // Transport. The HUD card needs interaction mode; the menu is always one
+                // keypress away, so playback control lives here too (owner report: "не могу
+                // переключать треки, ставить на паузу").
+                int transportWidth = Math.max(52, width / 3 - 4);
+                String[] transportKeys = {"silkvis.media.prev", "silkvis.media.toggle", "silkvis.media.next"};
+                MediaAction[] transportActions = {MediaAction.PREVIOUS, MediaAction.TOGGLE, MediaAction.NEXT};
+                for (int i = 0; i < transportActions.length; i++) {
+                    MediaAction action = transportActions[i];
+                    settingsWidgets.add(new ButtonWidget(
+                            new Rect(area.x() + i * (transportWidth + 4), y, transportWidth, 20),
+                            tr(transportKeys[i]), () -> mediaCommand(action)));
+                }
+                y += 26;
                 y = addToggle(area, y, width, tr("silkvis.media.enabled"), tr("silkvis.media.enabled.desc"),
                         global.media().enabled(), value -> {
                             var media = global.media();
@@ -324,6 +345,20 @@ public final class SilkVisScreen extends Screen {
                         tr("silkvis.hud.reset"), () -> runtime.setHudLayout(HudLayoutConfig.defaults()));
                 settingsWidgets.add(reset);
                 y += 34;
+                // The interaction key is unbound on purpose (no extra keybinds), so the mode
+                // was unreachable in game: the music card buttons could never be clicked.
+                ButtonWidget interaction = new ButtonWidget(new Rect(area.x(), y + 6, Math.min(width, 200), 22),
+                        tr("silkvis.hud.interaction_open"), () -> {
+                    runtime.setHudInteractionMode(true);
+                    if (client != null) {
+                        client.setScreen(new HudInteractionScreen());
+                    }
+                });
+                settingsWidgets.add(interaction);
+                y += 34;
+                settingsWidgets.add(new FixedText(tr("silkvis.hud.interaction_why"),
+                        new Rect(area.x(), y, width, 24)));
+                y += 28;
                 // Support flow: one file with versions, environment, module states and the
                 // log tail, written to the desktop.
                 ButtonWidget report = new ButtonWidget(new Rect(area.x(), y + 6, Math.min(width, 200), 22),
@@ -364,6 +399,57 @@ public final class SilkVisScreen extends Screen {
     }
 
     /** «Очередь 3 · тайлов 12 · 480 KiB · попаданий 82 %» — built from localized words. */
+    /** One line: title — artist, position / length. Unknown values are shown, not invented. */
+    private String nowPlayingLine() {
+        var service = runtime.mediaService();
+        if (service.isEmpty()) {
+            return tr("silkvis.media.now.none");
+        }
+        var snapshotOpt = service.get().snapshot();
+        if (snapshotOpt.isEmpty()) {
+            return tr("silkvis.media.now.none");
+        }
+        MediaSnapshot snapshot = snapshotOpt.get();
+        String title = snapshot.titleOpt().orElse(tr("silkvis.media.now.unknown"));
+        String artist = snapshot.artistOpt().orElse("");
+        long position = MediaTimeline
+                .projectPosition(snapshot, runtime.clock().monotonicNanos(), runtime.clock())
+                .orElse(-1L);
+        String positionText = position < 0 ? "--:--" : MediaTimeline.formatPosition(position);
+        String line = artist.isBlank() ? title : title + " \u2014 " + artist;
+        if (snapshot.playbackState() != silkvis.media.PlaybackState.UNKNOWN) {
+            line = line + " \u00b7 " + tr("silkvis.media.playback."
+                    + snapshot.playbackState().name().toLowerCase(Locale.ROOT));
+        }
+        return line + "   " + positionText + " / " + mediaLength(snapshot);
+    }
+
+    /** LIVE is a word, so it is translated here rather than in the media layer. */
+    private String mediaLength(MediaSnapshot snapshot) {
+        if (snapshot == null) {
+            return "--:--";
+        }
+        if (!MediaTimeline.isLiveOrUnknownLength(snapshot)) {
+            return MediaTimeline.formatPosition(snapshot.endMs());
+        }
+        return snapshot.playbackState() == silkvis.media.PlaybackState.PLAYING
+                ? tr("silkvis.media.live") : "--:--";
+    }
+
+    /** Commands are addressed to the current session; a rejection is logged, never silent. */
+    private void mediaCommand(MediaAction action) {
+        var service = runtime.mediaService();
+        if (service.isEmpty()) {
+            runtime.log().log("MEDIA_COMMAND_NO_PROVIDER", action.name());
+            return;
+        }
+        MediaCommandResult result = service.get().command(action);
+        if (result.status() != MediaCommandResult.Status.ACCEPTED) {
+            runtime.log().log("MEDIA_COMMAND_REJECTED",
+                    action.name() + ":" + result.status().name());
+        }
+    }
+
     private String mapStatsText() {
         return runtime.mapService().map(service -> {
             silkvis.map.MapService.Stats stats = service.stats();

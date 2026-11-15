@@ -20,6 +20,8 @@ import java.util.function.Consumer;
  */
 public final class MediaService implements MediaProviderListener, AutoCloseable {
     public static final long COMMAND_TIMEOUT_MS = 2000L;
+    /** Cover retry: 2 s while nothing arrived, so a failed read is retried but not spammed. */
+    private static final long ARTWORK_RETRY_MS = 2000L;
 
     private final MediaProvider provider;
     private final Clock clock;
@@ -39,6 +41,7 @@ public final class MediaService implements MediaProviderListener, AutoCloseable 
     private long requestCounter;
     private String artworkHash = "";
     private boolean artworkRequested;
+    private long artworkRequestedAtMs;
     private Long seekIntentMs;
 
     public MediaService(MediaProvider provider, Clock clock,
@@ -169,19 +172,35 @@ public final class MediaService implements MediaProviderListener, AutoCloseable 
         if (snapshot != null && !snapshot.artworkOpt().isPresent()) {
             artworkHash = "";
         }
+        // Nothing ever asked the provider for the cover until 0.1.15: the request method
+        // existed and had no caller, so the HUD always drew the neutral placeholder.
+        requestArtworkIfNeeded();
     }
 
-    /** Requests artwork at most once per (session, revision, ref) (MEDIA-14). */
+    /**
+     * Requests artwork at most once per session/ref, with a slow retry while the cover is
+     * still missing (a decode or WinRT hiccup must not cost the whole session's artwork).
+     */
     public void requestArtworkIfNeeded() {
         MediaSnapshot snapshot = current;
-        if (snapshot == null || artworkRequested) {
+        if (snapshot == null) {
+            artworkRequested = false;
             return;
         }
         Optional<String> ref = snapshot.artworkOpt();
         if (ref.isEmpty()) {
+            artworkRequested = false;
+            return;
+        }
+        if (!artworkHash.isEmpty()) {
+            return;
+        }
+        long now = clock.epochMillis();
+        if (artworkRequested && now - artworkRequestedAtMs < ARTWORK_RETRY_MS) {
             return;
         }
         artworkRequested = true;
+        artworkRequestedAtMs = now;
         try {
             provider.requestArtwork(snapshot.sessionId(), snapshot.sessionGeneration(), ref.get());
         } catch (RuntimeException e) {
@@ -228,6 +247,13 @@ public final class MediaService implements MediaProviderListener, AutoCloseable 
             if (snapshot.revision() < previous.revision()) {
                 return;
             }
+            // Same app, next track: the artwork ref is per session, the picture is not.
+            String previousTitle = previous.titleOpt().orElse("");
+            String newTitle = snapshot.titleOpt().orElse("");
+            if (!previousTitle.equals(newTitle)) {
+                artworkHash = "";
+                artworkRequested = false;
+            }
         } else {
             sessionGeneration++;
             artworkHash = "";
@@ -263,7 +289,7 @@ public final class MediaService implements MediaProviderListener, AutoCloseable 
                 || !artworkRef.equals(snapshot.artworkOpt().get())) {
             return;
         }
-        if (!ArtworkCache.looksLikePng(pngBytes) || pngBytes.length > IpcProtocol.MAX_ARTWORK_BYTES) {
+        if (!ArtworkCache.looksLikeImage(pngBytes) || pngBytes.length > IpcProtocol.MAX_ARTWORK_BYTES) {
             return;
         }
         String hash = hash(pngBytes);

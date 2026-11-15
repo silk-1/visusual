@@ -61,6 +61,24 @@ public final class ArtworkCache {
     }
 
     /** PNG signature + 512 KiB cap enforced before any decode (MEDIA-07). */
+    /**
+     * Cover image signature. Windows hands out whatever the app published — Chrome and
+     * Spotify thumbnails are usually JPEG, which the PNG-only check silently rejected, so
+     * the HUD always drew the empty placeholder (owner report, 2026-11-15). The decoder is
+     * ImageIO, so any format it reads is acceptable here.
+     */
+    public static boolean looksLikeImage(byte[] data) {
+        if (data == null || data.length < 8) {
+            return false;
+        }
+        boolean png = (data[0] & 0xFF) == 0x89 && data[1] == 'P' && data[2] == 'N' && data[3] == 'G';
+        boolean jpeg = (data[0] & 0xFF) == 0xFF && (data[1] & 0xFF) == 0xD8
+                && (data[2] & 0xFF) == 0xFF;
+        boolean gif = data[0] == 'G' && data[1] == 'I' && data[2] == 'F';
+        boolean bmp = data[0] == 'B' && data[1] == 'M';
+        return png || jpeg || gif || bmp;
+    }
+
     public static boolean looksLikePng(byte[] data) {
         if (data == null || data.length < 8) {
             return false;

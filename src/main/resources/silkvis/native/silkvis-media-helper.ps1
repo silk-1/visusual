@@ -368,9 +368,11 @@ function Send-Artwork($Payload) {
             $reader = New-Object Windows.Storage.Streams.DataReader($stream)
             $loaded = Await-Operation ($reader.LoadAsync([uint32]$size)) ([uint32])
             $reader.ReadBytes($buffer)
-            # Java decodes PNG; a JPEG stream is reported as unsupported instead of being
-            # passed off as an image it is not.
-            if ($size -gt 8 -and $buffer[0] -eq 0x89 -and $buffer[1] -eq 0x50) {
+            # Thumbnails are usually JPEG (Chrome, Spotify); a PNG-only check threw them away
+            # and the HUD showed an empty cover. Send the bytes and let the Java side decide.
+            $isPng = $size -gt 8 -and $buffer[0] -eq 0x89 -and $buffer[1] -eq 0x50
+            $isJpeg = $size -gt 8 -and $buffer[0] -eq 0xFF -and $buffer[1] -eq 0xD8
+            if ($isPng -or $isJpeg) {
                 $base64 = [Convert]::ToBase64String($buffer)
             }
         }
