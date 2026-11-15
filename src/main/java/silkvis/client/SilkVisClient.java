@@ -13,6 +13,7 @@ import net.minecraft.server.integrated.IntegratedServer;
 import net.minecraft.client.network.ServerInfo;
 import net.minecraft.util.Identifier;
 import org.lwjgl.glfw.GLFW;
+import silkvis.assets.TotemPackBuilder;
 import silkvis.config.ProfileIdentity;
 import silkvis.hud.HudViewModel;
 import silkvis.media.ExeHelperLauncher;
@@ -66,6 +67,19 @@ public final class SilkVisClient implements ClientModInitializer {
         Path gameDir = FabricLoader.getInstance().getGameDir();
         runtime.setTotemPaths(gameDir.resolve("silkvis-data").resolve("totems"),
                 gameDir.resolve("resourcepacks"));
+        // Writing the pack is half the job: Minecraft scans resourcepacks/ once, at startup,
+        // so a pack created afterwards never shows up in the vanilla list («создаёт, но не
+        // применяет»). The hook turns it on and reloads resources, on the render thread.
+        runtime.setTotemPackHook(() -> {
+            MinecraftClient client = MinecraftClient.getInstance();
+            if (client == null) {
+                return;
+            }
+            client.execute(() -> {
+                String result = TotemPackApplier.enable(client, TotemPackBuilder.PACK_DIR_NAME);
+                runtime.log().log("TOTEM_PACK_APPLY", result);
+            });
+        });
 
         runtime.integrations().probe("sodium", () -> FabricLoader.getInstance().isModLoaded("sodium"));
         runtime.integrations().probe("iris", () -> FabricLoader.getInstance().isModLoaded("iris"));

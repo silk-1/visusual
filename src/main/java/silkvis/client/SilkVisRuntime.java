@@ -95,6 +95,13 @@ public final class SilkVisRuntime {
     private volatile long totemVersion;
     /** Last link the player typed, kept for this session so it survives a tab rebuild. */
     private volatile String totemUrlDraft = "";
+    /**
+     * Called after a pack was written (on the IO thread). The client wires it to the resource
+     * pack applier, which must run on the render thread; the runtime stays Minecraft-free.
+     */
+    private volatile Runnable totemPackHook;
+    /** Outcome of the last "enable/disable the pack" click: a reason code, "" when none. */
+    private volatile String totemPackNotice = "";
     /** SilkVis' own translation table for the configured language (see LangTable). */
     private silkvis.ui.LangTable langTable = silkvis.ui.LangTable.empty();
 
@@ -554,11 +561,49 @@ public final class SilkVisRuntime {
             totemReason = result.reason();
             totemBusy = false;
             log.log("TOTEM_PACK", entry.name() + ":" + TotemPackBuilder.describe(result));
+            if (result.ok()) {
+                notifyTotemPack();
+            }
         });
     }
 
     public long totemVersion() {
         return totemVersion;
+    }
+
+    public void setTotemPackHook(Runnable hook) {
+        this.totemPackHook = hook;
+    }
+
+    /** Records the outcome of a manual enable/disable so the tab can state it in words. */
+    public void setTotemPackResult(boolean enable, String result) {
+        totemPackNotice = TotemPackApplier.OK.equals(result)
+                ? (enable ? "enabled" : "disabled") : result;
+        totemVersion++;
+        log.log(enable ? "TOTEM_PACK_APPLY" : "TOTEM_PACK_DISABLE", result);
+    }
+
+    /** One line under the buttons; empty when nothing has been switched yet. */
+    public String totemPackLine() {
+        if (totemPackNotice.isEmpty()) {
+            return "";
+        }
+        String key = "silkvis.totems.packresult." + totemPackNotice;
+        String text = localizer().get(key);
+        return text.equals(key) ? totemPackNotice : text;
+    }
+
+    /** Runs the pack hook if one is wired; a failure here must not break the build task. */
+    private void notifyTotemPack() {
+        Runnable hook = totemPackHook;
+        if (hook == null) {
+            return;
+        }
+        try {
+            hook.run();
+        } catch (RuntimeException e) {
+            log.log("TOTEM_PACK_HOOK_FAILED", e.getClass().getSimpleName());
+        }
     }
 
     public String totemUrlDraft() {
@@ -596,7 +641,9 @@ public final class SilkVisRuntime {
             totemBusy = false;
             totemVersion++;
             log.log("TOTEM_PACK", totemAppliedName + ":" + TotemPackBuilder.describe(pack));
-            if (!pack.ok()) {
+            if (pack.ok()) {
+                notifyTotemPack();
+            } else {
                 // A link to an HTML page leaves a useless ".png" behind: drop the file the
                 // mod itself created, but never a picture that merely failed to copy.
                 boolean sourceIsBad = "image_unreadable".equals(pack.reason())

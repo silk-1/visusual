@@ -9,6 +9,7 @@ import net.minecraft.client.input.KeyInput;
 import net.minecraft.text.Text;
 import silkvis.assets.TotemDownloader;
 import silkvis.assets.TotemLibrary;
+import silkvis.assets.TotemPackBuilder;
 import silkvis.config.GlobalConfig;
 import silkvis.config.VisualPreset;
 import silkvis.core.ModuleCategory;
@@ -89,6 +90,11 @@ public final class SilkVisScreen extends Screen {
 
     private String tr(String key) {
         return localizer().get(key);
+    }
+
+    /** Formatted variant; a broken placeholder returns the raw text, never an exception. */
+    private String tr(String key, Object... args) {
+        return localizer().get(key, args);
     }
 
     @Override
@@ -281,6 +287,11 @@ public final class SilkVisScreen extends Screen {
                 y = addToggle(area, y, width, tr("silkvis.media.artwork"),
                         tr("silkvis.media.artwork.desc"), global.media().showArtwork(),
                         value -> saveMediaArtwork(value));
+                // Cover state, in words: "загружается" forever with no reason is what the
+                // owner saw; the helper now reports why it came back empty.
+                settingsWidgets.add(new DynamicTextWidget(new Rect(area.x(), y, width, 12),
+                        this::artworkStateText));
+                y += 16;
                 // Manual retry: if the bridge was refused (PowerShell blocked by policy, no
                 // media session yet), fixing the cause should not require restarting the game.
                 settingsWidgets.add(new ButtonWidget(new Rect(area.x(), y + 6, Math.min(width, 220), ROW_HEIGHT),
@@ -403,7 +414,24 @@ public final class SilkVisScreen extends Screen {
                 y += ROW_HEIGHT + 14;
                 settingsWidgets.add(new DynamicTextWidget(new Rect(area.x(), y, width, 12),
                         runtime::totemStatusLine));
-                y += 18;
+                y += 16;
+                // The pack is switched on here, not only in the vanilla screen: that list is
+                // scanned at startup, so a pack written a second ago is not in it at all.
+                settingsWidgets.add(new DynamicTextWidget(new Rect(area.x(), y, width, 12),
+                        this::totemPackStateText));
+                y += 16;
+                int packButtonWidth = Math.max(70, Math.min(150, (width - 6) / 2));
+                settingsWidgets.add(new ButtonWidget(
+                        new Rect(area.x(), y, packButtonWidth, ROW_HEIGHT),
+                        tr("silkvis.totems.pack.enable"),
+                        () -> applyTotemPack(true)).style(ButtonWidget.Style.PRIMARY));
+                settingsWidgets.add(new ButtonWidget(
+                        new Rect(area.x() + packButtonWidth + 6, y, packButtonWidth, ROW_HEIGHT),
+                        tr("silkvis.totems.pack.disable"), () -> applyTotemPack(false)));
+                y += ROW_HEIGHT + 6;
+                settingsWidgets.add(new DynamicTextWidget(new Rect(area.x(), y, width, 12),
+                        runtime::totemPackLine));
+                y += 16;
                 settingsWidgets.add(new FixedText(tr("silkvis.totems.enable"),
                         new Rect(area.x(), y, width, 34)));
             }
@@ -471,6 +499,41 @@ public final class SilkVisScreen extends Screen {
         }
         settingsScroll.setContentHeight(Math.max(0, contentBottom - contentTop + 8));
         focus.setScope(collectFocusable());
+    }
+
+    /** One line about the album cover: cached, waiting, or the reason it is missing. */
+    private String artworkStateText() {
+        var service = runtime.mediaService();
+        if (service.isEmpty()) {
+            return "";
+        }
+        if (service.get().currentArtworkHash().isPresent()) {
+            return tr("silkvis.media.artwork.state.ok");
+        }
+        String notice = service.get().artworkNotice();
+        if (notice == null || notice.isEmpty()) {
+            return tr("silkvis.media.artwork.state.waiting");
+        }
+        String key = "silkvis.media.artwork.reason." + notice;
+        String translated = tr(key);
+        return tr("silkvis.media.artwork.state.missing",
+                translated.equals(key) ? notice : translated);
+    }
+
+    /** Live pack state: read from the manager, never cached (it changes outside this tab). */
+    private String totemPackStateText() {
+        MinecraftClient client = MinecraftClient.getInstance();
+        boolean on = TotemPackApplier.isEnabled(client, TotemPackBuilder.PACK_DIR_NAME);
+        return tr(on ? "silkvis.totems.pack.on" : "silkvis.totems.pack.off");
+    }
+
+    /** Enables or disables the generated pack and records the outcome in the log. */
+    private void applyTotemPack(boolean enable) {
+        MinecraftClient client = MinecraftClient.getInstance();
+        String result = enable
+                ? TotemPackApplier.enable(client, TotemPackBuilder.PACK_DIR_NAME)
+                : TotemPackApplier.disable(client, TotemPackBuilder.PACK_DIR_NAME);
+        runtime.setTotemPackResult(enable, result);
     }
 
     /** Where the pictures go; the absolute path is what the player has to open. */

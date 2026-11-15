@@ -40,6 +40,8 @@ public final class MediaService implements MediaProviderListener, AutoCloseable 
     private long sessionGeneration;
     private long requestCounter;
     private String artworkHash = "";
+    /** Why the last cover request came back empty; "" once a picture arrived. */
+    private volatile String artworkNotice = "";
     private boolean artworkRequested;
     private long artworkRequestedAtMs;
     private Long seekIntentMs;
@@ -86,6 +88,7 @@ public final class MediaService implements MediaProviderListener, AutoCloseable 
             pinnedSessionId = null;
         }
         artworkHash = "";
+        artworkNotice = "";
         artworkRequested = false;
     }
 
@@ -171,6 +174,7 @@ public final class MediaService implements MediaProviderListener, AutoCloseable 
         MediaSnapshot snapshot = current;
         if (snapshot != null && !snapshot.artworkOpt().isPresent()) {
             artworkHash = "";
+            artworkNotice = "";
         }
         // Nothing ever asked the provider for the cover until 0.1.15: the request method
         // existed and had no caller, so the HUD always drew the neutral placeholder.
@@ -234,6 +238,7 @@ public final class MediaService implements MediaProviderListener, AutoCloseable 
                 // and let the UI show "source unavailable" instead of another session's track.
                 current = null;
                 artworkHash = "";
+                artworkNotice = "";
                 artworkRequested = false;
                 seekIntentMs = null;
                 return;
@@ -252,11 +257,13 @@ public final class MediaService implements MediaProviderListener, AutoCloseable 
             String newTitle = snapshot.titleOpt().orElse("");
             if (!previousTitle.equals(newTitle)) {
                 artworkHash = "";
+                artworkNotice = "";
                 artworkRequested = false;
             }
         } else {
             sessionGeneration++;
             artworkHash = "";
+            artworkNotice = "";
             artworkRequested = false;
             seekIntentMs = null;
         }
@@ -289,12 +296,31 @@ public final class MediaService implements MediaProviderListener, AutoCloseable 
                 || !artworkRef.equals(snapshot.artworkOpt().get())) {
             return;
         }
-        if (!ArtworkCache.looksLikeImage(pngBytes) || pngBytes.length > IpcProtocol.MAX_ARTWORK_BYTES) {
+        if (pngBytes == null || pngBytes.length == 0) {
+            return;
+        }
+        if (!ArtworkCache.looksLikeImage(pngBytes)) {
+            artworkNotice = "not_an_image";
+            return;
+        }
+        if (pngBytes.length > IpcProtocol.MAX_ARTWORK_BYTES) {
+            artworkNotice = "too_large";
             return;
         }
         String hash = hash(pngBytes);
         artwork.put(hash, pngBytes);
         artworkHash = hash;
+        artworkNotice = "";
+    }
+
+    @Override
+    public void onArtworkNotice(String reason) {
+        artworkNotice = reason == null ? "" : reason;
+    }
+
+    /** Reason code of the last empty cover, or "" when the cover arrived. */
+    public String artworkNotice() {
+        return artworkNotice;
     }
 
     public Optional<String> currentArtworkHash() {
@@ -304,6 +330,7 @@ public final class MediaService implements MediaProviderListener, AutoCloseable 
     private void clearSession(String reason) {
         current = null;
         artworkHash = "";
+        artworkNotice = "";
         artworkRequested = false;
         seekIntentMs = null;
         statusReason = reason;
