@@ -244,7 +244,7 @@ public class HandTweaks extends SoupModule {
                 matrices.rotateZ((float) Math.toRadians(i * sin2 * -20.0F));
                 matrices.rotateX((float) Math.toRadians(sin2 * -80.0F));
                 matrices.rotateY((float) Math.toRadians(i * -45.0F));
-                matrices.translate(0.0, -0.1, 0.0);
+                matrices.translate(0.0F, -0.1F, 0.0F);
             }
             case "Power" -> {
                 matrices.translate(i * 0.56F, -0.32F, -0.72F);

@@ -16,7 +16,7 @@ import net.minecraft.entity.effect.StatusEffects;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.sound.SoundEvent;
-import net.minecraft.util.hand.Hand;
+import net.minecraft.util.Hand;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.entity.EntityType;
@@ -74,6 +74,18 @@ public final class SoupVisualsClient {
     /** The original's raycast reach for a friend's target: 5.3 while sprinting, else 3.3. */
     private static final float RAYCAST_SPRINTING = 5.3F;
     private static final float RAYCAST_DEFAULT = 3.3F;
+    /** Reach of the hit-point raycast: the original's vanilla attack reach with margin. */
+    private static final double HIT_RAY_LENGTH = 4.5;
+
+    /**
+     * Last tick's position per entity id, i.e. what the original read from the (then public)
+     * {@code Entity#prevX/prevY/prevZ} fields. In 1.21.10 those fields are private and the
+     * public {@code getLerpedPos(delta)} depends on the client's position-tracker state, so the
+     * client layer keeps the three numbers itself: one entry per entity, updated per tick,
+     * dropped when the entity leaves the scan radius (the map is cleared on world change).
+     * {@code Trail} needs exactly this pair (previous/current) and nothing else.
+     */
+    private final Map<Integer, double[]> previousPositions = new HashMap<>();
 
     private final HitBubbles hitBubbles = new HitBubbles();
     private final TotemParticles totemParticles = new TotemParticles();
@@ -305,7 +317,9 @@ public final class SoupVisualsClient {
             boolean hadTotem = this.totemWatch.contains(entity);
             boolean hasTotem = holdsTotem(entity);
             if (hadTotem && !hasTotem) {
-                Vec3d pos = entity.getPos();
+                // The original reads entity.getPos(). In 1.21.10 Entity has no getPos() any
+                // more; the synced position is the same value the original used.
+                Vec3d pos = entity.getSyncedPos();
                 this.totemParticles.onTotemPop(pos.x, pos.y, pos.z, entity.getHeight());
             }
             if (hasTotem) {
@@ -364,11 +378,18 @@ public final class SoupVisualsClient {
         }
     }
 
-    /** Closest point on the target's box along the view ray, falling back to its centre. */
+    /**
+     * Closest point on the target's box along the player's actual view ray, falling back to
+     * the box centre. The direction is the entity's own look vector (yaw, pitch) -- passing
+     * constants here would place the bubble at a fixed point in the target's box, not where
+     * the hit landed.
+     */
     private static Vec3d hitPoint(ClientPlayerEntity player, Entity target) {
         Vec3d eye = player.getEyePos();
-        Vec3d end = eye.add(player.getRotationVector(1.0F, 1.0F).multiply(4.5));
-        return target.getBoundingBox().raycast(eye, end).orElseGet(() -> target.getBoundingBox().getCenter());
+        Vec3d look = player.getRotationVector(player.getYaw(1.0F), player.getPitch(1.0F));
+        Vec3d end = eye.add(look.multiply(HIT_RAY_LENGTH));
+        return target.getBoundingBox().raycast(eye, end)
+                .orElseGet(() -> target.getBoundingBox().getCenter());
     }
 
     // ------------------------------------------------------------------ snapshots
@@ -379,13 +400,18 @@ public final class SoupVisualsClient {
      */
     private EntitySnapshot snapshot(LivingEntity entity, java.util.UUID selfId) {
         boolean self = entity.getUuid().equals(selfId);
+        // Previous tick's position, from our own cache: on the very first frame it is the
+        // current position, which gives a zero-length first segment instead of a trail that
+        // shoots in from nowhere.
+        double[] previous = this.previousPositions.computeIfAbsent(entity.getId(),
+                id -> new double[]{entity.getX(), entity.getY(), entity.getZ()});
         return new EntitySnapshot(
                 entity.getId(),
                 entity.getName().getString(),
                 entity instanceof PlayerEntity,
                 entity instanceof PlayerEntity && FriendList.isFriend(entity.getName().getString()),
                 entity.getX(), entity.getY(), entity.getZ(),
-                entity.prevX, entity.prevY, entity.prevZ,
+                previous[0], previous[1], previous[2],
                 entity.getEyeY(),
                 entity.getWidth(),
                 entity.getHeight(),
@@ -415,6 +441,9 @@ public final class SoupVisualsClient {
                 || this.trails.isEnabled() || this.killEffect.isEnabled()
                 || this.friendsTargetRender.isEnabled();
         if (!anyBatchTwoEnabled) {
+            // Keep the previous-position cache warm anyway (see advancePreviousPositions);
+            // the entity scan is the same one the modules need, so this costs one pass.
+            advancePreviousPositions(collectEntities(client, player));
             return;
         }
         float tickProgress = client.getRenderTickCounter().getTickProgress(false);
@@ -430,6 +459,24 @@ public final class SoupVisualsClient {
         if (this.friendsTargetRender.isEnabled()) {
             this.friendsTargetRender.tick(collectFriends(client, player, entities), byId(entities),
                     player.getX(), player.getY(), player.getZ());
+        }
+        // The snapshots above used last tick's positions; remember this tick's for the next
+        // pass, and forget entities that left the scan radius so the map cannot grow forever.
+        advancePreviousPositions(entities);
+    }
+
+    /**
+     * Remembers this tick's positions for the next snapshot pass.
+     *
+     * <p>Called even when no module is enabled: if the cache only advanced while a module was
+     * on, the first frame after switching Trails on would compare against a position from
+     * minutes ago and draw a trail across the whole map.</p>
+     */
+    private void advancePreviousPositions(List<EntitySnapshot> entities) {
+        Map<Integer, EntitySnapshot> byId = byId(entities);
+        this.previousPositions.keySet().retainAll(byId.keySet());
+        for (EntitySnapshot entity : entities) {
+            this.previousPositions.put(entity.id(), new double[]{entity.x(), entity.y(), entity.z()});
         }
     }
 
@@ -459,7 +506,11 @@ public final class SoupVisualsClient {
             float raycastDistance = friend.isSprinting() ? RAYCAST_SPRINTING : RAYCAST_DEFAULT;
             float tickProgress = client.getRenderTickCounter().getTickProgress(false);
             Vec3d start = friend.getEyePos();
-            Vec3d direction = friend.getRotationVector(tickProgress);
+            // Interpolated look vector. 1.21.10 has no getRotationVector(tickProgress) overload,
+            // so the yaw/pitch are lerped first and fed to the two-argument version -- the same
+            // order the original's MathUtil.interpolate uses.
+            Vec3d direction = friend.getRotationVector(
+                    friend.getLerpedYaw(tickProgress), friend.getLerpedPitch(tickProgress));
             Vec3d end = start.add(direction.multiply(raycastDistance));
             Box box = friend.getBoundingBox().expand(raycastDistance).expand(1.0);
             EntityHitResult result = ProjectileUtil.raycast(friend, start, end, box,
