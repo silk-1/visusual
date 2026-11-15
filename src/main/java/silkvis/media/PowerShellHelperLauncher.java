@@ -68,13 +68,13 @@ public final class PowerShellHelperLauncher implements MediaHelperLauncher {
         }
         Path script = directory.resolve(SCRIPT_NAME);
         try {
-            if (!Files.isRegularFile(script) || !expected.equalsIgnoreCase(sha256(script))) {
+            if (!Files.isRegularFile(script) || !expected.equalsIgnoreCase(scriptHash(script))) {
                 extract();
             }
             if (!Files.isRegularFile(script)) {
                 return "helper_resource_missing";
             }
-            if (!expected.equalsIgnoreCase(sha256(script))) {
+            if (!expected.equalsIgnoreCase(scriptHash(script))) {
                 return "hash_mismatch";
             }
         } catch (IOException e) {
@@ -132,10 +132,43 @@ public final class PowerShellHelperLauncher implements MediaHelperLauncher {
             if (in == null) {
                 throw new IOException("resource " + SCRIPT_RESOURCE + " not found");
             }
+            byte[] normalized = normalizeLineEndings(in.readAllBytes());
+            String expected = expectedHash();
+            if (expected != null && !expected.equalsIgnoreCase(MediaHelperBinary.sha256(normalized))) {
+                // The packaged script does not match its own manifest: never run it.
+                throw new IOException("packaged script hash mismatch");
+            }
             Path temp = directory.resolve(SCRIPT_NAME + ".tmp");
-            Files.copy(in, temp, StandardCopyOption.REPLACE_EXISTING);
+            Files.write(temp, normalized);
             Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING);
         }
+    }
+
+    /**
+     * The manifest hash is computed over LF text. A Windows checkout with
+     * {@code core.autocrlf=true} turns the script into CRLF, so the extracted copy no longer
+     * matched and the provider was refused with {@code hash_mismatch} (owner report,
+     * 2026-11-15). Line endings are not security-relevant, the content is, so both the file
+     * on disk and the packaged resource are normalised before hashing.
+     */
+    private static byte[] normalizeLineEndings(byte[] data) {
+        int carriageReturns = 0;
+        for (byte b : data) {
+            if (b == '\r') {
+                carriageReturns++;
+            }
+        }
+        if (carriageReturns == 0) {
+            return data;
+        }
+        byte[] out = new byte[data.length - carriageReturns];
+        int index = 0;
+        for (byte b : data) {
+            if (b != '\r') {
+                out[index++] = b;
+            }
+        }
+        return out;
     }
 
     private static String expectedHash() {
@@ -152,7 +185,7 @@ public final class PowerShellHelperLauncher implements MediaHelperLauncher {
         }
     }
 
-    private static String sha256(Path file) throws IOException {
-        return MediaHelperBinary.sha256(file);
+    private static String scriptHash(Path file) throws IOException {
+        return MediaHelperBinary.sha256(normalizeLineEndings(Files.readAllBytes(file)));
     }
 }

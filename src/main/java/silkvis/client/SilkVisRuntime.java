@@ -225,11 +225,8 @@ public final class SilkVisRuntime {
         if (externalMapId.isEmpty()) {
             return;
         }
-        HudWidgetConfig minimap = hudLayout().get(HudWidgetId.MINIMAP);
-        if (minimap.enabled()) {
-            setHudLayout(hudLayout().with(minimap.withEnabled(false)));
-            log.log("MAP_MINIMAP_DISABLED_EXTERNAL", externalMapId);
-        }
+        // SilkVis has no minimap of its own since 0.1.14: there is nothing left to switch
+        // off, only the tile pipeline to pause while an external map owns the screen.
         if (map != null) {
             map.setPaused(true);
         }
@@ -559,11 +556,6 @@ public final class SilkVisRuntime {
             return;
         }
         mapService().ifPresent(service -> service.setPaused(true));
-        HudWidgetConfig minimap = hudLayout().get(HudWidgetId.MINIMAP);
-        if (minimap.enabled()) {
-            setHudLayout(hudLayout().with(minimap.withEnabled(false)));
-            log.log("MAP_MINIMAP_DISABLED_EXTERNAL", info.modId());
-        }
     }
 
     /**

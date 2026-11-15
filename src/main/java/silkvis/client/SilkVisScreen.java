@@ -152,7 +152,7 @@ public final class SilkVisScreen extends Screen {
         switch (category) {
             case HUD -> {
                 for (HudWidgetId id : HudWidgetId.values()) {
-                    if (!id.p1()) {
+                    if (!id.available()) {
                         continue;
                     }
                     HudWidgetConfig cfg = runtime.hudLayout().get(id);

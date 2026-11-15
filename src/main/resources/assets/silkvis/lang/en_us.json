@@ -224,5 +224,14 @@
   "silkvis.language.en": "English",
   "silkvis.media.restart": "Restart bridge",
   "silkvis.media.restart.desc": "Rebuild the connection to Windows media sessions without restarting the game",
-  "silkvis.media.hud.status": "Music: %s"
+  "silkvis.media.hud.status": "Music: %s",
+  "silkvis.hud.day": "Day",
+  "silkvis.hud.dir.n": "N",
+  "silkvis.hud.dir.ne": "NE",
+  "silkvis.hud.dir.e": "E",
+  "silkvis.hud.dir.se": "SE",
+  "silkvis.hud.dir.s": "S",
+  "silkvis.hud.dir.sw": "SW",
+  "silkvis.hud.dir.w": "W",
+  "silkvis.hud.dir.nw": "NW"
 }

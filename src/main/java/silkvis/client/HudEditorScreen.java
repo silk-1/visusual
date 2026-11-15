@@ -62,7 +62,7 @@ public final class HudEditorScreen extends Screen {
         Rect screen = new Rect(0, 0, width, height);
         Rect safe = HudLayoutEngine.safeArea(screen);
         for (HudWidgetConfig cfg : layout.byId().values()) {
-            if (!cfg.enabled() || !cfg.id().p1()) {
+            if (!cfg.enabled() || !cfg.id().available()) {
                 continue;
             }
             boxes.put(cfg.id(), HudLayoutEngine.resolve(screen, safe, cfg, 110, 22));

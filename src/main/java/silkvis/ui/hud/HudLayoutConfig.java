@@ -80,8 +80,11 @@ public record HudLayoutConfig(List<HudWidgetConfig> widgets) {
             } catch (IllegalArgumentException e) {
                 throw ConfigException.of("hud.widgets.id", "unknown widget id");
             }
-            if (!id.p1()) {
-                throw ConfigException.of("hud.widgets.id", "P2 widget is not available in this build");
+            if (!id.available()) {
+                // Removed (MINIMAP, 0.1.14) or not in this build (TASK_STATUS): drop the
+                // entry and keep the rest of the layout. Throwing here would reset every
+                // widget of anyone who ever had a minimap enabled.
+                continue;
             }
             Anchor anchor;
             try {

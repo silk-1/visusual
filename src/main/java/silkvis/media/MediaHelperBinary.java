@@ -86,15 +86,14 @@ public final class MediaHelperBinary {
     }
 
     public static String sha256(Path file) throws IOException {
+        return sha256(Files.readAllBytes(file));
+    }
+
+    /** Hash of an in-memory payload: the extracted script is verified before it is written. */
+    public static String sha256(byte[] data) throws IOException {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            try (var in = Files.newInputStream(file)) {
-                byte[] buffer = new byte[8192];
-                int read;
-                while ((read = in.read(buffer)) > 0) {
-                    digest.update(buffer, 0, read);
-                }
-            }
+            digest.update(data);
             StringBuilder sb = new StringBuilder(64);
             for (byte b : digest.digest()) {
                 sb.append(String.format(Locale.ROOT, "%02x", b));
