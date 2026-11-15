@@ -574,6 +574,11 @@ public final class SoupSettingsScreen extends Screen {
         double mouseX = click.x();
         double mouseY = click.y();
         int button = click.button();
+        // Clicking the field must give it keyboard focus, otherwise typing goes nowhere:
+        // the same defect the main window had before focusOnHit() was added.
+        if (this.search != null) {
+            this.search.setFocused(this.search.hit(mouseX, mouseY));
+        }
         for (Widget widget : this.powerWidgets) {
             if (widget.mouseClicked(mouseX, mouseY, button)) {
                 return true;
@@ -593,9 +598,7 @@ public final class SoupSettingsScreen extends Screen {
         if (button == 0 && list.contains((int) mouseX, (int) mouseY) && this.hoveredModule >= 0) {
             List<SoupModule> modules = visibleModules();
             if (this.hoveredModule < modules.size()) {
-                this.selected = modules.get(this.hoveredModule);
-                this.settingsScroll.setOffset(0);
-                rebuildSettings();
+                selectModule(modules.get(this.hoveredModule));
                 return true;
             }
         }
@@ -655,11 +658,47 @@ public final class SoupSettingsScreen extends Screen {
 
     @Override
     public boolean keyPressed(KeyInput input) {
-        if (input.key() == Keys.ESCAPE) {
+        int key = input.key();
+        if (key == Keys.ESCAPE) {
+            if (this.search != null && this.search.focused()) {
+                // First Escape leaves the field, second closes: closing the screen while the
+                // player is still editing a search box is the wrong guess.
+                this.search.setFocused(false);
+                return true;
+            }
             close();
             return true;
         }
+        if (this.search != null && this.search.focused() && this.search.keyPressed(key, input.modifiers())) {
+            return true;
+        }
+        List<SoupModule> modules = visibleModules();
+        if (modules.isEmpty()) {
+            return super.keyPressed(input);
+        }
+        int current = modules.indexOf(this.selected);
+        if (key == Keys.TAB || key == Keys.DOWN) {
+            selectModule(modules.get((Math.max(0, current) + 1) % modules.size()));
+            return true;
+        }
+        if (key == Keys.UP) {
+            selectModule(modules.get((current <= 0 ? modules.size() : current) - 1));
+            return true;
+        }
+        if (key == Keys.ENTER && this.selected != null) {
+            // Enter is the keyboard equivalent of the power switch, so the screen is usable
+            // without a mouse (UI-05/UI-06).
+            setModuleEnabled(this.selected, !this.selected.isEnabled());
+            rebuildSettings();
+            return true;
+        }
         return super.keyPressed(input);
+    }
+
+    private void selectModule(SoupModule module) {
+        this.selected = module;
+        this.settingsScroll.setOffset(0);
+        rebuildSettings();
     }
 
     @Override

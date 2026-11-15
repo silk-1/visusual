@@ -54,13 +54,7 @@ public final class SilkVisClient implements ClientModInitializer {
         // The ported modules take part in the registry (their switches live there), so the
         // state the registry shows and the module state start out in agreement: whatever the
         // settings file said on load is pushed into the registry once.
-        for (silkvis.visual.soup.module.SoupModule module
-                : SoupVisualsClient.get().modules()) {
-            if (module.isEnabled()) {
-                runtime.modules().enable(
-                        "soup." + silkvis.visual.soup.setting.SoupSettingsFile.keyOf(module));
-            }
-        }
+        runtime.syncSoupModulesIntoRegistry();
         // Localizer is a functional interface (String -> String), so the reference has to go
         // through the method, not to the factory method that returns it.
         collector = new HudDataCollector(runtime.clock(),

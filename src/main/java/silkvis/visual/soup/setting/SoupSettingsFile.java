@@ -88,7 +88,9 @@ public final class SoupSettingsFile {
         JsonObject root;
         try {
             root = JsonValue.parse(Files.readString(file, StandardCharsets.UTF_8)).object();
-        } catch (IOException | RuntimeException e) {
+        } catch (IOException | silkvis.config.json.JsonException | RuntimeException e) {
+            // Checked json error, unreadable file or a structurally wrong tree: the defaults
+            // stay and the next save overwrites the damaged file.
             return false;
         }
         Map<String, Setting> index = new LinkedHashMap<>();
@@ -134,7 +136,13 @@ public final class SoupSettingsFile {
             if (setting instanceof BooleanSetting bool) {
                 bool.setValue(value.bool());
             } else if (setting instanceof ValueSetting number) {
-                number.setValue((float) number(value));
+                // setValue() writes whatever it is given, so a hand-edited file could put a
+                // value outside the declared range into the render path. Clamped here.
+                double parsed = number(value);
+                double min = number.getMin();
+                double max = number.getMax();
+                double clamped = max > min ? Math.max(min, Math.min(max, parsed)) : parsed;
+                number.setValue((float) clamped);
             } else if (setting instanceof SelectSetting select) {
                 select.setSelected(value.string());
             } else if (setting instanceof MultiSelectSetting multi && value instanceof JsonArray array) {
@@ -163,7 +171,11 @@ public final class SoupSettingsFile {
             return JsonValue.of(bool.isValue());
         }
         if (setting instanceof ValueSetting value) {
-            return JsonValue.of((double) value.getValue());
+            // A float widened to double prints as 0.4000000059604645 in the file. Rounding
+            // through the decimal text keeps the config readable and the value is still exact
+            // to four places, which is finer than any ported setting's step.
+            return JsonValue.of(Double.parseDouble(
+                    String.format(Locale.ROOT, "%.4f", value.getValue())));
         }
         if (setting instanceof SelectSetting select) {
             // A select with no selection yet (a module can declare the list after the value)

@@ -436,7 +436,36 @@ public final class SilkVisRuntime {
         }
     }
 
+    /**
+     * Pushes the state loaded from {@code soupvisuals.json} into the module registry, so the
+     * list and the module objects agree from the first frame. Registered modules are the only
+     * ones the list can switch, so an unregistered id is skipped instead of throwing.
+     */
+    public void syncSoupModulesIntoRegistry() {
+        for (silkvis.visual.soup.module.SoupModule module : SoupVisualsClient.get().modules()) {
+            String id = soupModuleId(module);
+            if (module.isEnabled() && modules.get(id).isPresent()) {
+                modules.enable(id);
+            }
+        }
+    }
+
+    /** Registry id of a ported module ({@code soup.hitbubbles}). */
+    public static String soupModuleId(silkvis.visual.soup.module.SoupModule module) {
+        return "soup." + silkvis.visual.soup.setting.SoupSettingsFile.keyOf(module);
+    }
+
     public void onWorldLeft() {
+        // disableAll() is about the world session, not about the player's choice: the ported
+        // modules that were on are switched back on after the world state is dropped, exactly
+        // like the original (which keeps its module switches across worlds). Without this a
+        // portal or a reconnect silently turned every visual module off.
+        java.util.List<String> soupOn = new java.util.ArrayList<>();
+        for (silkvis.visual.soup.module.SoupModule module : SoupVisualsClient.get().modules()) {
+            if (module.isEnabled()) {
+                soupOn.add(soupModuleId(module));
+            }
+        }
         modules.disableAll();
         token = WorldSessionToken.none();
         if (map != null) {
@@ -444,6 +473,9 @@ public final class SilkVisRuntime {
         }
         if (media != null && global.media().pauseSourceOnWorldExit()) {
             media.command(silkvis.media.MediaAction.PAUSE);
+        }
+        for (String id : soupOn) {
+            modules.enable(id);
         }
     }
 
@@ -761,7 +793,8 @@ public final class SilkVisRuntime {
             silkvis.visual.soup.setting.SoupSettingsFile.save(
                     paths.soupFile(), SoupVisualsClient.get().modules());
         } catch (java.io.IOException e) {
-            log.warn("soup settings not saved: " + e.getMessage());
+            // BoundedLog takes a code and a detail, not a log level.
+            log.log("SOUP_CONFIG", "not saved: " + e.getMessage());
         }
     }
 
