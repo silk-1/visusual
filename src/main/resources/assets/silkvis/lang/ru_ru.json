@@ -245,5 +245,15 @@
   "silkvis.totems.reason.file_too_large": "файл больше 4 МБ",
   "silkvis.totems.reason.image_unreadable": "это не картинка, которую можно прочитать (нужен PNG или JPG)",
   "silkvis.totems.reason.image_too_large": "картинка больше 4096 пикселей по стороне",
-  "silkvis.totems.reason.write_failed": "не удалось записать набор ресурсов"
+  "silkvis.totems.reason.write_failed": "не удалось записать набор ресурсов",
+  "silkvis.tab.totems.hint": "Свой тотем бессмертия из картинки: папка, файл или ссылка.",
+  "silkvis.totems.url.label": "Добавить по ссылке",
+  "silkvis.totems.url.hint": "https://… прямая ссылка на картинку",
+  "silkvis.totems.url.add": "Скачать и применить",
+  "silkvis.totems.url.note": "Скачается в папку выше: оттуда файл можно удалить или заменить в любой момент.",
+  "silkvis.totems.list.label": "Картинки в папке",
+  "silkvis.totems.status.downloading": "Качаю картинку…",
+  "silkvis.totems.reason.url_invalid": "ссылка не подходит: нужен адрес http:// или https://",
+  "silkvis.totems.reason.download_failed": "скачать не удалось: сервер не ответил или ссылка битая",
+  "silkvis.totems.reason.folder_full": "в папке уже 8 картинок — удалите лишние"
 }

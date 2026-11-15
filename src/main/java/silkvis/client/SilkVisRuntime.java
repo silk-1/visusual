@@ -1,6 +1,7 @@
 package silkvis.client;
 
 import net.fabricmc.loader.api.FabricLoader;
+import silkvis.assets.TotemDownloader;
 import silkvis.assets.TotemLibrary;
 import silkvis.assets.TotemPackBuilder;
 import silkvis.config.ConfigException;
@@ -88,6 +89,12 @@ public final class SilkVisRuntime {
     private volatile String totemReason = "";
     private volatile String totemAppliedName = "";
     private volatile boolean totemBusy;
+    /** Which "working" line to show: building a local file or downloading a link. */
+    private volatile String totemBusyKey = "silkvis.totems.status.busy";
+    /** Bumped after a background job so the open tab can rebuild its file list. */
+    private volatile long totemVersion;
+    /** Last link the player typed, kept for this session so it survives a tab rebuild. */
+    private volatile String totemUrlDraft = "";
     /** SilkVis' own translation table for the configured language (see LangTable). */
     private silkvis.ui.LangTable langTable = silkvis.ui.LangTable.empty();
 
@@ -539,6 +546,7 @@ public final class SilkVisRuntime {
             return;
         }
         totemBusy = true;
+        totemBusyKey = "silkvis.totems.status.busy";
         totemReason = "";
         totemAppliedName = entry.displayName();
         executors.io().execute(() -> {
@@ -549,11 +557,68 @@ public final class SilkVisRuntime {
         });
     }
 
+    public long totemVersion() {
+        return totemVersion;
+    }
+
+    public String totemUrlDraft() {
+        return totemUrlDraft;
+    }
+
+    /**
+     * Downloads the picture behind a link, then builds the pack from it. The URL is not
+     * trusted: only http/https, a size cap and a timeout, and the bytes still have to decode
+     * as an image before anything reaches the resource pack.
+     */
+    public void downloadTotem(String url) {
+        if (url == null || url.isBlank() || totemSourceDir == null || resourcePacksDir == null) {
+            return;
+        }
+        String link = url.trim();
+        totemUrlDraft = link;
+        totemBusy = true;
+        totemBusyKey = "silkvis.totems.status.downloading";
+        totemReason = "";
+        totemAppliedName = link;
+        executors.io().execute(() -> {
+            TotemDownloader.Downloaded download = TotemDownloader.download(link, totemSourceDir);
+            if (!download.ok()) {
+                totemReason = download.reason();
+                totemBusy = false;
+                totemVersion++;
+                log.log("TOTEM_URL", download.reason());
+                return;
+            }
+            refreshTotems();
+            TotemPackBuilder.Result pack = TotemPackBuilder.apply(download.file(), resourcePacksDir);
+            totemAppliedName = download.file().getFileName().toString();
+            totemReason = pack.reason();
+            totemBusy = false;
+            totemVersion++;
+            log.log("TOTEM_PACK", totemAppliedName + ":" + TotemPackBuilder.describe(pack));
+            if (!pack.ok()) {
+                // A link to an HTML page leaves a useless ".png" behind: drop the file the
+                // mod itself created, but never a picture that merely failed to copy.
+                boolean sourceIsBad = "image_unreadable".equals(pack.reason())
+                        || "image_too_large".equals(pack.reason())
+                        || "file_too_large".equals(pack.reason());
+                if (sourceIsBad) {
+                    try {
+                        java.nio.file.Files.deleteIfExists(download.file());
+                        refreshTotems();
+                    } catch (java.io.IOException ignored) {
+                        // Best effort: a leftover file is not worth an error path.
+                    }
+                }
+            }
+        });
+    }
+
     /** One localized line for the tab; reason codes never reach the screen. */
     public String totemStatusLine() {
         Localizer l = localizer();
         if (totemBusy) {
-            return l.get("silkvis.totems.status.busy");
+            return l.get(totemBusyKey);
         }
         if (totemReason.isEmpty()) {
             return l.get("silkvis.totems.status.none");

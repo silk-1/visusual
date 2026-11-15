@@ -35,8 +35,11 @@ public final class TextInputWidget extends Widget {
     @Override
     public void render(Painter painter, ThemeTokens theme) {
         int radius = theme.radiusControl();
+        // The field turns red as soon as the text stops being valid, not only after a failed
+        // commit: typing "ftp://..." should mark itself instead of waiting for Enter.
+        boolean invalid = showError || !model.isValid();
         painter.roundRect(bounds, radius,
-                Color.argb(showError ? theme.error() : focused ? theme.accent() : theme.border()));
+                Color.argb(invalid ? theme.error() : focused ? theme.accent() : theme.border()));
         painter.roundRect(bounds.inset(1, 1), Math.max(0, radius - 1), Color.argb(theme.surface()));
         String text = model.text();
         int textY = bounds.centerY() - painter.lineHeight() / 2;
