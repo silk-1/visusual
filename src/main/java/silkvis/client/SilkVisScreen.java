@@ -172,6 +172,9 @@ public final class SilkVisScreen extends Screen {
                 settingsWidgets.add(new DynamicTextWidget(
                         new Rect(area.x(), y, width, 12),
                         () -> runtime.mapService().map(s -> s.describe()).orElse("map: inactive")));
+                settingsWidgets.add(new ButtonWidget(new Rect(area.x(), y + 16, width, ROW_HEIGHT),
+                        tr("silkvis.map.open"),
+                        () -> MinecraftClient.getInstance().setScreen(new MapScreen())));
             }
             case MUSIC -> {
                 GlobalConfig global = runtime.global();

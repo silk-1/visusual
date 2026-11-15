@@ -129,5 +129,17 @@
   "key.silkvis.bug_report": "Создать отчёт об ошибке",
   "silkvis.settings.bug_report": "Создать отчёт об ошибке",
   "silkvis.bug_report.saved": "Отчёт SilkVis сохранён: %s",
-  "silkvis.bug_report.failed": "Не удалось сохранить отчёт SilkVis — см. latest.log"
+  "silkvis.bug_report.failed": "Не удалось сохранить отчёт SilkVis — см. latest.log",
+  "key.silkvis.open_map": "Карта",
+  "silkvis.map.title": "Карта",
+  "silkvis.map.open": "Открыть карту",
+  "silkvis.map.jump_to_player": "К игроку",
+  "silkvis.map.add_waypoint": "Точка здесь",
+  "silkvis.map.remove_waypoint": "Удалить точку",
+  "silkvis.map.waypoints": "Точки",
+  "silkvis.map.no_waypoints": "Точек пока нет",
+  "silkvis.map.waypoint_default": "Точка",
+  "silkvis.map.hint": "Перетаскивание — сдвиг · Колесо — зум · R — к игроку · ПКМ — точка · Esc — закрыть",
+  "silkvis.map.building": "Строятся тайлы…",
+  "silkvis.map.inactive": "Карта недоступна (нет мира)"
 }

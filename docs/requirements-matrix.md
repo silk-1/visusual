@@ -47,14 +47,14 @@
 | VIS-01/02/03 настройки камеры/мира/маркеров | `visual/VisualSettings.java` + UI | — | BLOCKED (нет hook, эффекты не применяются) |
 | VIS-04 AUTO по Sodium/Iris | `IntegrationRegistry.shaderMode` | `MiscChecks` | IMPLEMENTED_NOT_TESTED |
 | ASSET-01…04 тема/скай/тотем | — | — | PLANNED (V4) |
-| MAP-01 только клиентские данные | `client/ClientTileSampler.java` | семплер читает только загруженные чанки, сервер не опрашивается; **раунд 9**: тайлы наконец запрашиваются (`MinimapPrefetcher`) | IMPLEMENTED_NOT_TESTED (в игре не проверено) |
+| MAP-01 только клиентские данные | `client/ClientTileSampler.java` | семплер читает только загруженные чанки, сервер не опрашивается; тайлы запрашиваются (`MapPrefetcher`) | IMPLEMENTED_NOT_TESTED (в игре не проверено) |
 | MAP-02 identity мир/измерение/порт | `map/MapIdentity.java`, `config/ProfileIdentity.java` | `MapChecks` | IMPLEMENTED_NOT_TESTED |
-| MAP-03 миникарта/маркеры/waypoints | `ui/hud`, `client/MinimapRenderer.java`, `client/MinimapPrefetcher.java`, `map/Waypoint.java` | **раунд 9**: миникарта рисует тайлы из кэша, заполнение поля исправлено; маркеры/waypoints — нет; full map UI — нет | IMPLEMENTED_NOT_TESTED (маркеры отсутствуют) |
+| MAP-03 миникарта/маркеры/waypoints | `ui/hud`, `client/MinimapRenderer.java`, `client/MapScreen.java`, `client/MapPrefetcher.java`, `map/Waypoint.java` | **раунд 9**: миникарта строит и рисует тайлы; **раунд 10**: полноэкранная карта (pan/zoom/к игроку), waypoint создание/удаление/список, ПКМ по карте. Нет: поиска по точкам, слоёв Slice | IMPLEMENTED_NOT_TESTED |
 | MAP-04 слои и удаление stale сущностей | кэш тайлов, маркеры отдельно | — | PLANNED (слои) |
 | MAP-05 Surface/Slice в ключе тайла | `MapMode`, `MapIdentity.slice` | `MapChecks` | IMPLEMENTED_NOT_TESTED |
-| MAP-06 128×128 тайлы, LOD, dirty coalesce | `map/TileKey.java`, `TileMath.java`, `MapService`, `client/MinimapPrefetcher.java` | `MapChecks`; живая диагностика `MapService.describe()` выведена на вкладку «Карта» | IMPLEMENTED_NOT_TESTED |
+| MAP-06 128×128 тайлы, LOD, dirty coalesce | `map/TileKey.java`, `TileMath.java`, `MapService`, `client/MapPrefetcher.java` | `MapChecks`; живая диагностика `MapService.describe()` выведена на вкладку «Карта» | IMPLEMENTED_NOT_TESTED |
 | MAP-07 LRU по байтам, квота без маркеров | `BoundedTileCache`, `TileStore.enforceQuota` | `MapChecks` | IMPLEMENTED_NOT_TESTED |
-| MAP-08 версионированный формат + CRC + atomic | `TileCodec.java`, `TileStore.java` | `MapChecks` (corruption) | IMPLEMENTED_NOT_TESTED |
+| MAP-08 версионированный формат + CRC + atomic | `TileCodec.java`, `TileStore.java`, `map/MarkerSet.java` | `MapChecks` (corruption); маркеры — отдельный файл, кэш их не вытесняет (раунд 10: UI создаёт/удаляет точки) | IMPLEMENTED_NOT_TESTED |
 | MAP-09 Дом/База/Спавн вручную | `destinations/*` | `DestinationChecks` | IMPLEMENTED_NOT_TESTED |
 | MEDIA-01/02/03 GSMTC, Windows, NO_SESSION | `media/WindowsMediaProvider.java`, `MediaHelperBinary.java` | — | BLOCKED (helper не собран) |
 | MEDIA-04/05/06 дочерний процесс, hash, watchdog | `WindowsMediaProvider`, ADR-0003 | — | IMPLEMENTED_NOT_TESTED |

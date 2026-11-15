@@ -35,7 +35,8 @@ public final class SilkVisClient implements ClientModInitializer {
     private static KeyBinding openMenu;
     private static KeyBinding hudInteraction;
     private static KeyBinding bugReport;
-    private static final MinimapPrefetcher MINIMAP_PREFETCH = new MinimapPrefetcher();
+    private static KeyBinding openMap;
+    private static final MapPrefetcher MAP_PREFETCH = new MapPrefetcher();
     private static HudDataCollector collector;
     private static String lastDimension = "";
 
@@ -58,6 +59,10 @@ public final class SilkVisClient implements ClientModInitializer {
         // default key is not needed and cannot collide with anything.
         bugReport = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                 "key.silkvis.bug_report", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN, CATEGORY));
+        // M is free in vanilla; the map screen also opens from the Map tab, so removing the
+        // bind never makes the feature unreachable.
+        openMap = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+                "key.silkvis.open_map", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_M, CATEGORY));
 
         ClientTickEvents.END_CLIENT_TICK.register(this::onClientTick);
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> onJoin(client));
@@ -81,7 +86,7 @@ public final class SilkVisClient implements ClientModInitializer {
             collector.tick(client);
         }
         runtime.tick();
-        MINIMAP_PREFETCH.tick(runtime, client);
+        MAP_PREFETCH.tick(runtime, client);
         if (client.world != null) {
             String dimension = client.world.getRegistryKey().getValue().toString();
             if (!dimension.equals(lastDimension)) {
@@ -92,6 +97,11 @@ public final class SilkVisClient implements ClientModInitializer {
         while (openMenu.wasPressed()) {
             if (!(client.currentScreen instanceof SilkVisScreen)) {
                 client.setScreen(new SilkVisScreen());
+            }
+        }
+        while (openMap.wasPressed()) {
+            if (client.currentScreen == null) {
+                client.setScreen(new MapScreen());
             }
         }
         while (hudInteraction.wasPressed()) {
