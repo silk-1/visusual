@@ -94,6 +94,14 @@ public final class HudDataCollector {
         cached.put(HudWidgetId.FPS, List.of(fps.fps() + " FPS  "
                 + String.format(Locale.ROOT, "%.1f ms", fps.frameTimeMs())));
         if (fallbackLimiter.tryAcquire()) {
+            // Automation status is text assembled from engine state, not from the world, so it is
+            // refreshed on the same slow path as armor and the active tool.
+            String automation = silkvis.client.SilkVisRuntime.get().automationStatusLine();
+            if (automation.isEmpty()) {
+                cached.remove(HudWidgetId.TASK_STATUS);
+            } else {
+                cached.put(HudWidgetId.TASK_STATUS, List.of(automation));
+            }
             cached.put(HudWidgetId.EFFECTS, effects(player));
             ArmorSnapshot armor = armor(player);
             armorSnapshot = armor;

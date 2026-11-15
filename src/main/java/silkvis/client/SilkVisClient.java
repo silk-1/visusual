@@ -175,6 +175,7 @@ public final class SilkVisClient implements ClientModInitializer {
             collector.tick(client);
         }
         runtime.tick();
+        tickAutomation(runtime, client);
         MAP_PREFETCH.tick(runtime, client);
         if (client.world != null) {
             String dimension = client.world.getRegistryKey().getValue().toString();
@@ -214,6 +215,33 @@ public final class SilkVisClient implements ClientModInitializer {
                 BugReportService.createAndNotify(client);
             }
         }
+    }
+
+    /**
+     * One automation tick: capture the world once, hand it to the engine, and let the engine
+     * decide. The executor is wired here (and only here), because this is the class that owns the
+     * client instance.
+     *
+     * <p>"Player is busy" is read from the real key state rather than from a screen flag: a player
+     * who starts walking must get control back on the next tick, not after opening a menu.</p>
+     */
+    private static void tickAutomation(SilkVisRuntime runtime, MinecraftClient client) {
+        if (!runtime.automation().settings().enabled()) {
+            return;
+        }
+        if (runtime.automationExecutor() == null) {
+            runtime.setAutomationExecutor(new AutomationExecutor(client));
+        }
+        Snapshot snapshot = AutomationSnapshot.capture(client, client.world == null
+                ? 0L : client.world.getTime(), runtime.automation().settings().reachRadius());
+        boolean busy = false;
+        if (client.options != null) {
+            busy = client.options.forwardKey.isPressed() || client.options.backKey.isPressed()
+                    || client.options.leftKey.isPressed() || client.options.rightKey.isPressed()
+                    || client.options.jumpKey.isPressed() || client.options.sneakKey.isPressed()
+                    || client.options.attackKey.isPressed() || client.options.useKey.isPressed();
+        }
+        runtime.tickAutomation(snapshot, busy);
     }
 
     private void onJoin(MinecraftClient client) {

@@ -176,17 +176,20 @@ final class CoreChecks {
         });
 
         // Behaviour changed in 0.1.14: a widget that this build does not render (removed
-        // MINIMAP, future TASK_STATUS) is skipped instead of failing the whole file. The
-        // check now pins both halves of that contract: the rest survives, garbage still fails.
-        check("hud config skips removed and p2 widgets but keeps the rest", () -> {
+        // MINIMAP) is skipped instead of failing the whole file. 0.3 enabled TASK_STATUS, so the
+        // check now pins that the automation status widget survives a round trip as well.
+        check("hud config skips removed widgets but keeps the rest", () -> {
             JsonObject doc = JsonValue.newObject().put("widgets", JsonValue.newArray()
                     .add(JsonValue.newObject().put("id", "MINIMAP").put("anchor", "TOP_RIGHT"))
-                    .add(JsonValue.newObject().put("id", "TASK_STATUS").put("anchor", "BOTTOM_CENTER"))
+                    .add(JsonValue.newObject().put("id", "TASK_STATUS").put("anchor", "BOTTOM_CENTER")
+                            .put("enabled", true))
                     .add(JsonValue.newObject().put("id", "COORDINATES").put("anchor", "TOP_LEFT")
                             .put("offsetX", 12)));
             HudLayoutConfig decoded = HudLayoutConfig.decode(doc);
             assertEquals(12, decoded.get(HudWidgetId.COORDINATES).offsetX(), "known widget kept");
             assertTrue(!decoded.get(HudWidgetId.MINIMAP).enabled(), "removed widget stays off");
+            assertTrue(decoded.get(HudWidgetId.TASK_STATUS).enabled(),
+                    "the automation status widget is part of the layout now");
             expectThrows(ConfigException.class, () -> HudLayoutConfig.decode(JsonValue.newObject()
                             .put("widgets", JsonValue.newArray().add(
                                     JsonValue.newObject().put("id", "NOPE").put("anchor", "TOP_LEFT")))),

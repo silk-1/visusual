@@ -8,6 +8,12 @@ import net.minecraft.client.input.CharInput;
 import net.minecraft.client.input.KeyInput;
 import net.minecraft.text.Text;
 import silkvis.assets.TotemDownloader;
+import silkvis.automation.AutomationCatalog;
+import silkvis.automation.AutomationMode;
+import silkvis.automation.AutomationSettings;
+import silkvis.automation.BlockPos;
+import silkvis.automation.GoalRegistry;
+import silkvis.automation.StopReason;
 import silkvis.assets.TotemLibrary;
 import silkvis.assets.TotemPackBuilder;
 import silkvis.config.GlobalConfig;
@@ -86,6 +92,189 @@ public final class SilkVisScreen extends Screen {
     private Localizer localizer() {
         // Was Text.translatable directly, which ignored the language setting entirely.
         return runtime.localizer();
+    }
+
+
+    /**
+     * The Automation tab: mode, the safety numbers, the goal list and the run controls.
+     *
+     * <p>Everything here writes through {@link SilkVisRuntime#setAutomationSettings}, which applies
+     * and saves in one step, so the switch the player sees and the switch the engine reads cannot
+     * drift. Goals that exist in the catalogue but have no implementation are listed with the
+     * "planned" note and no button, which is the honest version of a planned tab.</p>
+     */
+    private int buildAutomationTab(Rect area, int y, int width) {
+        SilkVisRuntime runtime = SilkVisRuntime.get();
+        AutomationSettings settings = runtime.automation().settings();
+
+        // Mode first: it is the one switch that decides whether anything at all may be pressed.
+        settingsWidgets.add(new FixedText(tr("silkvis.automation.mode"),
+                new Rect(area.x(), y, width, 12)));
+        y += 14;
+        AutomationMode[] modes = AutomationMode.values();
+        int modeWidth = Math.max(40, Math.min(width, 320) / modes.length - 4);
+        for (int i = 0; i < modes.length; i++) {
+            AutomationMode mode = modes[i];
+            ButtonWidget button = new ButtonWidget(
+                    new Rect(area.x() + i * (modeWidth + 4), y, modeWidth, 20),
+                    tr("silkvis.automation.mode." + mode.name().toLowerCase(Locale.ROOT)),
+                    () -> applyAutomation(withMode(settings, mode)));
+            if (settings.mode() == mode) {
+                button.style(ButtonWidget.Style.PRIMARY);
+            }
+            settingsWidgets.add(button);
+        }
+        y += 24;
+        settingsWidgets.add(new FixedText(tr("silkvis.automation.mode."
+                + settings.mode().name().toLowerCase(Locale.ROOT) + ".desc"),
+                new Rect(area.x(), y, width, 30)));
+        y += 32;
+
+        // Status line and the stop button: a running goal must always be one click from stopping.
+        settingsWidgets.add(new DynamicTextWidget(new Rect(area.x(), y, width, 12),
+                runtime::automationStatusLine));
+        y += 16;
+        int buttonWidth = Math.max(80, Math.min(150, (width - 6) / 2));
+        settingsWidgets.add(new ButtonWidget(
+                new Rect(area.x(), y, buttonWidth, ROW_HEIGHT),
+                tr("silkvis.automation.stop"), () -> {
+            runtime.stopAutomation(StopReason.BY_PLAYER);
+            rebuildSettings();
+        }).style(ButtonWidget.Style.PRIMARY));
+        settingsWidgets.add(new ButtonWidget(
+                new Rect(area.x() + buttonWidth + 6, y, buttonWidth, ROW_HEIGHT),
+                tr("silkvis.automation.stop_all"), () -> {
+            runtime.setAutomationSettings(withMode(settings, AutomationMode.OFF));
+            runtime.stopAutomation(StopReason.BY_PLAYER);
+            rebuildSettings();
+        }));
+        y += ROW_HEIGHT + 8;
+
+        // Safety numbers. These are the settings a player is most likely to want to change, and
+        // the ones that make the difference between "helpful" and "walked me into lava".
+        y = addSlider(area, y, width, tr("silkvis.automation.health_floor"), " hp",
+                0, 20, 1, settings.healthFloor(), value ->
+                        applyAutomation(withHealthFloor(settings, (float) value)));
+        y = addSlider(area, y, width, tr("silkvis.automation.food_floor"), "",
+                0, 20, 1, settings.foodFloor(), value ->
+                        applyAutomation(withFoodFloor(settings, (int) Math.round(value))));
+        y = addSlider(area, y, width, tr("silkvis.automation.danger_radius"), " " + tr("silkvis.unit.blocks"),
+                0, 32, 1, settings.dangerRadius(), value ->
+                        applyAutomation(withDangerRadius(settings, value)));
+        y = addSlider(area, y, width, tr("silkvis.automation.search_nodes"), "",
+                64, 8192, 64, settings.searchNodes(), value ->
+                        applyAutomation(withSearchNodes(settings, (int) Math.round(value))));
+        y = addToggle(area, y, width, tr("silkvis.automation.allow_break"),
+                tr("silkvis.automation.allow_break.desc"), settings.allowBreak(), value ->
+                        applyAutomation(withAllowBreak(settings, value)));
+        y = addToggle(area, y, width, tr("silkvis.automation.allow_place"),
+                tr("silkvis.automation.allow_place.desc"), settings.allowPlace(), value ->
+                        applyAutomation(withAllowPlace(settings, value)));
+
+        // Goal list. A READY goal gets a start button; the rest say why they are not there.
+        settingsWidgets.add(new FixedText(tr("silkvis.automation.goals"),
+                new Rect(area.x(), y, width, 12)));
+        y += 16;
+        BlockPos target = automationTarget();
+        for (AutomationCatalog.Entry entry : AutomationCatalog.entries()) {
+            boolean ready = runtime.automation().allGoals().stream()
+                    .anyMatch(goal -> goal.id().equals(entry.id()))
+                    && entry.status() == AutomationCatalog.Status.READY;
+            String label = tr(entry.titleKey()) + "  " + entry.id();
+            if (!ready) {
+                settingsWidgets.add(new FixedText(label + "  -  " + tr("silkvis.automation.planned"),
+                        new Rect(area.x(), y, width, 12)));
+                y += 14;
+                continue;
+            }
+            ButtonWidget start = new ButtonWidget(
+                    new Rect(area.x(), y, Math.min(width, 260), ROW_HEIGHT), label,
+                    () -> {
+                        if (!runtime.startAutomation(entry.id(), target)) {
+                            // The start was refused (mode too low or an unknown id): the status
+                            // line already carries the reason, but the tab must show it too.
+                            rebuildSettings();
+                        }
+                    });
+            settingsWidgets.add(start);
+            String description = tr(entry.descriptionKey());
+            if (!description.equals(entry.descriptionKey())) {
+                settingsWidgets.add(new FixedText(description,
+                        new Rect(area.x() + Math.min(width, 260) + 6, y + 2,
+                                Math.max(40, width - Math.min(width, 260) - 6), ROW_HEIGHT)));
+            }
+            y += ROW_HEIGHT + 4;
+        }
+        settingsWidgets.add(new FixedText(tr("silkvis.automation.target_note"),
+                new Rect(area.x(), y + 2, width, 30)));
+        y += 34;
+        return y;
+    }
+
+    /**
+     * The block the run should aim at: what the player is looking at, else the block they stand
+     * on. Returned to the tab so every start button uses the same rule.
+     */
+    private BlockPos automationTarget() {
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client == null || client.player == null) {
+            return GoalRegistry.NO_TARGET;
+        }
+        net.minecraft.util.hit.HitResult hit = client.crosshairTarget;
+        if (hit instanceof net.minecraft.util.hit.BlockHitResult block
+                && hit.getType() == net.minecraft.util.hit.HitResult.Type.BLOCK) {
+            net.minecraft.util.math.BlockPos pos = block.getBlockPos();
+            return new BlockPos(pos.getX(), pos.getY(), pos.getZ());
+        }
+        net.minecraft.util.math.BlockPos feet = client.player.getBlockPos();
+        return new BlockPos(feet.getX(), feet.getY(), feet.getZ());
+    }
+
+    private void applyAutomation(AutomationSettings next) {
+        SilkVisRuntime.get().setAutomationSettings(next);
+        rebuildSettings();
+    }
+
+    private static AutomationSettings withMode(AutomationSettings s, AutomationMode mode) {
+        return new AutomationSettings(mode, s.reachRadius(), s.searchNodes(), s.healthFloor(),
+                s.foodFloor(), s.dangerRadius(), s.replanDistance(), s.allowBreak(),
+                s.allowPlace(), s.showPath(), s.hotbarOnly());
+    }
+
+    private static AutomationSettings withHealthFloor(AutomationSettings s, float value) {
+        return new AutomationSettings(s.mode(), s.reachRadius(), s.searchNodes(), value,
+                s.foodFloor(), s.dangerRadius(), s.replanDistance(), s.allowBreak(),
+                s.allowPlace(), s.showPath(), s.hotbarOnly());
+    }
+
+    private static AutomationSettings withFoodFloor(AutomationSettings s, int value) {
+        return new AutomationSettings(s.mode(), s.reachRadius(), s.searchNodes(), s.healthFloor(),
+                value, s.dangerRadius(), s.replanDistance(), s.allowBreak(),
+                s.allowPlace(), s.showPath(), s.hotbarOnly());
+    }
+
+    private static AutomationSettings withDangerRadius(AutomationSettings s, double value) {
+        return new AutomationSettings(s.mode(), s.reachRadius(), s.searchNodes(), s.healthFloor(),
+                s.foodFloor(), value, s.replanDistance(), s.allowBreak(),
+                s.allowPlace(), s.showPath(), s.hotbarOnly());
+    }
+
+    private static AutomationSettings withSearchNodes(AutomationSettings s, int value) {
+        return new AutomationSettings(s.mode(), s.reachRadius(), value, s.healthFloor(),
+                s.foodFloor(), s.dangerRadius(), s.replanDistance(), s.allowBreak(),
+                s.allowPlace(), s.showPath(), s.hotbarOnly());
+    }
+
+    private static AutomationSettings withAllowBreak(AutomationSettings s, boolean value) {
+        return new AutomationSettings(s.mode(), s.reachRadius(), s.searchNodes(), s.healthFloor(),
+                s.foodFloor(), s.dangerRadius(), s.replanDistance(), value,
+                s.allowPlace(), s.showPath(), s.hotbarOnly());
+    }
+
+    private static AutomationSettings withAllowPlace(AutomationSettings s, boolean value) {
+        return new AutomationSettings(s.mode(), s.reachRadius(), s.searchNodes(), s.healthFloor(),
+                s.foodFloor(), s.dangerRadius(), s.replanDistance(), s.allowBreak(),
+                value, s.showPath(), s.hotbarOnly());
     }
 
     private String tr(String key) {
@@ -578,8 +767,7 @@ public final class SilkVisScreen extends Screen {
                 settingsWidgets.add(new FixedText(tr("silkvis.map.external_why"),
                         new Rect(area.x(), y + 94, width, 34)));
             }
-            case AUTOMATION_P2 -> settingsWidgets.add(new FixedText(
-                    tr("silkvis.automation.planned_note"), new Rect(area.x(), y + 6, width, 32)));
+            case AUTOMATION_P2 -> y = buildAutomationTab(area, y, width);
             default -> {
                 // VISUAL handled above; nothing extra.
             }
