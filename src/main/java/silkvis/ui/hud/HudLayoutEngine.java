@@ -56,6 +56,18 @@ public final class HudLayoutEngine {
         return false;
     }
 
+    /**
+     * Moves a box by whole logical units and keeps it inside the safe area. The editor uses
+     * this for arrow keys: dragging is not always precise enough to align two widgets.
+     */
+    public static Rect nudge(Rect box, int dx, int dy, Rect safeArea) {
+        if (box == null) {
+            return new Rect(0, 0, 0, 0);
+        }
+        Rect moved = box.withPosition(box.x() + dx, box.y() + dy);
+        return safeArea == null ? moved : Rect.clampInto(moved, safeArea);
+    }
+
     /** Snaps a coordinate to the configured grid (0 = no snapping). */
     public static int snap(int value, int grid) {
         if (grid <= 0) {

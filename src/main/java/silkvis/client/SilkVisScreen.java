@@ -180,6 +180,16 @@ public final class SilkVisScreen extends Screen {
 
         switch (category) {
             case HUD -> {
+                // The editor is the place where position, scale and opacity live; the tab
+                // itself only switches widgets on and off (owner: «полноценное редактирование»).
+                settingsWidgets.add(new ButtonWidget(
+                        new Rect(area.x(), y + 4, Math.min(width, 220), ROW_HEIGHT),
+                        tr("silkvis.hud.editor.open"), () -> {
+                    if (client != null) {
+                        client.setScreen(new HudEditorScreen());
+                    }
+                }).style(ButtonWidget.Style.PRIMARY));
+                y += ROW_HEIGHT + 12;
                 for (HudWidgetId id : HudWidgetId.values()) {
                     if (!id.available()) {
                         continue;

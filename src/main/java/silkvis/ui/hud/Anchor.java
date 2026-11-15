@@ -31,12 +31,16 @@ public enum Anchor {
         return fy;
     }
 
-    /** Offset direction: +1 means "away from the anchored edge". */
+    /**
+     * Offset direction: +1 means "away from the anchored edge". A centred anchor used to
+     * return 0, which silently threw its offset away: a BOTTOM_CENTER widget with offsetY 80
+     * was drawn at the bottom edge and the editor could not move it.
+     */
     public int offsetSignX() {
-        return fx == 0f ? 1 : fx == 1f ? -1 : 0;
+        return fx == 1f ? -1 : 1;
     }
 
     public int offsetSignY() {
-        return fy == 0f ? 1 : fy == 1f ? -1 : 0;
+        return fy == 1f ? -1 : 1;
     }
 }
