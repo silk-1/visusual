@@ -150,41 +150,227 @@ public final class HudOverlayRenderer {
         }
     }
 
+    /** Control buttons on the music card; order defines the hit-test index. */
+    public enum NowPlayingControl {
+        PREVIOUS,
+        PLAY_PAUSE,
+        NEXT
+    }
+
+    /**
+     * Hit rectangles of the controls drawn last frame. The interaction screen reads them
+     * instead of recomputing the layout: geometry lives in exactly one place.
+     */
+    private static volatile Rect[] controlRects;
+
+    /** Which control sits under the cursor, or null. Only valid while interaction mode is on. */
+    public static NowPlayingControl controlAt(double mouseX, double mouseY) {
+        Rect[] rects = controlRects;
+        if (rects == null) {
+            return null;
+        }
+        NowPlayingControl[] values = NowPlayingControl.values();
+        for (int i = 0; i < values.length && i < rects.length; i++) {
+            if (rects[i] != null && rects[i].contains((int) mouseX, (int) mouseY)) {
+                return values[i];
+            }
+        }
+        return null;
+    }
+
     private static void renderNowPlaying(VanillaPainter painter, ThemeTokens theme, Rect screen, Rect safe,
                                          HudWidgetConfig cfg, SilkVisRuntime runtime, List<Rect> occupied) {
-        Optional<MediaService> service = runtime.mediaService();
-        if (service.isEmpty()) {
+        Optional<MediaService> serviceOpt = runtime.mediaService();
+        if (serviceOpt.isEmpty()) {
+            controlRects = null;
             return;
         }
-        Optional<MediaSnapshot> snapshotOpt = service.get().snapshot();
+        MediaService service = serviceOpt.get();
+        Optional<MediaSnapshot> snapshotOpt = service.snapshot();
         if (snapshotOpt.isEmpty()) {
+            // Nothing playing: draw nothing at all. An empty frame with a title placeholder
+            // is worse than an absent widget (MEDIA-14).
+            controlRects = null;
             return;
         }
         MediaSnapshot snapshot = snapshotOpt.get();
-        int width = 240;
-        int height = 56;
+        silkvis.config.MediaConfig media = runtime.global().media();
+        silkvis.config.NowPlayingVariant variant = media.variant();
+        boolean interaction = runtime.hudInteractionMode();
+
+        int width = variant == silkvis.config.NowPlayingVariant.LINE ? 230 : 250;
+        int height = switch (variant) {
+            case LINE -> 18;
+            case PROGRESS -> 36;
+            case CARD -> 64;
+        };
         Rect box = avoidOverlap(HudLayoutEngine.resolve(screen, safe, cfg, width, height), occupied, screen);
         occupied.add(box);
         painter.roundPanel(box, theme.radiusControl(),
                 Color.argb(theme.surface().withAlpha(theme.surface().alpha() * 0.7f * cfg.alpha())),
                 Color.argb(theme.border()));
-        Rect art = new Rect(box.x() + 4, box.y() + 4, 48, 48);
-        // Artwork upload is pending (docs/known-limitations.md): neutral placeholder is
-        // shown instead of a foreign cover.
-        painter.fill(art, Color.argb(theme.surfaceHover()));
-        int textX = art.right() + 6;
+
         String title = snapshot.titleOpt().orElse("—");
-        painter.text(ellipsize(painter, title, width - 60), textX, box.y() + 6,
-                Color.argb(theme.textPrimary()), false);
-        if (snapshot.artistOpt().isPresent()) {
-            painter.text(ellipsize(painter, snapshot.artistOpt().get(), width - 60), textX, box.y() + 18,
-                    Color.argb(theme.textSecondary()), false);
+        String artist = snapshot.artistOpt().orElse("");
+        long now = runtime.clock().monotonicNanos();
+        long position = MediaTimeline.projectPosition(snapshot, now, runtime.clock()).orElse(0L);
+        double fraction = progressFraction(snapshot, position);
+
+        switch (variant) {
+            case LINE -> {
+                int textWidth = box.width() - 10;
+                String line = artist.isBlank() ? title : title + " — " + artist;
+                painter.text(ellipsize(painter, line, textWidth), box.x() + 5,
+                        box.centerY() - painter.lineHeight() / 2, Color.argb(theme.textPrimary()), false);
+            }
+            case PROGRESS -> {
+                int textX = box.x() + 5;
+                int textWidth = box.width() - 10;
+                painter.text(ellipsize(painter, title, textWidth), textX, box.y() + 4,
+                        Color.argb(theme.textPrimary()), false);
+                String second = artist.isBlank() ? snapshot.displaySource() : artist;
+                painter.text(ellipsize(painter, second, textWidth), textX, box.y() + 15,
+                        Color.argb(theme.textSecondary()), false);
+                String time = MediaTimeline.formatPosition(position) + " / "
+                        + MediaTimeline.describeLength(snapshot);
+                painter.text(time, box.right() - 5 - painter.textWidth(time), box.y() + 15,
+                        Color.argb(theme.textSecondary()), false);
+                drawProgressBar(painter, theme, new Rect(textX, box.bottom() - 8, textWidth, 3),
+                        fraction);
+            }
+            case CARD -> {
+                Rect art = new Rect(box.x() + 4, box.y() + 6, 52, 52);
+                drawArtwork(painter, theme, art, service, runtime, media.showArtwork());
+                int textX = art.right() + 6;
+                int textWidth = box.right() - 5 - textX;
+                painter.text(ellipsize(painter, title, textWidth), textX, box.y() + 6,
+                        Color.argb(theme.textPrimary()), false);
+                if (!artist.isBlank()) {
+                    painter.text(ellipsize(painter, artist, textWidth), textX, box.y() + 17,
+                            Color.argb(theme.textSecondary()), false);
+                }
+                painter.text(snapshot.displaySource(), textX, box.y() + 28,
+                        Color.argb(theme.textSecondary()), false);
+                String time = MediaTimeline.formatPosition(position) + " / "
+                        + MediaTimeline.describeLength(snapshot);
+                painter.text(time, textX, box.y() + 39, Color.argb(theme.textSecondary()), false);
+                drawProgressBar(painter, theme,
+                        new Rect(textX, box.bottom() - 9, textWidth, 3), fraction);
+                if (interaction) {
+                    controlRects = drawControls(painter, theme, box, snapshot);
+                } else {
+                    controlRects = null;
+                }
+            }
         }
-        painter.text(snapshot.displaySource(), textX, box.y() + 30, Color.argb(theme.textSecondary()), false);
-        long position = MediaTimeline.projectPosition(snapshot, runtime.clock().monotonicNanos(), runtime.clock())
-                .orElse(0L);
-        String progress = MediaTimeline.formatPosition(position) + " / " + MediaTimeline.describeLength(snapshot);
-        painter.text(progress, textX, box.y() + 42, Color.argb(theme.textSecondary()), false);
+        if (variant != silkvis.config.NowPlayingVariant.CARD) {
+            controlRects = null;
+        }
+    }
+
+    /** 0..1 progress, or 0 for live/unknown length: never a fake half-filled bar. */
+    private static double progressFraction(MediaSnapshot snapshot, long positionMs) {
+        long end = snapshot.endMs() == null ? 0L : snapshot.endMs();
+        if (end <= 0L) {
+            return 0d;
+        }
+        long start = snapshot.startMs() == null ? 0L : snapshot.startMs();
+        long span = end - start;
+        if (span <= 0L) {
+            return 0d;
+        }
+        double value = (positionMs - start) / (double) span;
+        return value < 0 ? 0 : Math.min(1, value);
+    }
+
+    private static void drawProgressBar(VanillaPainter painter, ThemeTokens theme, Rect bar,
+                                        double fraction) {
+        painter.fill(bar, Color.argb(theme.surfaceHover()));
+        int filled = (int) Math.round(bar.width() * Math.max(0, Math.min(1, fraction)));
+        if (filled > 0) {
+            painter.fill(new Rect(bar.x(), bar.y(), filled, bar.height()),
+                    Color.argb(theme.accent()));
+        }
+    }
+
+    /** Cover as a colour grid; a neutral square until the decode finishes (never a stall). */
+    private static void drawArtwork(VanillaPainter painter, ThemeTokens theme, Rect area,
+                                    MediaService service, SilkVisRuntime runtime, boolean enabled) {
+        int[] grid = null;
+        if (enabled) {
+            String hash = service.currentArtworkHash().orElse(null);
+            if (hash != null) {
+                byte[] png = service.artwork().get(hash).orElse(null);
+                grid = ArtworkPixels.grid(hash, png, runtime.executors().io());
+            }
+        }
+        if (grid == null) {
+            painter.fill(area, Color.argb(theme.surfaceHover()));
+            painter.outline(area, Color.argb(theme.border()), 1);
+            return;
+        }
+        int cell = Math.max(1, area.width() / ArtworkPixels.GRID);
+        for (int gy = 0; gy < ArtworkPixels.GRID; gy++) {
+            for (int gx = 0; gx < ArtworkPixels.GRID; gx++) {
+                int color = grid[gy * ArtworkPixels.GRID + gx];
+                if (color == 0) {
+                    continue;
+                }
+                painter.fill(new Rect(area.x() + gx * cell, area.y() + gy * cell, cell, cell), color);
+            }
+        }
+    }
+
+    /**
+     * Three buttons on the card while interaction mode is on (HUD-05). Drawn, not typed:
+     * the vanilla font has no reliable media glyphs, so shapes are filled rectangles.
+     */
+    private static Rect[] drawControls(VanillaPainter painter, ThemeTokens theme, Rect box,
+                                       MediaSnapshot snapshot) {
+        int size = 14;
+        int gap = 4;
+        int right = box.right() - 5;
+        int bottom = box.bottom() - 5;
+        Rect next = new Rect(right - size, bottom - size, size, size);
+        Rect play = new Rect(next.x() - gap - size, bottom - size, size, size);
+        Rect previous = new Rect(play.x() - gap - size, bottom - size, size, size);
+        int fill = Color.argb(theme.surfaceHover());
+        int glyph = Color.argb(theme.textPrimary());
+        for (Rect rect : new Rect[]{previous, play, next}) {
+            painter.roundRect(rect, 3, fill);
+            painter.outline(rect, Color.argb(theme.border()), 1);
+        }
+        drawTriangle(painter, previous, glyph, false, true);
+        boolean playing = snapshot.playbackState() == silkvis.media.PlaybackState.PLAYING;
+        if (playing) {
+            int barWidth = Math.max(1, size / 5);
+            painter.fill(new Rect(play.x() + size / 2 - barWidth - 1, play.y() + 4,
+                    barWidth, size - 8), glyph);
+            painter.fill(new Rect(play.x() + size / 2 + 1, play.y() + 4, barWidth, size - 8), glyph);
+        } else {
+            drawTriangle(painter, play, glyph, true, false);
+        }
+        drawTriangle(painter, next, glyph, true, true);
+        return new Rect[]{previous, play, next};
+    }
+
+    /** Small filled triangle; {@code bar} adds the "skip" tick mark used by prev/next. */
+    private static void drawTriangle(VanillaPainter painter, Rect rect, int color,
+                                     boolean pointRight, boolean bar) {
+        int inner = rect.width() - 6;
+        int left = rect.x() + (rect.width() - inner) / 2;
+        int top = rect.y() + 3;
+        for (int row = 0; row < inner; row++) {
+            // Width grows to the middle and shrinks again: that is the horizontal extent of
+            // a triangle whose flat edge is vertical.
+            int width = Math.min(row, inner - 1 - row) + 1;
+            int x = pointRight ? left : left + inner - width;
+            painter.fill(new Rect(x, top + row, width, 1), color);
+        }
+        if (bar) {
+            int barX = pointRight ? left + inner - 1 : left;
+            painter.fill(new Rect(barX, top, 1, inner), color);
+        }
     }
 
     private static String ellipsize(VanillaPainter painter, String text, int maxWidth) {

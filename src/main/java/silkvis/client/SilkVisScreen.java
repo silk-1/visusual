@@ -208,7 +208,8 @@ public final class SilkVisScreen extends Screen {
                             runtime.requestGlobalSave(new GlobalConfig(global.language(), global.preset(),
                                     global.reducedMotion(), global.blurEnabled(), global.verboseDiagnostics(),
                                     new silkvis.config.MediaConfig(value, media.selection(), media.pinnedAppId(),
-                                            media.hudWidgetEnabled(), media.pauseSourceOnWorldExit())));
+                                            media.hudWidgetEnabled(), media.pauseSourceOnWorldExit(),
+                                            media.variant(), media.showArtwork())));
                         });
                 y = addToggle(area, y, width, tr("silkvis.media.hud_widget"),
                         tr("silkvis.media.hud_widget.desc"), global.media().hudWidgetEnabled(), value -> {
@@ -216,8 +217,28 @@ public final class SilkVisScreen extends Screen {
                             runtime.requestGlobalSave(new GlobalConfig(global.language(), global.preset(),
                                     global.reducedMotion(), global.blurEnabled(), global.verboseDiagnostics(),
                                     new silkvis.config.MediaConfig(media.enabled(), media.selection(),
-                                            media.pinnedAppId(), value, media.pauseSourceOnWorldExit())));
+                                            media.pinnedAppId(), value, media.pauseSourceOnWorldExit(),
+                                            media.variant(), media.showArtwork())));
                         });
+                // Appearance: the three variants the owner asked for, plus artwork.
+                y += 4;
+                int segmentWidth = Math.max(48, width / 3 - 4);
+                silkvis.config.NowPlayingVariant[] variants = silkvis.config.NowPlayingVariant.values();
+                for (int i = 0; i < variants.length; i++) {
+                    silkvis.config.NowPlayingVariant variant = variants[i];
+                    ButtonWidget button = new ButtonWidget(
+                            new Rect(area.x() + i * (segmentWidth + 4), y, segmentWidth, 20),
+                            tr("silkvis.media.variant." + variant.name().toLowerCase(Locale.ROOT)),
+                            () -> saveMediaVariant(variant));
+                    if (global.media().variant() == variant) {
+                        button.style(ButtonWidget.Style.PRIMARY);
+                    }
+                    settingsWidgets.add(button);
+                }
+                y += 26;
+                y = addToggle(area, y, width, tr("silkvis.media.artwork"),
+                        tr("silkvis.media.artwork.desc"), global.media().showArtwork(),
+                        value -> saveMediaArtwork(value));
             }
             case VISUAL -> {
                 VisualSettings visual = runtime.ui().visual();
@@ -311,6 +332,21 @@ public final class SilkVisScreen extends Screen {
         }
         settingsScroll.setContentHeight(Math.max(0, contentBottom - contentTop + 8));
         focus.setScope(collectFocusable());
+    }
+
+    private void saveMediaVariant(silkvis.config.NowPlayingVariant variant) {
+        GlobalConfig global = runtime.global();
+        runtime.requestGlobalSave(new GlobalConfig(global.language(), global.preset(),
+                global.reducedMotion(), global.blurEnabled(), global.verboseDiagnostics(),
+                global.media().withVariant(variant)));
+        rebuildSettings();
+    }
+
+    private void saveMediaArtwork(boolean value) {
+        GlobalConfig global = runtime.global();
+        runtime.requestGlobalSave(new GlobalConfig(global.language(), global.preset(),
+                global.reducedMotion(), global.blurEnabled(), global.verboseDiagnostics(),
+                global.media().withArtwork(value)));
     }
 
     private int addToggle(Rect area, int y, int width, String label, String description,

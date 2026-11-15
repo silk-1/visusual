@@ -133,8 +133,16 @@ public final class SilkVisClient implements ClientModInitializer {
                 client.setScreen(new MapScreen());
             }
         }
+        // Interaction mode is a transparent screen, not a flag alone: it is the only way to
+        // receive clicks over the world without a mixin, and it blocks world clicks by
+        // construction (HUD-05).
         while (hudInteraction.wasPressed()) {
-            runtime.setHudInteractionMode(!runtime.hudInteractionMode());
+            if (client.currentScreen instanceof HudInteractionScreen screen) {
+                screen.close();
+            } else if (client.currentScreen == null && client.player != null) {
+                runtime.setHudInteractionMode(true);
+                client.setScreen(new HudInteractionScreen());
+            }
         }
         if (bugReport != null) {
             while (bugReport.wasPressed()) {

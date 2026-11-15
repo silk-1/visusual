@@ -161,5 +161,13 @@
   "silkvis.map.external_hint": "SilkVis minimap and tile builder are off; use the Atlas map (key M by default, rebindable in Controls).",
   "silkvis.map.external_missing": "AtlasMap not installed",
   "silkvis.map.external_why": "With AtlasMap installed SilkVis does not build or draw its own map: one terrain pipeline, one minimap (ADR-0007).",
-  "silkvis.media.status": "Provider"
+  "silkvis.media.status": "Provider",
+  "silkvis.media.variant.line": "Line",
+  "silkvis.media.variant.progress": "Progress",
+  "silkvis.media.variant.card": "Card",
+  "silkvis.media.artwork": "Album art",
+  "silkvis.media.artwork.desc": "Draw the cover as a coarse colour grid: there is no GPU texture path yet, so it stays blocky.",
+  "silkvis.media.controls_hint": "HUD interaction mode: the Music card shows prev / play / next buttons",
+  "silkvis.hud.interaction_title": "HUD interaction",
+  "silkvis.hud.interaction_hint": "HUD interaction · click the music buttons · Esc — exit"
 }
