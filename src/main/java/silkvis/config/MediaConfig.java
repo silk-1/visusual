@@ -9,8 +9,20 @@ public record MediaConfig(
         SessionSelection selection,
         String pinnedAppId,
         boolean hudWidgetEnabled,
-        boolean pauseSourceOnWorldExit
+        boolean pauseSourceOnWorldExit,
+        NowPlayingVariant variant,
+        boolean showArtwork
 ) {
+    /**
+     * Backward-compatible constructor: keeps existing call sites (and configs written by
+     * 0.1.10 and earlier) working, with the defaults a new user gets.
+     */
+    public MediaConfig(boolean enabled, SessionSelection selection, String pinnedAppId,
+                       boolean hudWidgetEnabled, boolean pauseSourceOnWorldExit) {
+        this(enabled, selection, pinnedAppId, hudWidgetEnabled, pauseSourceOnWorldExit,
+                NowPlayingVariant.CARD, true);
+    }
+
     public MediaConfig {
         if (selection == null) {
             selection = SessionSelection.AUTO;
@@ -18,10 +30,24 @@ public record MediaConfig(
         if (pinnedAppId == null) {
             pinnedAppId = "";
         }
+        if (variant == null) {
+            variant = NowPlayingVariant.CARD;
+        }
+    }
+
+    public MediaConfig withVariant(NowPlayingVariant value) {
+        return new MediaConfig(enabled, selection, pinnedAppId, hudWidgetEnabled,
+                pauseSourceOnWorldExit, value, showArtwork);
+    }
+
+    public MediaConfig withArtwork(boolean value) {
+        return new MediaConfig(enabled, selection, pinnedAppId, hudWidgetEnabled,
+                pauseSourceOnWorldExit, variant, value);
     }
 
     public static MediaConfig defaults() {
-        return new MediaConfig(false, SessionSelection.AUTO, "", false, true);
+        return new MediaConfig(false, SessionSelection.AUTO, "", false, true,
+                NowPlayingVariant.CARD, true);
     }
 
     public JsonObject encode() {
@@ -30,7 +56,9 @@ public record MediaConfig(
                 .put("selection", selection.name())
                 .put("pinnedAppId", pinnedAppId)
                 .put("hudWidgetEnabled", hudWidgetEnabled)
-                .put("pauseSourceOnWorldExit", pauseSourceOnWorldExit);
+                .put("pauseSourceOnWorldExit", pauseSourceOnWorldExit)
+                .put("variant", variant.name())
+                .put("showArtwork", showArtwork);
     }
 
     public static MediaConfig decode(JsonObject o) throws ConfigException {
@@ -54,7 +82,18 @@ public record MediaConfig(
         boolean pauseOnExit = o.has("pauseSourceOnWorldExit")
                 ? o.get("pauseSourceOnWorldExit").bool()
                 : d.pauseSourceOnWorldExit();
-        return new MediaConfig(enabled, selection, pinned, hudWidget, pauseOnExit);
+        NowPlayingVariant variant = d.variant();
+        if (o.has("variant")) {
+            String raw = o.get("variant").string();
+            try {
+                variant = NowPlayingVariant.valueOf(raw.toUpperCase(java.util.Locale.ROOT));
+            } catch (IllegalArgumentException e) {
+                // Unknown value from a newer build: fall back instead of rejecting the file.
+                variant = d.variant();
+            }
+        }
+        boolean showArtwork = o.has("showArtwork") ? o.get("showArtwork").bool() : d.showArtwork();
+        return new MediaConfig(enabled, selection, pinned, hudWidget, pauseOnExit, variant, showArtwork);
     }
 
     public void validate() throws ConfigException {

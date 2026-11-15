@@ -64,8 +64,8 @@
 | MEDIA-10/11/12 поля, capabilities, Try* | `MediaSnapshot`, `MediaCapabilities`, `silkvis-media-helper.ps1` | **раунд 13**: capabilities из `Controls`, команды `Try*` реализованы в скрипте | IMPLEMENTED_NOT_TESTED (helper) |
 | MEDIA-13 timeline/LIVE/seek | `media/MediaTimeline.java` | `MediaChecks` | IMPLEMENTED_NOT_TESTED |
 | MEDIA-14 сброс прогресса, pending seek, timeout | `MediaService` | `MediaChecks` | IMPLEMENTED_NOT_TESTED |
-| MEDIA-15 keybinds не назначены, ellipsis | `SilkVisClient`, `HudOverlayRenderer` | — | IMPLEMENTED_NOT_TESTED |
-| MEDIA-16/17 без громкости, bounded cache, без истории | `ArtworkCache`, `MediaService` | `MediaChecks` | IMPLEMENTED_NOT_TESTED |
+| MEDIA-15 keybinds не назначены, ellipsis | `SilkVisClient`, `HudOverlayRenderer`, `HudInteractionScreen` | **раунд 14**: управление через экран взаимодействия, медиа-клавиши не перехватываются; ellipsis общий | IMPLEMENTED_NOT_TESTED |
+| MEDIA-16/17 без громкости, bounded cache, без истории | `ArtworkCache`, `ArtworkPixels`, `MediaService` | `MediaChecks`; **раунд 14**: обложка рисуется сеткой 26×26 из RAM-кэша, декод вне кадра, на диск ничего | IMPLEMENTED_NOT_TESTED |
 | 7.4 матрица совместимости | — | — | BLOCKED (нет прогона) |
 | CFG-01 пути и безопасные имена | `config/ConfigPaths.java` | — | IMPLEMENTED_NOT_TESTED |
 | CFG-02 разделение global/profile | `GlobalConfig`, `UiConfig`, `DestinationsConfig` | — | IMPLEMENTED_NOT_TESTED |
