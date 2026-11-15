@@ -309,28 +309,44 @@ public final class AutomationSnapshot implements Snapshot {
         }
 
         /**
-         * Lava is a block, not just a fluid: comparing the block avoids depending on a fluid tag
-         * name, and {@code Blocks.LAVA} covers both the source and the flowing state.
+         * Danger is decided by registry id and by the fluid, not by comparing {@code Blocks.*}
+         * constants: the id strings are stable data, they cover every wood type and modded
+         * variant (soul fire, lava from a mod), and they cannot fail to resolve at compile time.
          */
         private static boolean lava(BlockState state) {
-            return state.getBlock() == net.minecraft.block.Blocks.LAVA;
+            return is(state, "lava") || fluidIs(state, "lava");
         }
 
         private static boolean fire(BlockState state) {
-            var block = state.getBlock();
-            return block == net.minecraft.block.Blocks.FIRE || block == net.minecraft.block.Blocks.SOUL_FIRE;
+            return is(state, "fire") || is(state, "soul_fire");
         }
 
         private static boolean magma(BlockState state) {
-            return state.getBlock() == net.minecraft.block.Blocks.MAGMA_BLOCK;
+            return is(state, "magma_block");
         }
 
         private static boolean cactus(BlockState state) {
-            return state.getBlock() == net.minecraft.block.Blocks.CACTUS;
+            return is(state, "cactus");
         }
 
         private static boolean powderSnow(BlockState state) {
-            return state.getBlock() == net.minecraft.block.Blocks.POWDER_SNOW;
+            return is(state, "powder_snow");
+        }
+
+        /** True when the block's registry path is exactly this name (namespace ignored). */
+        private static boolean is(BlockState state, String path) {
+            var id = net.minecraft.registry.Registries.BLOCK.getId(state.getBlock());
+            return id != null && path.equals(id.getPath());
+        }
+
+        /** True when the block holds a fluid with this registry path (source or flowing). */
+        private static boolean fluidIs(BlockState state, String path) {
+            var fluid = state.getFluidState().getFluid();
+            if (fluid == null) {
+                return false;
+            }
+            var id = net.minecraft.registry.Registries.FLUID.getId(fluid);
+            return id != null && path.equals(id.getPath());
         }
     }
 }
