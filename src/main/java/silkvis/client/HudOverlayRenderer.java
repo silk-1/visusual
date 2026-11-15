@@ -82,7 +82,8 @@ public final class HudOverlayRenderer {
                 int size = Math.min(128, Math.min(screen.width(), screen.height()) / 3);
                 Rect box = HudLayoutEngine.resolve(screen, safe, cfg, size, size);
                 MinimapRenderer.render(painter, box, theme, map.get(), identity.get(),
-                        runtime.ui().map(), client);
+                        runtime.ui().map(), client,
+                        net.minecraft.text.Text.translatable("silkvis.map.no_tiles").getString());
                 continue;
             }
             if (lines.isEmpty()) {
@@ -100,7 +101,8 @@ public final class HudOverlayRenderer {
         }
         int height = lines.size() * painter.lineHeight() + Math.max(0, lines.size() - 1) * 2;
         Rect box = HudLayoutEngine.resolve(screen, safe, cfg, width + 8, height + 6);
-        painter.fill(box, Color.argb(theme.surface().withAlpha(theme.surface().alpha() * 0.55f * cfg.alpha())));
+        painter.roundRect(box, theme.radiusControl(),
+                Color.argb(theme.surface().withAlpha(theme.surface().alpha() * 0.55f * cfg.alpha())));
         int y = box.y() + 3;
         for (String line : lines) {
             painter.text(line, box.x() + 4, y, Color.argb(theme.textPrimary().withAlpha(cfg.alpha())), true);
@@ -122,8 +124,9 @@ public final class HudOverlayRenderer {
         int width = 240;
         int height = 56;
         Rect box = HudLayoutEngine.resolve(screen, safe, cfg, width, height);
-        painter.fill(box, Color.argb(theme.surface().withAlpha(theme.surface().alpha() * 0.7f * cfg.alpha())));
-        painter.outline(box, Color.argb(theme.border()), 1);
+        painter.roundPanel(box, theme.radiusControl(),
+                Color.argb(theme.surface().withAlpha(theme.surface().alpha() * 0.7f * cfg.alpha())),
+                Color.argb(theme.border()));
         Rect art = new Rect(box.x() + 4, box.y() + 4, 48, 48);
         // Artwork upload is pending (docs/known-limitations.md): neutral placeholder is
         // shown instead of a foreign cover.

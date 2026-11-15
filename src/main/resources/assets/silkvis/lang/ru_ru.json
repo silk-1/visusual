@@ -116,5 +116,14 @@
   "silkvis.module.theme.local": "Локальная тема",
   "silkvis.module.theme.local.desc": "Локальное фоновое изображение с проверкой лимитов.",
   "silkvis.module.integrations.probe": "Интеграции",
-  "silkvis.module.integrations.probe.desc": "Sodium, Iris и необязательные адаптеры."
+  "silkvis.module.integrations.probe.desc": "Sodium, Iris и необязательные адаптеры.",
+  "silkvis.map.no_tiles": "Нет тайлов",
+  "silkvis.tab.visual.hint": "Поле зрения, частицы и плотность дождя.",
+  "silkvis.tab.hud.hint": "Какие виджеты рисуются; положение — в редакторе HUD.",
+  "silkvis.tab.map.hint": "Ориентация и масштаб миникарты.",
+  "silkvis.tab.music.hint": "Оверлей Now Playing; источник — плеер Windows.",
+  "silkvis.tab.theme.hint": "Снижение движения, размытие и пресеты.",
+  "silkvis.tab.integrations.hint": "Обнаружение соседних модов; ничего не скачивается.",
+  "silkvis.tab.settings.hint": "Редактор HUD и сброс раскладки.",
+  "silkvis.tab.automation.hint": "P2: задачи появятся позже, сейчас не исполняются."
 }

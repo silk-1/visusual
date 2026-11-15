@@ -129,7 +129,8 @@ public final class SilkVisScreen extends Screen {
         settingsWidgets.clear();
         ModuleCategory category = runtime.screenModel().selectedCategory();
         Rect area = layout.settings().inset(8, 8);
-        int y = area.y() + 22;
+        // Below the title, the caption, the accent rule and the hairline (renderSettings).
+        int y = area.y() + 42;
         int width = Math.max(80, area.width() - 8);
 
         switch (category) {
@@ -289,8 +290,14 @@ public final class SilkVisScreen extends Screen {
         ThemeTokens theme = runtime.theme();
         painter.fill(new Rect(0, 0, width, height), Color.argb(theme.background().withAlpha(0.55f)));
         Rect window = layout.window();
-        painter.fill(window, Color.argb(theme.background()));
-        painter.outline(window, Color.argb(theme.border()), 1);
+        // Depth without blur: three expanding translucent layers behind the window (UI-08
+        // allows a bounded number of passes, not a per-panel effect).
+        for (int layer = 3; layer >= 1; layer--) {
+            painter.roundRect(window.inset(-layer * 2, -layer * 2), theme.radiusPanel() + layer * 2,
+                    Color.argb(theme.background().withAlpha(0.10f)));
+        }
+        painter.roundPanel(window, theme.radiusPanel(), Color.argb(theme.background()),
+                Color.argb(theme.border()));
 
         renderNavigation(painter, theme);
         renderModuleList(painter, theme, mouseX, mouseY);
@@ -299,9 +306,11 @@ public final class SilkVisScreen extends Screen {
         for (Widget widget : chrome) {
             widget.render(painter, theme);
         }
-        painter.fill(layout.footer(), Color.argb(theme.surface().withAlpha(0.35f)));
-        painter.text(tr("silkvis.footer.hint"), layout.footer().x() + 4,
-                layout.footer().centerY() - painter.lineHeight() / 2, Color.argb(theme.textSecondary()), false);
+        Rect footer = layout.footer();
+        painter.roundPanel(footer, theme.radiusControl() + 2,
+                Color.argb(theme.surface().withAlpha(0.45f)), Color.argb(theme.border().withAlpha(0.5f)));
+        painter.text(tr("silkvis.footer.hint"), footer.x() + 6,
+                footer.centerY() - painter.lineHeight() / 2, Color.argb(theme.textSecondary()), false);
 
         updateHover(mouseX, mouseY);
         String tooltipKey = tooltipAt(mouseX, mouseY);
@@ -317,9 +326,17 @@ public final class SilkVisScreen extends Screen {
 
     private void renderNavigation(Painter painter, ThemeTokens theme) {
         Rect nav = layout.navigation();
-        painter.fill(nav, Color.argb(theme.surface().withAlpha(0.5f)));
-        painter.text(tr("silkvis.screen.title"), nav.x() + 4, layout.window().y() + 10,
+        // Card, not a slab: the window already has its own radius.
+        painter.roundPanel(nav, theme.radiusPanel(),
+                Color.argb(theme.surface().withAlpha(0.55f)),
+                Color.argb(theme.border().withAlpha(0.45f)));
+        Rect window = layout.window();
+        painter.text(tr("silkvis.screen.title"), nav.x() + 2, window.y() + 10,
                 Color.argb(theme.accent()), true);
+        // Accent underline ties the wordmark to the navigation column.
+        int wordmarkWidth = painter.textWidth(tr("silkvis.screen.title"));
+        painter.fill(new Rect(nav.x() + 2, window.y() + 21, Math.min(wordmarkWidth, nav.width() - 8), 1),
+                Color.argb(theme.accent().withAlpha(0.65f)));
     }
 
     /**
@@ -346,7 +363,8 @@ public final class SilkVisScreen extends Screen {
         if (list.width() <= 0) {
             return;
         }
-        painter.fill(list, Color.argb(theme.surface().withAlpha(0.35f)));
+        painter.roundPanel(list, theme.radiusPanel(), Color.argb(theme.surface().withAlpha(0.35f)),
+                Color.argb(theme.border().withAlpha(0.35f)));
         List<ModuleDescriptor> modules = runtime.screenModel().visibleModules(localizer());
         int rowY = list.y() + 4 - listScroll.offset();
         hoveredRow = -1;
@@ -355,7 +373,7 @@ public final class SilkVisScreen extends Screen {
             Rect row = new Rect(list.x() + 4, rowY, list.width() - 8, ROW_HEIGHT);
             if (row.bottom() > list.y() && row.y() < list.bottom() && row.contains(mouseX, mouseY)) {
                 hoveredRow = i;
-                painter.fill(row, Color.argb(theme.surfaceHover()));
+                painter.roundRect(row, theme.radiusControl(), Color.argb(theme.surfaceHover()));
             }
             String name = localizer().get(module.displayKey());
             if (name.equals(module.displayKey())) {
@@ -387,16 +405,47 @@ public final class SilkVisScreen extends Screen {
         if (area.width() <= 0) {
             return;
         }
-        painter.fill(area, Color.argb(theme.surface().withAlpha(0.55f)));
+        painter.roundPanel(area, theme.radiusPanel(), Color.argb(theme.surface().withAlpha(0.55f)),
+                Color.argb(theme.border().withAlpha(0.45f)));
         ModuleCategory category = runtime.screenModel().selectedCategory();
-        painter.text(tr(category.langKey()), area.x() + 8, area.y() + 6, Color.argb(theme.textPrimary()), true);
-        painter.fill(new Rect(area.x() + 8, area.y() + 18, area.width() - 16, 1),
-                Color.argb(theme.border()));
-        painter.pushClip(area.inset(0, 20, 0, 0));
+        String title = tr(category.langKey());
+        painter.text(title, area.x() + 10, area.y() + 8, Color.argb(theme.textPrimary()), true);
+        // One caption line per section: it explains what the pane is for and keeps a
+        // two-control tab from looking broken (missing keys simply render nothing).
+        String hintKey = category.langKey() + ".hint";
+        String hint = tr(hintKey);
+        if (!hint.equals(hintKey)) {
+            painter.text(fit(painter, hint, area.width() - 20), area.x() + 10, area.y() + 20,
+                    Color.argb(theme.textSecondary()), false);
+        }
+        // Short accent rule under the title block, full-width hairline below it.
+        painter.fill(new Rect(area.x() + 10, area.y() + 32, Math.min(28, painter.textWidth(title)), 2),
+                Color.argb(theme.accent().withAlpha(0.8f)));
+        painter.fill(new Rect(area.x() + 10, area.y() + 36, area.width() - 20, 1),
+                Color.argb(theme.border().withAlpha(0.7f)));
+        painter.pushClip(area.inset(0, 38, 0, 0));
         for (Widget widget : settingsWidgets) {
             widget.render(painter, theme);
         }
         painter.popClip();
+    }
+
+    /** Truncates with an ellipsis without needing text metrics outside the painter. */
+    private static String fit(Painter painter, String text, int maxWidth) {
+        if (maxWidth <= 0) {
+            return "";
+        }
+        if (painter.textWidth(text) <= maxWidth) {
+            return text;
+        }
+        StringBuilder sb = new StringBuilder();
+        for (char c : text.toCharArray()) {
+            if (painter.textWidth(sb.toString() + c + "…") > maxWidth) {
+                break;
+            }
+            sb.append(c);
+        }
+        return sb + "…";
     }
 
     private void renderTooltip(Painter painter, ThemeTokens theme, String text) {
@@ -410,8 +459,8 @@ public final class SilkVisScreen extends Screen {
         int x = Math.min(tooltips.x() + 8, Math.max(4, width - boxWidth - 12));
         int y = Math.min(tooltips.y() + 10, Math.max(4, height - boxHeight - 8));
         Rect box = new Rect(x, y, boxWidth + 8, boxHeight);
-        painter.fill(box, Color.argb(theme.surface().withAlpha(0.98f)));
-        painter.outline(box, Color.argb(theme.border()), 1);
+        painter.roundPanel(box, theme.radiusControl(), Color.argb(theme.surface().withAlpha(0.98f)),
+                Color.argb(theme.border()));
         int textY = box.y() + 3;
         for (String line : lines) {
             painter.text(line, box.x() + 4, textY, Color.argb(theme.textPrimary()), false);

@@ -43,16 +43,18 @@ public final class ButtonWidget extends Widget {
                 : hovered ? theme.surfaceHover()
                 : style == Style.PRIMARY ? theme.accent().withAlpha(0.22f)
                 : theme.surface();
-        painter.fill(bounds, Color.argb(fill));
-        painter.outline(bounds, Color.argb(style == Style.PRIMARY ? theme.accent() : theme.border()), 1);
+        // Border and fill are two rounded shapes: the outer one is the 1-unit border
+        // colour (UI-02 corner radius was defined but never drawn before).
+        int radius = theme.radiusControl();
+        Rect borderRect = focused ? bounds.inset(-1, -1) : bounds;
+        painter.roundRect(borderRect, focused ? radius + 1 : radius,
+                Color.argb(style == Style.PRIMARY || focused ? theme.accent() : theme.border()));
+        painter.roundRect(bounds, radius, Color.argb(fill));
         int textColor = Color.argb(!enabled ? theme.textSecondary()
                 : style == Style.DANGER ? theme.error() : theme.textPrimary());
         int width = painter.textWidth(label);
         painter.text(label, bounds.centerX() - width / 2,
                 bounds.centerY() - painter.lineHeight() / 2, textColor, false);
-        if (focused) {
-            painter.outline(bounds.inset(-1, -1), Color.argb(theme.accent()), 1);
-        }
     }
 
     public void setHovered(boolean value) {

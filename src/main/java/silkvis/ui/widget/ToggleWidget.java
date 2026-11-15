@@ -43,26 +43,33 @@ public final class ToggleWidget extends Widget {
         int toggleHeight = 14;
         Rect track = new Rect(bounds.right() - toggleWidth, bounds.centerY() - toggleHeight / 2,
                 toggleWidth, toggleHeight);
+        // Focus halo goes first: the switch panel is drawn on top of it, which leaves a
+        // clean ring without an alpha-0 "erase" pass.
+        if (focused) {
+            painter.roundRect(track.inset(-2, -2), toggleHeight / 2 + 2, Color.argb(theme.accent()));
+        }
+        // Row highlight, then the label, so the text stays readable.
+        if (hovered) {
+            painter.roundRect(bounds, theme.radiusControl(),
+                    Color.argb(theme.surfaceHover().withAlpha(0.18f)));
+        }
         painter.text(label, bounds.x(), bounds.centerY() - painter.lineHeight() / 2,
                 Color.argb(enabled ? theme.textPrimary() : theme.textSecondary()), false);
-        painter.fill(track, Color.argb(!enabled ? theme.surface()
-                : value ? theme.accent().withAlpha(0.85f) : theme.surfaceHover()));
-        painter.outline(track, Color.argb(theme.border()), 1);
-        int knobSize = toggleHeight - 4;
-        int knobX = value ? track.right() - knobSize - 2 : track.x() + 2;
-        painter.fill(new Rect(knobX, track.y() + 2, knobSize, knobSize),
+        // Pill switch: radius is half the height, which reads as a switch, not a checkbox.
+        painter.roundPanel(track, toggleHeight / 2,
+                Color.argb(!enabled ? theme.surface()
+                        : value ? theme.accent().withAlpha(0.85f) : theme.surfaceHover()),
+                Color.argb(theme.border()));
+        int knobSize = toggleHeight - 6;
+        int knobX = value ? track.right() - knobSize - 4 : track.x() + 4;
+        Rect knob = new Rect(knobX, track.centerY() - knobSize / 2, knobSize, knobSize);
+        painter.roundRect(knob, knobSize / 2,
                 Color.argb(enabled ? theme.textPrimary() : theme.textSecondary()));
         // Text state so the meaning does not depend on colour alone (UI-01).
         String stateKey = !enabled ? "off" : value ? "on" : "off";
         int stateWidth = painter.textWidth(stateKey);
         painter.text(stateKey, track.x() - stateWidth - 6, bounds.centerY() - painter.lineHeight() / 2,
                 Color.argb(theme.textSecondary()), false);
-        if (hovered) {
-            painter.outline(bounds, Color.argb(theme.border()), 1);
-        }
-        if (focused) {
-            painter.outline(bounds.inset(-1, -1), Color.argb(theme.accent()), 1);
-        }
     }
 
     public void setHovered(boolean hovered) {

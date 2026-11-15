@@ -72,18 +72,22 @@ public final class SliderWidget extends Widget {
         Rect track = track();
         painter.text(label, bounds.x(), bounds.y() - painter.lineHeight() - 1,
                 Color.argb(theme.textSecondary()), false);
-        painter.fill(track, Color.argb(theme.surfaceHover()));
+        int radius = track.height() / 2;
+        if (focused) {
+            painter.roundRect(track.inset(-3, -5), radius + 5, Color.argb(theme.accent().withAlpha(0.30f)));
+        }
+        painter.roundRect(track, radius, Color.argb(theme.surfaceHover()));
         int fillWidth = (int) Math.round(track.width() * ((preview - min) / (max - min)));
-        painter.fill(new Rect(track.x(), track.y(), fillWidth, track.height()), Color.argb(theme.accent()));
-        int knobX = track.x() + fillWidth - 3;
-        painter.fill(new Rect(knobX, track.y() - 3, 6, track.height() + 6),
+        if (fillWidth > 0) {
+            painter.roundRect(new Rect(track.x(), track.y(), fillWidth, track.height()), radius,
+                    Color.argb(theme.accent()));
+        }
+        int knobX = Math.max(track.x() - 1, Math.min(track.right() - 5, track.x() + fillWidth - 3));
+        painter.roundRect(new Rect(knobX, track.y() - 3, 6, track.height() + 6), 3,
                 Color.argb(enabled ? theme.textPrimary() : theme.textSecondary()));
         String display = formatValue(preview) + (unitKey == null ? "" : " " + unitKey);
         painter.text(display, bounds.right() - painter.textWidth(display),
                 bounds.centerY() - painter.lineHeight() / 2, Color.argb(theme.textPrimary()), false);
-        if (focused) {
-            painter.outline(bounds, Color.argb(theme.accent()), 1);
-        }
     }
 
     private String formatValue(double v) {

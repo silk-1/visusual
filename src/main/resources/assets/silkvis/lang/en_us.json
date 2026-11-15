@@ -131,5 +131,14 @@
   "silkvis.module.theme.local": "Local theme",
   "silkvis.module.theme.local.desc": "Local background image with validated limits.",
   "silkvis.module.integrations.probe": "Integrations",
-  "silkvis.module.integrations.probe.desc": "Sodium, Iris and optional adapters."
+  "silkvis.module.integrations.probe.desc": "Sodium, Iris and optional adapters.",
+  "silkvis.map.no_tiles": "No tiles",
+  "silkvis.tab.visual.hint": "Field of view, particles and rain density.",
+  "silkvis.tab.hud.hint": "Which widgets are drawn; positions live in the HUD editor.",
+  "silkvis.tab.map.hint": "Minimap orientation and zoom.",
+  "silkvis.tab.music.hint": "Now Playing overlay; the source is the Windows player.",
+  "silkvis.tab.theme.hint": "Reduced motion, blur and presets.",
+  "silkvis.tab.integrations.hint": "Detects neighbouring mods; nothing is downloaded.",
+  "silkvis.tab.settings.hint": "HUD editor and layout reset.",
+  "silkvis.tab.automation.hint": "P2: tasks arrive later, none run today."
 }

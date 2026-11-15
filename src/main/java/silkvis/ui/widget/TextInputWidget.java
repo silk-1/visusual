@@ -34,8 +34,10 @@ public final class TextInputWidget extends Widget {
 
     @Override
     public void render(Painter painter, ThemeTokens theme) {
-        painter.fill(bounds, Color.argb(theme.surface()));
-        painter.outline(bounds, Color.argb(showError ? theme.error() : focused ? theme.accent() : theme.border()), 1);
+        int radius = theme.radiusControl();
+        painter.roundRect(bounds, radius,
+                Color.argb(showError ? theme.error() : focused ? theme.accent() : theme.border()));
+        painter.roundRect(bounds.inset(1, 1), Math.max(0, radius - 1), Color.argb(theme.surface()));
         String text = model.text();
         int textY = bounds.centerY() - painter.lineHeight() / 2;
         // The hint used to be received and never drawn, so the search field rendered as a
