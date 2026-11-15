@@ -7,6 +7,7 @@ import silkvis.config.Debouncer;
 import silkvis.config.GlobalConfig;
 import silkvis.config.JsonConfigFile;
 import silkvis.config.LoadOutcome;
+import silkvis.config.MediaConfig;
 import silkvis.config.ProfileIdentity;
 import silkvis.config.UiConfig;
 import silkvis.core.BoundedExecutors;
@@ -83,6 +84,11 @@ public final class SilkVisRuntime {
     private BoundedTileCache tileCache = new BoundedTileCache(64L * 1024 * 1024);
     private MapIdentity mapIdentity;
     private boolean mediaStarted;
+    /** Built once at client init; lets the runtime start the bridge later, on demand. */
+    private Supplier<MediaProvider> mediaFactory;
+    /** Throttle for retries: a refused bridge must not spawn a process every tick. */
+    private long mediaNextAttemptNanos;
+    private static final long MEDIA_RETRY_MS = 15_000L;
     private boolean hudInteractionMode;
 
     private final RateLimiter mediaPollLimiter = new RateLimiter(clock, 1);
@@ -275,8 +281,10 @@ public final class SilkVisRuntime {
             langTable = silkvis.ui.LangTable.load(
                     "auto".equals(updated.language()) ? detectLanguage() : updated.language());
         }
+        MediaConfig previousMedia = this.global.media();
         this.global = updated;
         applyTheme();
+        applyMediaSettings(previousMedia, updated.media());
         globalDebouncer.submit(updated);
     }
 
@@ -323,6 +331,9 @@ public final class SilkVisRuntime {
     /** Called once on the client tick; safe to call when no world is loaded. */
     public void tick() {
         globalDebouncer.tick();
+        // Retry with a throttle: a refused bridge keeps its reason visible in the Music tab
+        // and the HUD instead of silently doing nothing until the next launch.
+        tryStartMedia();
         mediaPollLimiter.tryAcquire();
         if (media != null) {
             media.tick();
@@ -365,24 +376,104 @@ public final class SilkVisRuntime {
         executors.close();
     }
 
-    public void startMediaIfEnabled(Supplier<MediaProvider> factory) {
-        if (mediaStarted || !global.media().enabled()) {
+    /**
+     * Registers the bridge factory. Separate from starting on purpose: the tile/media
+     * adoption order at client init must not be able to throw before the factory exists.
+     */
+    public void setMediaFactory(Supplier<MediaProvider> factory) {
+        this.mediaFactory = factory;
+        this.mediaNextAttemptNanos = 0L;
+    }
+
+    /**
+     * Starts the bridge if music is enabled. Called at client init and every tick, so
+     * enabling music in the Music tab takes effect immediately instead of after a restart
+     * (that was the whole "музыка не робит" report: the provider was created once at
+     * launch, when the flag was still off).
+     */
+    public void startMediaIfEnabled() {
+        tryStartMedia();
+    }
+
+    public void setMediaEnabled(boolean enabled) {
+        if (!enabled) {
+            stopMedia();
             return;
         }
+        mediaNextAttemptNanos = 0L;
+        tryStartMedia();
+    }
+
+    /** Music tab button: drop the current bridge and build a new one right now. */
+    public void restartMedia() {
+        stopMedia();
+        mediaNextAttemptNanos = 0L;
+        tryStartMedia();
+        log.log("MEDIA_RESTART", global.media().enabled() ? "enabled" : "disabled");
+    }
+
+    /** Last refusal reason; empty when the bridge started or music is off. */
+    public String mediaUnavailableReason() {
+        return mediaUnavailableReason;
+    }
+
+    private void stopMedia() {
+        MediaService current = media;
+        media = null;
+        mediaStarted = false;
+        mediaUnavailableReason = "";
+        if (current != null) {
+            // close() waits for the child process: never on the render/UI thread.
+            executors.io().execute(current::close);
+            log.log("MEDIA_STOPPED", "user");
+        }
+        updateMediaCapability();
+    }
+
+    private void tryStartMedia() {
+        if (mediaStarted || mediaFactory == null || !global.media().enabled()) {
+            return;
+        }
+        long now = clock.monotonicNanos();
+        if (now < mediaNextAttemptNanos) {
+            return;
+        }
+        mediaNextAttemptNanos = now + MEDIA_RETRY_MS * 1_000_000L;
         MediaProvider provider;
         try {
-            provider = factory.get();
+            provider = mediaFactory.get();
         } catch (RuntimeException | LinkageError e) {
             // Keep the reason: "music does nothing" is not an acceptable status message.
-            mediaUnavailableReason = e.getMessage() == null
+            String reason = e.getMessage() == null
                     ? e.getClass().getSimpleName() : e.getMessage();
-            log.log("PROVIDER_UNAVAILABLE", mediaUnavailableReason);
+            if (!reason.equals(mediaUnavailableReason)) {
+                log.log("PROVIDER_UNAVAILABLE", reason);
+            }
+            mediaUnavailableReason = reason;
             return;
         }
-        media = new MediaService(provider, clock, snapshot -> { }, result -> { });
-        media.start(global.media().selection(), global.media().pinnedAppId());
+        MediaService service = new MediaService(provider, clock, snapshot -> { }, result -> { });
+        service.start(global.media().selection(), global.media().pinnedAppId());
+        media = service;
         mediaStarted = true;
+        mediaUnavailableReason = "";
+        log.log("MEDIA_STARTED", provider.id());
         updateMediaCapability();
+    }
+
+    /**
+     * Applies media settings that used to be written to the config and never read: the
+     * enable flag (no start/stop), the selection and the pinned app (no re-subscribe).
+     */
+    private void applyMediaSettings(MediaConfig before, MediaConfig after) {
+        if (before.enabled() != after.enabled()) {
+            setMediaEnabled(after.enabled());
+        }
+        if (before.selection() != after.selection()
+                || !before.pinnedAppId().equals(after.pinnedAppId())) {
+            mediaService().ifPresent(service ->
+                    service.setSelection(after.selection(), after.pinnedAppId()));
+        }
     }
 
     // ---------------------------------------------------------------- accessors

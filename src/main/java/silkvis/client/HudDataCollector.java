@@ -3,6 +3,7 @@ package silkvis.client;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.entity.EquipmentSlot;
+import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.entity.effect.StatusEffectInstance;
 import net.minecraft.item.ItemStack;
 import net.minecraft.registry.RegistryKey;
@@ -38,6 +39,12 @@ public final class HudDataCollector {
      * (reported after the first in-game run, 2026-11-15).
      */
     private final EnumMap<HudWidgetId, List<String>> cached = new EnumMap<>(HudWidgetId.class);
+    /**
+     * Structured armor rows. The HUD draws the real item icon, so the text-only model is
+     * not enough; the snapshot is rebuilt at 1 Hz on the tick thread and never during
+     * rendering (HUD-04).
+     */
+    private volatile ArmorSnapshot armorSnapshot = ArmorSnapshot.EMPTY;
 
     public HudDataCollector(Clock clock) {
         this.clock = clock;
@@ -58,6 +65,7 @@ public final class HudDataCollector {
     public void tick(MinecraftClient client) {
         if (client == null || client.player == null || client.world == null) {
             cached.clear();
+            armorSnapshot = ArmorSnapshot.EMPTY;
             model = HudViewModel.empty();
             return;
         }
@@ -75,7 +83,9 @@ public final class HudDataCollector {
                 + String.format(Locale.ROOT, "%.1f ms", fps.frameTimeMs())));
         if (fallbackLimiter.tryAcquire()) {
             cached.put(HudWidgetId.EFFECTS, effects(player));
-            cached.put(HudWidgetId.ARMOR, armor(player));
+            ArmorSnapshot armor = armor(player);
+            armorSnapshot = armor;
+            cached.put(HudWidgetId.ARMOR, armorLines(armor));
             cached.put(HudWidgetId.ACTIVE_TOOL, tool(player));
         }
         model = new HudViewModel(cached, clock.monotonicNanos());
@@ -118,16 +128,67 @@ public final class HudDataCollector {
         return out;
     }
 
-    private static List<String> armor(ClientPlayerEntity player) {
-        List<String> out = new ArrayList<>();
-        EquipmentSlot[] slots = {EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET};
-        for (EquipmentSlot slot : slots) {
+    /** Whatever is equipped in the four armor slots, in head-to-feet order. */
+    public ArmorSnapshot armorSnapshot() {
+        return armorSnapshot;
+    }
+
+    private static ArmorSnapshot armor(ClientPlayerEntity player) {
+        List<ArmorSnapshot.Slot> slots = new ArrayList<>();
+        EquipmentSlot[] order = {EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET};
+        for (EquipmentSlot slot : order) {
             ItemStack stack = player.getEquippedStack(slot);
             if (stack.isEmpty()) {
                 continue;
             }
-            int remaining = stack.getMaxDamage() - stack.getDamage();
-            out.add(stack.getName().getString() + "  " + remaining);
+            String durability = "";
+            float ratio = 1f;
+            int max = stack.getMaxDamage();
+            if (max > 0) {
+                int remaining = Math.max(0, max - stack.getDamage());
+                durability = remaining + "/" + max;
+                ratio = remaining / (float) max;
+            }
+            slots.add(new ArmorSnapshot.Slot(stack.copy(), stack.getName().getString(),
+                    durability, ratio, enchantments(stack)));
+        }
+        return slots.isEmpty() ? ArmorSnapshot.EMPTY : new ArmorSnapshot(List.copyOf(slots));
+    }
+
+    /**
+     * Up to two enchantments with their level, as the item tooltip would name them. Kept
+     * short on purpose: the row is one line next to a 16px icon, and a third enchantment
+     * turns "прочность" into a wall of text.
+     */
+    private static String enchantments(ItemStack stack) {
+        var component = EnchantmentHelper.getEnchantments(stack);
+        if (component.isEmpty()) {
+            return "";
+        }
+        List<String> names = new ArrayList<>();
+        for (var entry : component.getEnchantmentEntries()) {
+            names.add(entry.getKey().value()
+                    .getName(entry.getKey(), entry.getValue()).getString());
+            if (names.size() >= 2) {
+                break;
+            }
+        }
+        String joined = String.join(", ", names);
+        if (joined.length() > 26 && names.size() > 1) {
+            joined = names.get(0);
+        }
+        return component.getSize() > names.size() ? joined + " +" + (component.getSize() - names.size()) : joined;
+    }
+
+    /** Text fallback for the editor preview and for the case where icons cannot be drawn. */
+    private static List<String> armorLines(ArmorSnapshot snapshot) {
+        List<String> out = new ArrayList<>();
+        for (ArmorSnapshot.Slot slot : snapshot.slots()) {
+            String line = slot.line();
+            if (!slot.enchantments().isEmpty()) {
+                line = line + " · " + slot.enchantments();
+            }
+            out.add(line);
         }
         return out;
     }

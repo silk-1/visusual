@@ -221,5 +221,8 @@
   "silkvis.language.title": "Interface language",
   "silkvis.language.auto": "Auto",
   "silkvis.language.ru": "Russian",
-  "silkvis.language.en": "English"
+  "silkvis.language.en": "English",
+  "silkvis.media.restart": "Restart bridge",
+  "silkvis.media.restart.desc": "Rebuild the connection to Windows media sessions without restarting the game",
+  "silkvis.media.hud.status": "Music: %s"
 }
