@@ -243,9 +243,9 @@ public final class AutomationExecutor implements silkvis.automation.AutomationEn
         if (slot < 0 || slot >= 9) {
             return Result.BLOCKED;
         }
-        // The field, not the setter: both exist, but the field is what the vanilla hotbar keys
-        // write as well, so the two paths cannot disagree.
-        player.getInventory().selectedSlot = slot;
+        // The setter, not the field: selectedSlot is private in PlayerInventory (the compiler
+        // said so once), and setSelectedSlot is what the vanilla hotbar keys end up calling.
+        player.getInventory().setSelectedSlot(slot);
         return Result.DONE;
     }
 

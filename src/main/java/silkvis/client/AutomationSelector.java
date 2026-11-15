@@ -4,28 +4,20 @@ import net.minecraft.client.MinecraftClient;
 import silkvis.automation.AutomationMode;
 import silkvis.automation.BlockPos;
 import silkvis.automation.GoalRegistry;
+import silkvis.automation.Selector;
 import silkvis.automation.Snapshot;
 import silkvis.automation.StopReason;
 import silkvis.ui.Localizer;
 
 /**
- * Decides which goal should run right now, and starts it.
+ * Turns the core {@link Selector} rules into a started goal, or into a reason.
  *
- * <p>This is the piece that makes the subsystem usable without opening a menu: press the panic
- * key and the nearest thing that is obviously wrong wins - you are on fire or in lava, a hostile
- * mob is on top of you, there are dropped items at your feet. All of it is decided from a
- * {@link Snapshot}, so the rules are data, not guesses about the live world.</p>
- *
- * <p>Order matters and is the whole design: danger before loot, loot before walking, and nothing
- * at all when the engine is off or the player is driving. Every start and every refusal is logged,
- * because "I pressed the key and nothing happened" must be answerable from {@code latest.log}.</p>
+ * <p>The ordering itself lives in {@code silkvis.automation.Selector} so it can be asserted
+ * without the game; this class only adds the two things the core cannot know - which block the
+ * camera is looking at, and how to start a goal - plus the log line that answers "I pressed the
+ * key and nothing happened".</p>
  */
 public final class AutomationSelector {
-    /** Hostile mob this close and the emergency goal outranks everything else. */
-    static final double THREAT_RADIUS = 6.0;
-    /** Dropped items are worth a walk only when they are near and clearly theirs to take. */
-    static final double LOOT_RADIUS = 8.0;
-
     /** What the selector decided, so the caller can log it without asking the engine. */
     public record Decision(String goalId, BlockPos target, StopReason refusal) {
         public boolean started() {
@@ -33,74 +25,41 @@ public final class AutomationSelector {
         }
     }
 
-    private final SilkVisRuntime runtime;
+    private final AutomationHost host;
 
-    public AutomationSelector(SilkVisRuntime runtime) {
-        this.runtime = runtime;
+    public AutomationSelector(AutomationHost host) {
+        this.host = host;
     }
 
-    /**
-     * Picks a goal for the current situation and starts it.
-     *
-     * @return the decision; {@link Decision#started()} is false when nothing was appropriate,
-     *         with the reason filled in
-     */
+    /** Picks a goal for the current situation and starts it. */
     public Decision pickAndStart(MinecraftClient client, Snapshot snapshot) {
-        if (snapshot == null) {
-            return new Decision(null, null, StopReason.WORLD_CHANGED);
+        AutomationMode mode = this.host.automation().settings().mode();
+        Selector.Pick pick = Selector.urgent(snapshot, mode);
+        if (pick.found()) {
+            BlockPos feet = snapshot.player();
+            return start(pick.goalId(), feet);
         }
-        AutomationMode mode = this.runtime.automation().settings().mode();
-        if (mode == AutomationMode.OFF) {
-            return new Decision(null, null, StopReason.MODE_TOO_LOW);
+        if (pick.reason() != StopReason.NONE) {
+            // Automation is off, or there is no world: say so rather than falling through to a walk.
+            return new Decision(null, null, pick.reason());
         }
-        BlockPos feet = snapshot.player();
-        // 1. Danger first: being in lava outranks any amount of loot.
-        if (standingInDanger(snapshot, feet)) {
-            return start("A22", feet);
-        }
-        // 2. A hostile mob within reach of the player.
-        for (Snapshot.EntityInfo entity : snapshot.entities()) {
-            if (entity.hostile() && entity.distance() <= THREAT_RADIUS) {
-                return start("A22", feet);
-            }
-        }
-        // 3. Loot at the feet: the cheap, frequent case a player expects a single key to cover.
-        if (hasLootNearby(snapshot)) {
-            return start("A21", feet);
-        }
-        // 4. Whatever the camera is looking at, if it is a block worth walking to.
-        BlockPos looked = this.runtime.automationTarget(client);
-        if (looked != null && !looked.equals(GoalRegistry.NO_TARGET)
-                && !looked.equals(feet)) {
+        BlockPos looked = this.host.automationTarget(client);
+        if (looked != null && !looked.equals(GoalRegistry.NO_TARGET) && snapshot != null
+                && !looked.equals(snapshot.player())) {
             return start("A19", looked);
         }
         return new Decision(null, null, StopReason.TARGET_GONE);
     }
 
     private Decision start(String id, BlockPos target) {
-        boolean started = this.runtime.startAutomation(id, target);
+        boolean started = this.host.startAutomation(id, target);
         return started ? new Decision(id, target, StopReason.NONE)
                 : new Decision(null, target, StopReason.MODE_TOO_LOW);
     }
 
-    private static boolean standingInDanger(Snapshot snapshot, BlockPos feet) {
-        return snapshot.grid().dangerous(feet.x(), feet.y(), feet.z())
-                || snapshot.grid().dangerous(feet.x(), feet.y() - 1, feet.z());
-    }
-
-    private static boolean hasLootNearby(Snapshot snapshot) {
-        for (Snapshot.EntityInfo entity : snapshot.entities()) {
-            if (!entity.hostile() && entity.type().endsWith(":item")
-                    && entity.distance() <= LOOT_RADIUS) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     /** One line for the chat/log: what was chosen and why, or why nothing was. */
     public String describe(Decision decision) {
-        Localizer tr = this.runtime.localizer();
+        Localizer tr = this.host.localizer();
         if (decision == null) {
             return tr.get("silkvis.automation.selector.none");
         }

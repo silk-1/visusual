@@ -14,6 +14,8 @@ import net.minecraft.client.network.ServerInfo;
 import net.minecraft.util.Identifier;
 import org.lwjgl.glfw.GLFW;
 import silkvis.assets.TotemPackBuilder;
+import silkvis.automation.Snapshot;
+import silkvis.automation.StopReason;
 import silkvis.config.ProfileIdentity;
 import silkvis.hud.HudViewModel;
 import silkvis.media.ExeHelperLauncher;
@@ -245,8 +247,7 @@ public final class SilkVisClient implements ClientModInitializer {
         if (runtime.automationExecutor() == null) {
             runtime.setAutomationExecutor(new AutomationExecutor(client));
         }
-        Snapshot snapshot = AutomationSnapshot.capture(client, client.world == null
-                ? 0L : client.world.getTime(), runtime.automation().settings().reachRadius());
+        Snapshot snapshot = runtime.automationSnapshot(client);
         boolean busy = false;
         if (client.options != null) {
             busy = client.options.forwardKey.isPressed() || client.options.backKey.isPressed()
@@ -264,7 +265,7 @@ public final class SilkVisClient implements ClientModInitializer {
     private static void tickAutomationKeys(SilkVisRuntime runtime, MinecraftClient client) {
         if (automationStop != null) {
             while (automationStop.wasPressed()) {
-                runtime.stopAutomation(silkvis.automation.StopReason.BY_PLAYER);
+                runtime.stopAutomation(StopReason.BY_PLAYER);
             }
         }
         if (automationGo != null) {
@@ -275,8 +276,10 @@ public final class SilkVisClient implements ClientModInitializer {
                 }
                 AutomationSelector.Decision decision = new AutomationSelector(runtime)
                         .pickAndStart(client, runtime.automationSnapshot(client));
-                runtime.log().event("AUTOMATION_KEY", decision.started()
-                        ? "start " + decision.goalId() : "nothing: " + decision.refusal().code());
+                String outcome = decision.started() ? "start " + decision.goalId()
+                        : "nothing: " + (decision.refusal() == null
+                                ? StopReason.INTERNAL.code() : decision.refusal().code());
+                runtime.log().event("AUTOMATION_KEY", outcome);
             }
         }
     }

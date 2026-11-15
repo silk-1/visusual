@@ -57,6 +57,9 @@ final class AutomationChecks {
         aimFindsTheLookedAtBlock();
         aimRespectsTheLookDirection();
         aimIgnoresAir();
+        selectorPrefersDangerOverLoot();
+        selectorIgnoresFarLootAndFrames();
+        selectorDoesNothingWhenOff();
         registryModeGate();
         catalogMatchesRegistry();
         engineUsesPlannedStepsOnly();
@@ -373,6 +376,69 @@ final class AutomationChecks {
             SelfCheck.assertEquals(StopReason.WORLD_CHANGED, engine.status().reason(),
                     "stopped for the world change");
             SelfCheck.assertTrue(!engine.active(), "no goal after the change");
+        });
+    }
+
+    // ------------------------------------------------------------------ selector
+
+    private static void selectorPrefersDangerOverLoot() {
+        SelfCheck.check("automation: danger outranks loot, loot outranks walking", () -> {
+            FakeWorld calm = new FakeWorld().withFloor(6);
+            SelfCheck.assertEquals(StopReason.NONE,
+                    silkvis.automation.Selector.urgent(calm, AutomationMode.MOVE).reason(),
+                    "nothing urgent on an empty floor");
+            SelfCheck.assertTrue(!silkvis.automation.Selector.urgent(
+                    calm, AutomationMode.MOVE).found(), "no goal picked");
+
+            FakeWorld loot = new FakeWorld().withFloor(6).withItem(7, 2.5, 64.0, 0.5);
+            SelfCheck.assertEquals("A21",
+                    silkvis.automation.Selector.urgent(loot, AutomationMode.MOVE).goalId(),
+                    "loot at the feet is worth a walk");
+
+            // A hostile mob within the threat radius beats the item lying next to it.
+            FakeWorld mob = new FakeWorld().withFloor(6).withItem(7, 2.5, 64.0, 0.5)
+                    .withEntity(9, "minecraft:zombie", 3.5, 64.0, 0.5, true);
+            SelfCheck.assertEquals("A22",
+                    silkvis.automation.Selector.urgent(mob, AutomationMode.MOVE).goalId(),
+                    "the mob wins");
+
+            // Standing in lava beats both, even with a mob and an item nearby.
+            FakeWorld lava = new FakeWorld().withFloor(6).withItem(7, 1.5, 64.0, 0.5)
+                    .withEntity(9, "minecraft:zombie", 2.5, 64.0, 0.5, true);
+            lava.withDangerous(0, 64, 0);
+            SelfCheck.assertEquals("A22",
+                    silkvis.automation.Selector.urgent(lava, AutomationMode.MOVE).goalId(),
+                    "lava is first");
+        });
+    }
+
+    private static void selectorIgnoresFarLootAndFrames() {
+        SelfCheck.check("automation: only real, near loot counts", () -> {
+            FakeWorld far = new FakeWorld().withFloor(20).withItem(7, 2.5, 64.0, 18.5);
+            SelfCheck.assertTrue(!silkvis.automation.Selector.urgent(
+                    far, AutomationMode.MOVE).found(), "loot 18 blocks away is not urgent");
+            // minecraft:item_frame is an entity whose id ends in "item" but is not loot; a prefix
+            // or suffix test would have picked it up.
+            FakeWorld frame = new FakeWorld().withFloor(6)
+                    .withEntity(11, "minecraft:item_frame", 1.5, 64.0, 0.5, false);
+            SelfCheck.assertTrue(!silkvis.automation.Selector.urgent(
+                    frame, AutomationMode.MOVE).found(), "an item frame is not a dropped item");
+            FakeWorld near = new FakeWorld().withFloor(6).withItem(7, 0.5, 64.0, 1.5);
+            SelfCheck.assertTrue(silkvis.automation.Selector.urgent(
+                    near, AutomationMode.MOVE).found(), "an item at the feet is");
+        });
+    }
+
+    private static void selectorDoesNothingWhenOff() {
+        SelfCheck.check("automation: the selector is silent in the OFF mode", () -> {
+            FakeWorld world = new FakeWorld().withFloor(6).withItem(7, 1.5, 64.0, 0.5);
+            silkvis.automation.Selector.Pick pick = silkvis.automation.Selector.urgent(
+                    world, AutomationMode.OFF);
+            SelfCheck.assertTrue(!pick.found(), "nothing started");
+            SelfCheck.assertEquals(StopReason.MODE_TOO_LOW, pick.reason(), "and it says why");
+            SelfCheck.assertEquals(StopReason.WORLD_CHANGED,
+                    silkvis.automation.Selector.urgent(null, AutomationMode.MOVE).reason(),
+                    "no world is its own reason");
         });
     }
 
