@@ -89,7 +89,7 @@ docs/                           матрицы, ADR, отчёт, огранич�
 - `docs/performance/startup.md` — почему запуск долгий и как это измерить
 - `docs/agent-prompts/` — самодостаточные задачи для второго агента (параллельная работа)
 - `docs/build.md` — сборка, wrapper, артефакты
-- `docs/adr/` — ADR-0001…0006 (build, render adapter, media bridge, config, map, внешние интеграции)
+- `docs/adr/` — ADR-0001…0007 (build, render adapter, media bridge, config, map, внешние интеграции, карта Atlas)
 
 ## Границы
 

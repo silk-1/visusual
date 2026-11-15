@@ -32,6 +32,8 @@ import silkvis.ui.Localizer;
 import silkvis.ui.MainScreenModel;
 import silkvis.ui.ThemeTokens;
 import silkvis.ui.hud.HudLayoutConfig;
+import silkvis.ui.hud.HudWidgetConfig;
+import silkvis.ui.hud.HudWidgetId;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -65,6 +67,9 @@ public final class SilkVisRuntime {
     private UiConfig ui = UiConfig.defaults();
     private DestinationsConfig destinations = new DestinationsConfig("default", DestinationsConfig.defaultSlots());
     private MarkerSet markers = MarkerSet.empty();
+    /** Empty unless a third-party map is installed (ADR-0007). */
+    private String externalMapId = "";
+    private String externalMapLabel = "";
 
     private String profileId = "default";
     private WorldSessionToken token = WorldSessionToken.none();
@@ -190,6 +195,10 @@ public final class SilkVisRuntime {
 
     private void startMapService() {
         if (tileStore == null || mapIdentity == null) {
+            return;
+        }
+        if (!externalMapId.isEmpty()) {
+            // The external map owns terrain on this client: do not build a single tile.
             return;
         }
         TileSamplerHolder holder = new TileSamplerHolder();
@@ -391,6 +400,45 @@ public final class SilkVisRuntime {
     public void setDestinations(DestinationsConfig value) {
         this.destinations = value;
         saveDestinations();
+    }
+
+    /**
+     * ADR-0007: AtlasMap / AtlasMapExtended wins over our own map.
+     *
+     * <p>SilkVis then stops sampling terrain (a whole pipeline whose output nothing draws)
+     * and switches its minimap widget off once, because two minimaps overlap and the
+     * external one is the better map. Waypoints and the rest of the HUD are untouched.</p>
+     */
+    public void applyExternalMapPolicy(ExternalMapIntegration.Info info) {
+        boolean present = info != null;
+        externalMapId = present ? info.modId() : "";
+        externalMapLabel = present ? info.describe() : "";
+        modules.get("map.core").ifPresent(entry -> {
+            if (present) {
+                entry.markUnavailable(silkvis.core.ErrorCode.INTEGRATION_CONFLICT,
+                        "external_map:" + info.modId());
+            } else {
+                entry.clearUnavailable();
+            }
+        });
+        if (!present) {
+            return;
+        }
+        mapService().ifPresent(service -> service.setPaused(true));
+        HudWidgetConfig minimap = hudLayout().get(HudWidgetId.MINIMAP);
+        if (minimap.enabled()) {
+            setHudLayout(hudLayout().with(minimap.withEnabled(false)));
+            log.log("MAP_MINIMAP_DISABLED_EXTERNAL", info.modId());
+        }
+    }
+
+    public boolean externalMapPresent() {
+        return !externalMapId.isEmpty();
+    }
+
+    /** Display string of the detected external map, or empty. */
+    public String externalMapLabel() {
+        return externalMapLabel;
     }
 
     public MarkerSet markers() {

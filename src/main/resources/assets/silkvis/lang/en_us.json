@@ -156,5 +156,9 @@
   "silkvis.map.waypoint_default": "Waypoint",
   "silkvis.map.hint": "Drag to pan · Wheel to zoom · R — player · Right click — waypoint · Esc — close",
   "silkvis.map.building": "Building tiles…",
-  "silkvis.map.inactive": "Map unavailable (no world)"
+  "silkvis.map.inactive": "Map unavailable (no world)",
+  "silkvis.map.external_found": "AtlasMap detected",
+  "silkvis.map.external_hint": "SilkVis minimap and tile builder are off; use the Atlas map (key M by default, rebindable in Controls).",
+  "silkvis.map.external_missing": "AtlasMap not installed",
+  "silkvis.map.external_why": "With AtlasMap installed SilkVis does not build or draw its own map: one terrain pipeline, one minimap (ADR-0007)."
 }
