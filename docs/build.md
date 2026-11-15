@@ -28,7 +28,7 @@ Wrapper **закоммичен целиком**: `gradlew`, `gradlew.bat`, `grad
 Все версии — в `gradle.properties`, placeholder'ов больше нет:
 
 ```properties
-mod_version=0.1.14-p1
+mod_version=0.1.14-p2
 minecraft_version=1.21.10
 yarn_mappings=1.21.10+build.3
 loader_version=0.20.1
@@ -82,3 +82,15 @@ IPC-парсер, timeline, выбор сессии, состояния кома
 C++/WinRT, кладётся рядом с `manifest.properties` (SHA-256). В этой среде он **не
 собран**, поэтому музыкальный провайдер при запуске честно сообщает
 `ERROR: helper_missing` вместо фиктивных данных.
+
+## Какой файл кидать в mods
+
+`build\libs` содержит **ровно один** jar: `silkvis-<версия>+mc1.21.10.jar`. Sources-jar
+больше не выпускается: он содержал `fabric.mod.json` с неразвёрнутым `${version}` и ни
+одного класса, и если такой файл попадал в `mods`, игра падала на старте с
+`ClassNotFoundException: silkvis.client.SilkVisClient` (отчёт владельца, 2026-11-15).
+
+`build.bat` теперь сам ставит собранный jar в `%appdata%\.minecraft\mods`, предварительно
+удаляя оттуда старые `silkvis-*.jar` (включая `-sources`), и печатает имя установленного
+файла.
+

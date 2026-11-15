@@ -71,6 +71,28 @@ echo [SilkVis] END   %DATE% %TIME%
 echo.
 if "%CODE%"=="0" (
   echo [SilkVis] SUCCESS. Jar is in build\libs\
+  rem  Install straight into the game: one jar, no picking the wrong file. A sources jar
+  rem  once ended up in mods and the game crashed with ClassNotFoundException.
+  set "MODS=%APPDATA%\.minecraft\mods"
+  if not exist "!MODS!" set "MODS="
+  if not defined MODS if exist "F:\silkvis\.minecraft\mods" set "MODS=F:\silkvis\.minecraft\mods"
+  if defined MODS (
+    del /q "!MODS!\silkvis-*.jar" >nul 2>&1
+    set "INSTALLED="
+    for %%J in ("%~dp0build\libs\*.jar") do (
+      set "NAME=%%~nxJ"
+      if "!NAME:-sources=!"=="!NAME!" (
+        copy /y "%%~fJ" "!MODS!\" >nul && set "INSTALLED=%%~nxJ"
+      )
+    )
+    if defined INSTALLED (
+      echo [SilkVis] Installed into !MODS!: !INSTALLED!
+    ) else (
+      echo [SilkVis] WARNING: no jar found in build\libs to install.
+    )
+  ) else (
+    echo [SilkVis] mods folder not found - copy the jar from build\libs manually.
+  )
 ) else (
   echo [SilkVis] FAILED with exit code %CODE%.
   echo [SilkVis] Copy the lines after "* What went wrong:" and send them back.
