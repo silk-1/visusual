@@ -12,6 +12,7 @@ import silkvis.config.json.JsonException;
 import silkvis.config.json.JsonObject;
 import silkvis.config.json.JsonValue;
 import silkvis.ui.hud.HudLayoutConfig;
+import silkvis.ui.hud.HudWidgetId;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -156,10 +157,22 @@ final class CoreChecks {
                     "duplicate widget");
         });
 
-        check("hud config rejects p2 widget in a p1 build", () -> {
-            JsonObject doc = JsonValue.newObject().put("widgets", JsonValue.newArray().add(
-                    JsonValue.newObject().put("id", "TASK_STATUS").put("anchor", "TOP_LEFT")));
-            expectThrows(ConfigException.class, () -> HudLayoutConfig.decode(doc), "p2 widget rejected");
+        // Behaviour changed in 0.1.14: a widget that this build does not render (removed
+        // MINIMAP, future TASK_STATUS) is skipped instead of failing the whole file. The
+        // check now pins both halves of that contract: the rest survives, garbage still fails.
+        check("hud config skips removed and p2 widgets but keeps the rest", () -> {
+            JsonObject doc = JsonValue.newObject().put("widgets", JsonValue.newArray()
+                    .add(JsonValue.newObject().put("id", "MINIMAP").put("anchor", "TOP_RIGHT"))
+                    .add(JsonValue.newObject().put("id", "TASK_STATUS").put("anchor", "BOTTOM_CENTER"))
+                    .add(JsonValue.newObject().put("id", "COORDINATES").put("anchor", "TOP_LEFT")
+                            .put("offsetX", 12)));
+            HudLayoutConfig decoded = HudLayoutConfig.decode(doc);
+            assertEquals(12, decoded.get(HudWidgetId.COORDINATES).offsetX(), "known widget kept");
+            assertTrue(!decoded.get(HudWidgetId.MINIMAP).enabled(), "removed widget stays off");
+            expectThrows(ConfigException.class, () -> HudLayoutConfig.decode(JsonValue.newObject()
+                            .put("widgets", JsonValue.newArray().add(
+                                    JsonValue.newObject().put("id", "NOPE").put("anchor", "TOP_LEFT")))),
+                    "unknown id still rejected");
         });
 
         check("debouncer coalesces edits and flushes once", () -> {
