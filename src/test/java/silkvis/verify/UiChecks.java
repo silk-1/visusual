@@ -14,9 +14,14 @@ import silkvis.ui.hud.VisibilityContext;
 import silkvis.ui.hud.VisibilityPolicy;
 import silkvis.ui.widget.TextInputModel;
 import silkvis.ui.widget.Widget;
+import silkvis.ui.widget.WidgetDispatch;
+import silkvis.ui.widget.ButtonWidget;
 import silkvis.ui.widget.Keys;
 import silkvis.ui.widget.ToggleWidget;
 import silkvis.ui.Painter;
+
+import java.util.ArrayList;
+import java.util.List;
 
 import static silkvis.verify.SelfCheck.assertEquals;
 import static silkvis.verify.SelfCheck.assertTrue;
@@ -167,6 +172,95 @@ final class UiChecks {
             toggle.setEnabled(false);
             assertTrue(!toggle.focusable(), "disabled widget is not focusable");
             assertTrue(!toggle.mouseClicked(1, 1, 0), "disabled widget ignores clicks");
+        });
+
+        // The crash that prompted this: a settings button runs its action on release, the
+        // action rebuilds the pane, and the release was still walking the list it had just
+        // cleared. In game that was ConcurrentModificationException inside mouseReleased.
+        check("a widget action may rebuild the list it was dispatched from", () -> {
+            List<Widget> widgets = new ArrayList<>();
+            int[] rebuilt = {0};
+            ButtonWidget rebuilds = new ButtonWidget(new Rect(0, 0, 40, 20), "rebuild", () -> {
+                // Same shape as rebuildSettings(): clear, then refill with SEVERAL rows.
+                // The count matters. Refilling with fewer rows than the cursor's position
+                // leaves the iterator with nothing to advance to, so it would never notice
+                // the modification and a live-list walk would silently survive -- which is
+                // exactly how a first version of this check passed against the broken code.
+                // A real settings pane refills with many rows, and the loop then advances:
+                // that is what threw in the crash report.
+                widgets.clear();
+                for (int i = 0; i < 3; i++) {
+                    widgets.add(new ButtonWidget(new Rect(0, i * 24, 40, 20), "fresh" + i, () -> { }));
+                }
+                rebuilt[0]++;
+            });
+            widgets.add(rebuilds);
+            widgets.add(new ButtonWidget(new Rect(0, 30, 40, 20), "other", () -> { }));
+
+            assertTrue(rebuilds.mouseClicked(5, 5, 0), "button pressed");
+            // Must not throw, and the action must have run exactly once.
+            boolean handled = WidgetDispatch.release(widgets, 5, 5, 0);
+            assertTrue(handled, "release claimed");
+            assertEquals(1, rebuilt[0], "action ran once despite the rebuild");
+
+            // The control the rebuild created was never pressed, so it must not see the
+            // release: a second delivery would let it double-apply its own action.
+            List<Widget> onlyFresh = new ArrayList<>(widgets);
+            assertTrue(!WidgetDispatch.release(onlyFresh, 5, 5, 0), "fresh control ignores the release");
+
+            // The old code path, kept as the proof the guard is load-bearing: iterating the
+            // live list over the same mutation is what threw in the report.
+            List<Widget> live = new ArrayList<>();
+            ButtonWidget mutator = new ButtonWidget(new Rect(0, 0, 40, 20), "mutate", () -> live.clear());
+            live.add(mutator);
+            live.add(new ButtonWidget(new Rect(0, 30, 40, 20), "tail", () -> { }));
+            assertTrue(mutator.mouseClicked(5, 5, 0), "mutator pressed");
+            boolean threw = false;
+            try {
+                for (Widget widget : live) {
+                    widget.mouseReleased(5, 5, 0);
+                }
+            } catch (java.util.ConcurrentModificationException expected) {
+                threw = true;
+            }
+            assertTrue(threw, "walking the live list still throws, so the copy is required");
+        });
+
+        check("widget dispatch tolerates an empty or missing list", () -> {
+            assertTrue(!WidgetDispatch.release(null, 0, 0, 0), "null list");
+            assertTrue(!WidgetDispatch.release(new ArrayList<>(), 0, 0, 0), "empty list");
+        });
+
+        // Two callers, two policies: the settings pane accumulates, the main screen stops at
+        // the first handler. Both snapshot; only one stops early. Checked so the split cannot
+        // be "simplified" back into a single wrong method.
+        check("dispatch stops at the first handler only when asked", () -> {
+            // Both share one rect on purpose: the dispatcher hands the SAME cursor position
+            // to every widget, so two buttons in different places could never both be hit by
+            // a single call. Overlapping controls are also the honest case here -- the
+            // question is "does the walk stop or continue", not "which one was under the
+            // cursor".
+            int[] runs = {0, 0};
+            ButtonWidget first = new ButtonWidget(new Rect(0, 0, 40, 20), "first", () -> runs[0]++);
+            ButtonWidget second = new ButtonWidget(new Rect(0, 0, 40, 20), "second", () -> runs[1]++);
+            List<Widget> both = new ArrayList<>();
+            both.add(first);
+            both.add(second);
+
+            assertTrue(first.mouseClicked(5, 5, 0), "first pressed");
+            assertTrue(second.mouseClicked(5, 5, 0), "second pressed");
+
+            WidgetDispatch.releaseFirst(both, 5, 5, 0);
+            assertEquals(1, runs[0], "first handler ran");
+            assertEquals(0, runs[1], "second skipped by releaseFirst");
+
+            runs[0] = 0;
+            runs[1] = 0;
+            assertTrue(first.mouseClicked(5, 5, 0), "first re-pressed");
+            assertTrue(second.mouseClicked(5, 5, 0), "second re-pressed");
+            WidgetDispatch.release(both, 5, 5, 0);
+            assertEquals(1, runs[0], "release reaches the first");
+            assertEquals(1, runs[1], "release also reaches the second");
         });
     }
 

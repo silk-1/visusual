@@ -18,6 +18,7 @@ import silkvis.ui.widget.Keys;
 import silkvis.ui.widget.TextInputModel;
 import silkvis.ui.widget.TextInputWidget;
 import silkvis.ui.widget.Widget;
+import silkvis.ui.widget.WidgetDispatch;
 import silkvis.visual.soup.module.SoupModule;
 import silkvis.visual.soup.setting.BooleanSetting;
 import silkvis.visual.soup.setting.ButtonSetting;
@@ -631,19 +632,23 @@ public final class SoupSettingsScreen extends Screen {
     public boolean mouseReleased(Click click) {
         // ButtonWidget fires its action on release, so clicks have to be routed here too;
         // without this every button in this screen looked pressed and did nothing.
+        //
+        // Iterated over copies, not over the live lists: an action on release calls
+        // rebuildAfterChange(), which clears settingWidgets and powerWidgets and refills them.
+        // Mutating a list while its iterator is open threw ConcurrentModificationException and
+        // crashed the game on the first setting clicked. The copy also fixes the semantics:
+        // pressing one control must not deliver the release to controls built afterwards.
         double mouseX = click.x();
         double mouseY = click.y();
         int button = click.button();
-        boolean handled = false;
-        for (Widget widget : this.powerWidgets) {
-            handled |= widget.mouseReleased(mouseX, mouseY, button);
-        }
-        for (Widget widget : this.settingWidgets) {
-            handled |= widget.mouseReleased(mouseX, mouseY, button);
-        }
-        for (Widget widget : this.chrome) {
-            handled |= widget.mouseReleased(mouseX, mouseY, button);
-        }
+        // Routed through WidgetDispatch: a button runs its action on release, and the action
+        // rebuilds these very lists (dependent options appear or disappear). Walking the live
+        // list threw ConcurrentModificationException and crashed the game on the first setting
+        // clicked. The helper snapshots first, and skips controls the rebuild just created:
+        // they were never pressed, so the release is not theirs to handle.
+        boolean handled = WidgetDispatch.release(this.powerWidgets, mouseX, mouseY, button);
+        handled |= WidgetDispatch.release(this.settingWidgets, mouseX, mouseY, button);
+        handled |= WidgetDispatch.release(this.chrome, mouseX, mouseY, button);
         return handled || super.mouseReleased(click);
     }
 
