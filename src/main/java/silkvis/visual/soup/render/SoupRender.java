@@ -221,6 +221,7 @@ public final class SoupRender {
     }
 
     private static void quadVertex(VertexConsumer buffer, Matrix4f matrix, Vector3f pos, int color) {
+        // DebugQuads format is POSITION_COLOR only on some mappings; keep it minimal.
         buffer.vertex(matrix, pos.x, pos.y, pos.z).color(color);
     }
 
@@ -256,18 +257,39 @@ public final class SoupRender {
 
     private static void vertex(VertexConsumer buffer, Matrix4f world,
                                float x, float y, float z, float u, float v, int color) {
-        buffer.vertex(world, x, y, z).color(color).texture(u, v)
-                .overlay(SoupRender.OVERLAY).light(SoupRender.LIGHT);
+        // CRITICAL for 1.21.10: EntityTranslucentEmissive requires NORMAL.
+        // Missing it crashes with: IllegalStateException: Missing elements in vertex: Normal
+        buffer.vertex(world, x, y, z)
+                .color(color)
+                .texture(u, v)
+                .overlay(SoupRender.OVERLAY)
+                .light(SoupRender.LIGHT)
+                .normal(0.0F, 1.0F, 0.0F);
     }
 
     private static void emitLine(VertexConsumer buffer, Matrix4f world,
                                  Vector3f start, Vector3f end, int colorStart, int colorEnd) {
-        lineVertex(buffer, world, start, colorStart);
-        lineVertex(buffer, world, end, colorEnd);
+        // Line format needs a direction-ish normal; use delta so width expands correctly.
+        float dx = end.x - start.x;
+        float dy = end.y - start.y;
+        float dz = end.z - start.z;
+        float len = (float) Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (len < 1.0e-6F) {
+            dx = 0.0F;
+            dy = 1.0F;
+            dz = 0.0F;
+        } else {
+            dx /= len;
+            dy /= len;
+            dz /= len;
+        }
+        lineVertex(buffer, world, start, colorStart, dx, dy, dz);
+        lineVertex(buffer, world, end, colorEnd, dx, dy, dz);
     }
 
-    private static void lineVertex(VertexConsumer buffer, Matrix4f world, Vector3f pos, int color) {
-        buffer.vertex(world, pos.x, pos.y, pos.z).color(color).normal(0.0F, 0.0F, 0.0F);
+    private static void lineVertex(VertexConsumer buffer, Matrix4f world, Vector3f pos, int color,
+                                   float nx, float ny, float nz) {
+        buffer.vertex(world, pos.x, pos.y, pos.z).color(color).normal(nx, ny, nz);
     }
 
     /** No overlay effects (no hurt flash, no block outline) -- the original's default. */
