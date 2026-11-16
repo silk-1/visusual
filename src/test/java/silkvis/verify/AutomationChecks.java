@@ -14,6 +14,7 @@ import silkvis.automation.Snapshot;
 import silkvis.automation.Step;
 import silkvis.automation.StepKind;
 import silkvis.automation.StopReason;
+import silkvis.automation.ToolSelect;
 import silkvis.automation.goals.CollectGoal;
 import silkvis.automation.goals.EatGoal;
 import silkvis.automation.goals.FarmGoal;
@@ -55,6 +56,9 @@ final class AutomationChecks {
         eatGoalEatsWhenHungry();
         eatGoalRefusesDebuffFood();
         eatGoalStopsWithNothingToEat();
+        toolSelectPicksTheRightFamily();
+        toolSelectPrefersTheBetterTier();
+        miningHoldsTheToolInsteadOfGivingUp();
         engineRefusesLowMode();
         engineStopsOnLowHealth();
         engineBacksOffWhenPlayerDrives();
@@ -410,6 +414,95 @@ final class AutomationChecks {
             SelfCheck.assertTrue(steps.isEmpty(), "no steps");
             SelfCheck.assertEquals(StopReason.NO_TOOL, goal.stopReason(), "names the reason");
             SelfCheck.assertTrue(goal.done(), "gives up instead of spinning");
+        });
+    }
+
+    // ------------------------------------------------------------------ tool select (A10)
+
+    private static void toolSelectPicksTheRightFamily() {
+        SelfCheck.check("automation: tool select answers in the block's own family", () -> {
+            // Stone wants a pickaxe even when a better-tier axe is in the next slot: tier only
+            // orders items inside one family, never across families.
+            FakeWorld world = new FakeWorld().withFloor(4)
+                    .withHotbar(0, "minecraft:netherite_axe")
+                    .withHotbar(1, "minecraft:iron_pickaxe")
+                    .withHotbar(2, "minecraft:stone_shovel");
+            SelfCheck.assertEquals(1,
+                    ToolSelect.bestSlotFor(world, "minecraft:stone"), "pickaxe for stone");
+            SelfCheck.assertEquals(0,
+                    ToolSelect.bestSlotFor(world, "minecraft:oak_log"), "axe for a log");
+            SelfCheck.assertEquals(2,
+                    ToolSelect.bestSlotFor(world, "minecraft:dirt"), "shovel for dirt");
+            // A hotbar with no tool of the wanted family answers -1, and the caller keeps its
+            // own behaviour (MineGoal reads breakTicks and decides for itself).
+            FakeWorld bare = new FakeWorld().withFloor(4)
+                    .withHotbar(0, "minecraft:bread")
+                    .withHotbar(1, "minecraft:sword");
+            SelfCheck.assertEquals(-1,
+                    ToolSelect.bestSlotFor(bare, "minecraft:stone"), "no pickaxe, no slot");
+            SelfCheck.assertTrue(ToolSelect.stepsToHoldTool(bare, "minecraft:stone").isEmpty(),
+                    "nothing to select when there is no tool");
+        });
+    }
+
+    private static void toolSelectPrefersTheBetterTier() {
+        SelfCheck.check("automation: tool select prefers the better tier and skips the swap", () -> {
+            FakeWorld world = new FakeWorld().withFloor(4)
+                    .withHotbar(0, "minecraft:wooden_pickaxe")
+                    .withHotbar(4, "minecraft:diamond_pickaxe")
+                    .withHotbar(5, "minecraft:stone_axe");
+            SelfCheck.assertEquals(4,
+                    ToolSelect.bestSlotFor(world, "minecraft:iron_ore"), "diamond wins");
+
+            // Already holding it: no SELECT_SLOT step, or the run shows a pointless flicker.
+            FakeWorld holding = new FakeWorld().withFloor(4)
+                    .withHotbar(0, "minecraft:wooden_pickaxe")
+                    .withHotbar(4, "minecraft:diamond_pickaxe")
+                    .holdingSlot(4);
+            SelfCheck.assertTrue(
+                    ToolSelect.stepsToHoldTool(holding, "minecraft:iron_ore").isEmpty(),
+                    "nothing to do when the best tool is already held");
+
+            // Holding something worse: exactly one step, to the best slot.
+            FakeWorld worse = new FakeWorld().withFloor(4)
+                    .withHotbar(0, "minecraft:wooden_pickaxe")
+                    .withHotbar(4, "minecraft:diamond_pickaxe")
+                    .holdingSlot(0);
+            List<Step> steps = ToolSelect.stepsToHoldTool(worse, "minecraft:iron_ore");
+            SelfCheck.assertEquals(1, steps.size(), "one step");
+            SelfCheck.assertEquals(StepKind.SELECT_SLOT, steps.get(0).kind(), "a selection");
+            SelfCheck.assertEquals(4, steps.get(0).x(), "the diamond slot");
+
+            // Golden tools are fast but fragile; they rank with wood, not above diamond.
+            FakeWorld gold = new FakeWorld().withFloor(4)
+                    .withHotbar(0, "minecraft:golden_pickaxe")
+                    .withHotbar(1, "minecraft:diamond_pickaxe");
+            SelfCheck.assertEquals(1,
+                    ToolSelect.bestSlotFor(gold, "minecraft:stone"), "diamond beats gold");
+        });
+    }
+
+    /**
+     * The bug A10 exists for: the right tool was in the hotbar but not in hand, so the block's
+     * break time looked infinite and the goal reported NO_TOOL. The plan must now select it.
+     */
+    private static void miningHoldsTheToolInsteadOfGivingUp() {
+        SelfCheck.check("automation: mining selects the tool it needs instead of NO_TOOL", () -> {
+            FakeWorld world = new FakeWorld().withFloor(4)
+                    .withBlock(1, 64, 0, "minecraft:iron_ore")
+                    .withBreakTicks(1, 64, 0, 15)
+                    .withHotbar(0, "minecraft:bread")
+                    .withHotbar(2, "minecraft:iron_pickaxe")
+                    .holdingSlot(0);
+            MineGoal goal = new MineGoal(List.of(new BlockPos(1, 64, 0)), true);
+            goal.reset(world);
+            List<Step> steps = new ArrayList<>();
+            goal.planSteps(world, new Budget(1024), steps);
+            SelfCheck.assertEquals(2, steps.size(), "select, then mine");
+            SelfCheck.assertEquals(StepKind.SELECT_SLOT, steps.get(0).kind(), "tool first");
+            SelfCheck.assertEquals(2, steps.get(0).x(), "the pickaxe slot");
+            SelfCheck.assertEquals(StepKind.MINE, steps.get(1).kind(), "then the block");
+            SelfCheck.assertTrue(!goal.done(), "still working, not stopped for a missing tool");
         });
     }
 

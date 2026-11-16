@@ -25,7 +25,7 @@
 **Слои.** `silkvis.automation` не знает про Minecraft вообще:
 
 ```
-Goal (A01, A03, A04, A09, A19, A21, A22)
+Goal (A01, A03, A04, A09, A10, A19, A21, A22)
   └─ plan(Snapshot, Budget) → List<Step>      // чистые данные
 AutomationEngine                              // предохранители, один goal, бюджет на тик
   └─ Executor.execute(Step, AutomationMode)   // единственное место с вводом
