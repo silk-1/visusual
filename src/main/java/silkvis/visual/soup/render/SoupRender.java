@@ -16,55 +16,30 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Port of SoupVisuals' {@code Render3DUtil} batched texture/line/quad pass, cut down to what
- * the ported modules use: {@code drawTexture}, {@code drawLine}, {@code drawQuad} and
- * {@code drawBox}, plus the flush that turns the batched lists into one draw call per layer.
+ * Port of SoupVisuals' {@code Render3DUtil} batched texture/line/quad pass.
  *
- * <p><b>Version work (1.21.11 -> 1.21.10).</b> The original streams quads into a
- * {@code BufferBuilder} through {@code Tessellator.getInstance().begin(...)} +
- * {@code BufferRenderer.drawWithGlobalProgram(...)} and sets blend/depth state through
- * {@code GlStateManager}/its own {@code GLCompat}. This port keeps the batching model
- * (a static list of textures + lines, flushed once per frame) but draws through the public
- * render pipeline of 1.21.10:</p>
- * <ul>
- *   <li>textures: {@link RenderLayer#getEntityTranslucentEmissive(Identifier)} with the
- *       world {@link VertexConsumerProvider} -- the same "glowing, unlit, alpha-blended"
- *       result the original got from POSITION_TEX_COLOR + SRC_ALPHA blending;</li>
- *   <li>lines: {@link RenderLayer#getLines()} (debug line strip with width 1 at the
- *       pipeline level), coloured per vertex.</li>
- * </ul>
- * <p>Doing it this way means no raw GL calls, no shader keys, and the GUI/world state is
- * untouched, which is what SilkVis' ADR-0002 asks for. The visible difference: line width
- * is 1 px (the original allowed width 1..3), noted in the module comments.</p>
+ * <p>1.21.10 note: {@link RenderLayer#getEntityTranslucentEmissive(Identifier)} requires
+ * POSITION + COLOR + TEXTURE + OVERLAY + LIGHT + <b>NORMAL</b>. Omitting {@code .normal()}
+ * crashes with {@code IllegalStateException: Missing elements in vertex: Normal} the moment
+ * hit particles / bubbles queue their first textured quad.</p>
  */
 public final class SoupRender {
-    /** Depth-tested batch: hidden behind blocks, like {@code depth=true} in the original. */
     private static final List<Quad> QUADS_DEPTH = new ArrayList<>();
-    /** Overlay batch: drawn on top of everything, {@code depth=false} in the original. */
     private static final List<Quad> QUADS = new ArrayList<>();
     private static final List<Line> LINES_DEPTH = new ArrayList<>();
     private static final List<Line> LINES = new ArrayList<>();
-    /** Filled quads of a hitbox / trail pass (no texture, POSITION_COLOR semantics). */
     private static final List<Face> FACES_DEPTH = new ArrayList<>();
     private static final List<Face> FACES = new ArrayList<>();
 
     private SoupRender() {
     }
 
-    /** Queues a camera-relative textured quad; flushes with {@link #flush(MatrixStack)}. */
     public static void drawTexture(Matrix4f matrix, Identifier texture, float x, float y,
                                    float width, float height, int color, boolean depth) {
         drawTexture(matrix, texture, x, y, width, height, new Vector4i(color, color, color, color),
                 depth);
     }
 
-    /**
-     * Queues a textured quad with one colour per vertex, in the original's
-     * {@code Render3DUtil.drawTexture(..., Vector4i color, ...)} order:
-     * {@code x} = bottom-left, {@code y} = bottom-right, {@code z} = top-right,
-     * {@code w} = top-left. That is what the "Vertexes" colour animation of HitBubbles and
-     * JumpCircles needs; every other caller passes the same colour four times.
-     */
     public static void drawTexture(Matrix4f matrix, Identifier texture, float x, float y,
                                    float width, float height, Vector4i colors, boolean depth) {
         if (texture == null || colors == null) {
@@ -77,7 +52,6 @@ public final class SoupRender {
         target.add(new Quad(texture, matrix, x, y, width, height, colors));
     }
 
-    /** Queues a camera-relative line; width is evaluated per line in the original. */
     public static void drawLine(Matrix4f matrix, Vector3f start, Vector3f end,
                                 int colorStart, int colorEnd, boolean depth) {
         List<Line> target = depth ? LINES_DEPTH : LINES;
@@ -87,11 +61,6 @@ public final class SoupRender {
         target.add(new Line(matrix, new Vector3f(start), new Vector3f(end), colorStart, colorEnd));
     }
 
-    /**
-     * Queues one untextured quad (four world-space corners, counter-clockwise) with a single
-     * colour. This is the port of the original's {@code Render3DUtil.drawQuad}, which the
-     * hitbox fill and the trail ribbon are built from.
-     */
     public static void drawQuad(Matrix4f matrix, Vector3f a, Vector3f b, Vector3f c, Vector3f d,
                                 int color, boolean depth) {
         List<Face> target = depth ? FACES_DEPTH : FACES;
@@ -102,12 +71,6 @@ public final class SoupRender {
                 new Vector3f(d), color));
     }
 
-    /**
-     * Port of {@code Render3DUtil.drawBox}: the box is grown by {@code 0.001} like the
-     * original, the fill is the colour at 10 % alpha, the outline is twelve lines at full
-     * alpha. Lines come out 1 px wide because {@link RenderLayer#getLines()} has a fixed
-     * width in 1.21.10 (see the class comment).
-     */
     public static void drawBox(Matrix4f matrix, double minX, double minY, double minZ,
                                double maxX, double maxY, double maxZ, int color,
                                float width, boolean line, boolean fill, boolean depth) {
@@ -146,34 +109,29 @@ public final class SoupRender {
         return new Vector3f((float) x, (float) y, (float) z);
     }
 
-    /**
-     * How many primitives are waiting for the next flush. Used by the periodic debug line: a
-     * module that is on but queues nothing is a different bug from one that queues nothing
-     * because it is off, and only the queue size tells them apart.
-     */
     public static int pending() {
         return QUADS.size() + QUADS_DEPTH.size() + LINES.size() + LINES_DEPTH.size()
                 + FACES.size() + FACES_DEPTH.size();
     }
 
-    /**
-     * Draws everything queued since the last flush. Must run on the render thread inside a
-     * world render event, where a {@link VertexConsumerProvider} is valid.
-     */
     public static void flush(MatrixStack matrices, VertexConsumerProvider consumers) {
         if (consumers == null) {
             clearAll();
             return;
         }
-        flushQuads(consumers, QUADS_DEPTH);
-        flushQuads(consumers, QUADS);
-        flushFaces(consumers, FACES_DEPTH);
-        flushFaces(consumers, FACES);
-        flushLines(consumers, LINES_DEPTH);
-        flushLines(consumers, LINES);
-        // Nothing is retained between frames: a queued quad whose frame never reached the
-        // flush (screen open, world unloaded) must not leak into the next frame.
-        clearAll();
+        try {
+            flushQuads(consumers, QUADS_DEPTH);
+            flushQuads(consumers, QUADS);
+            flushFaces(consumers, FACES_DEPTH);
+            flushFaces(consumers, FACES);
+            flushLines(consumers, LINES_DEPTH);
+            flushLines(consumers, LINES);
+        } catch (IllegalStateException ex) {
+            // Vertex format mismatch must not take down the whole client.
+            System.err.println("[silkvis] SoupRender.flush skipped: " + ex.getMessage());
+        } finally {
+            clearAll();
+        }
     }
 
     private static void clearAll() {
@@ -188,15 +146,10 @@ public final class SoupRender {
     private static void flushQuads(VertexConsumerProvider consumers, List<Quad> quads) {
         for (Quad quad : quads) {
             if (!hasTexture(quad.texture)) {
-                // A missing texture would otherwise make RenderLayer allocate a layer that
-                // never resolves; skip it, exactly like the original skips a null id.
                 continue;
             }
-            VertexConsumer buffer = consumers.getBuffer(RenderLayer.getEntityTranslucentEmissive(quad.texture));
-            // The quad carries its own camera-relative matrix (the caller copied the stack
-            // matrix and applied its rotate/translate/scale), so that matrix is the one the
-            // vertices go through -- using the event stack here would draw every textured quad
-            // at the camera origin.
+            VertexConsumer buffer = consumers.getBuffer(
+                    RenderLayer.getEntityTranslucentEmissive(quad.texture));
             emitQuad(buffer, quad.matrix, quad.x, quad.y, quad.width, quad.height, quad.colors);
         }
         quads.clear();
@@ -206,12 +159,8 @@ public final class SoupRender {
         if (faces.isEmpty()) {
             return;
         }
-        // Untextured translucent quads: the 1.21.10 counterpart of the original's
-        // POSITION_COLOR buffer with SRC_ALPHA / ONE_MINUS_SRC_ALPHA blending.
         VertexConsumer buffer = consumers.getBuffer(RenderLayer.getDebugQuads());
         for (Face face : faces) {
-            // Every face carries its own camera-relative matrix, so the stack matrix of the
-            // event is not applied a second time here.
             quadVertex(buffer, face.matrix, face.a, face.color);
             quadVertex(buffer, face.matrix, face.b, face.color);
             quadVertex(buffer, face.matrix, face.c, face.color);
@@ -221,7 +170,6 @@ public final class SoupRender {
     }
 
     private static void quadVertex(VertexConsumer buffer, Matrix4f matrix, Vector3f pos, int color) {
-        // DebugQuads format is POSITION_COLOR only on some mappings; keep it minimal.
         buffer.vertex(matrix, pos.x, pos.y, pos.z).color(color);
     }
 
@@ -229,8 +177,6 @@ public final class SoupRender {
         if (lines.isEmpty()) {
             return;
         }
-        // Camera-relative space: every queued line brought its own camera-relative matrix
-        // (the same one the caller's vertices were expressed in).
         VertexConsumer buffer = consumers.getBuffer(RenderLayer.getLines());
         for (Line line : lines) {
             emitLine(buffer, line.matrix, line.start, line.end, line.colorStart, line.colorEnd);
@@ -243,33 +189,31 @@ public final class SoupRender {
         return registered != null;
     }
 
-    /**
-     * One quad, vertex colours in the original order (bottom-left, bottom-right, top-right,
-     * top-left) so the four per-vertex colours of {@code Vertexes} mode keep their corners.
-     */
     private static void emitQuad(VertexConsumer buffer, Matrix4f world,
                                  float x, float y, float width, float height, Vector4i colors) {
+        // Billboard faces the camera; constant +Y normal is enough for emissive unlit.
         vertex(buffer, world, x, y + height, 0.0F, 0.0F, 0.0F, colors.x);
         vertex(buffer, world, x + width, y + height, 0.0F, 0.0F, 1.0F, colors.y);
         vertex(buffer, world, x + width, y, 0.0F, 1.0F, 1.0F, colors.z);
         vertex(buffer, world, x, y, 0.0F, 1.0F, 0.0F, colors.w);
     }
 
+    /**
+     * Writes a full entity-translucent-emissive vertex.
+     * Order: pos → color → uv → overlay → light → <b>normal</b> (required on 1.21.10).
+     */
     private static void vertex(VertexConsumer buffer, Matrix4f world,
                                float x, float y, float z, float u, float v, int color) {
-        // CRITICAL for 1.21.10: EntityTranslucentEmissive requires NORMAL.
-        // Missing it crashes with: IllegalStateException: Missing elements in vertex: Normal
         buffer.vertex(world, x, y, z)
                 .color(color)
                 .texture(u, v)
-                .overlay(SoupRender.OVERLAY)
-                .light(SoupRender.LIGHT)
+                .overlay(OVERLAY)
+                .light(LIGHT)
                 .normal(0.0F, 1.0F, 0.0F);
     }
 
     private static void emitLine(VertexConsumer buffer, Matrix4f world,
                                  Vector3f start, Vector3f end, int colorStart, int colorEnd) {
-        // Line format needs a direction-ish normal; use delta so width expands correctly.
         float dx = end.x - start.x;
         float dy = end.y - start.y;
         float dz = end.z - start.z;
@@ -292,9 +236,7 @@ public final class SoupRender {
         buffer.vertex(world, pos.x, pos.y, pos.z).color(color).normal(nx, ny, nz);
     }
 
-    /** No overlay effects (no hurt flash, no block outline) -- the original's default. */
     private static final int OVERLAY = 0;
-    /** Full block-sky light, so particles stay bright at night like the original's unlit quads. */
     private static final int LIGHT = 0x00F000F0;
 
     private record Quad(Identifier texture, Matrix4f matrix, float x, float y,
@@ -304,7 +246,6 @@ public final class SoupRender {
     private record Line(Matrix4f matrix, Vector3f start, Vector3f end, int colorStart, int colorEnd) {
     }
 
-    /** One untextured quad in camera-relative space ({@code Render3DUtil.drawQuad}). */
     private record Face(Matrix4f matrix, Vector3f a, Vector3f b, Vector3f c, Vector3f d, int color) {
     }
 }
