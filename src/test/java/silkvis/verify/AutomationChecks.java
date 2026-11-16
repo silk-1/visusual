@@ -14,7 +14,9 @@ import silkvis.automation.Snapshot;
 import silkvis.automation.Step;
 import silkvis.automation.StepKind;
 import silkvis.automation.StopReason;
+import silkvis.automation.ToolSelect;
 import silkvis.automation.goals.CollectGoal;
+import silkvis.automation.goals.EatGoal;
 import silkvis.automation.goals.FarmGoal;
 import silkvis.automation.goals.GotoGoal;
 import silkvis.automation.goals.MineGoal;
@@ -50,6 +52,13 @@ final class AutomationChecks {
         collectGoalSkipsLavaItems();
         safetyGoalLeavesThePit();
         farmGoalHarvestsOnlyRipe();
+        eatGoalWaitsWhenFed();
+        eatGoalEatsWhenHungry();
+        eatGoalRefusesDebuffFood();
+        eatGoalStopsWithNothingToEat();
+        toolSelectPicksTheRightFamily();
+        toolSelectPrefersTheBetterTier();
+        miningHoldsTheToolInsteadOfGivingUp();
         engineRefusesLowMode();
         engineStopsOnLowHealth();
         engineBacksOffWhenPlayerDrives();
@@ -316,6 +325,184 @@ final class AutomationChecks {
             SelfCheck.assertEquals(StepKind.MINE, steps.get(0).kind(), "harvest the ripe one");
             SelfCheck.assertEquals(1, steps.get(0).x(), "the ripe crop, not the green one");
             SelfCheck.assertEquals(StepKind.USE_ITEM, steps.get(1).kind(), "replant right away");
+        });
+    }
+
+    // ------------------------------------------------------------------ eat (A09)
+
+    /**
+     * The goal is a standing order, not a job: fed means "do nothing this tick", never
+     * "finished". A goal that returned done here would end the automation the first time the
+     * player was full.
+     */
+    private static void eatGoalWaitsWhenFed() {
+        SelfCheck.check("automation: auto eat does nothing while fed", () -> {
+            FakeWorld world = new FakeWorld().withFloor(4).withFood(20)
+                    .withHotbar(0, "minecraft:bread");
+            EatGoal goal = new EatGoal();
+            goal.reset(world);
+            List<Step> steps = new ArrayList<>();
+            goal.planSteps(world, new Budget(256), steps);
+            SelfCheck.assertTrue(steps.isEmpty(), "no steps while fed");
+            SelfCheck.assertTrue(!goal.done(), "still standing by, not finished");
+            SelfCheck.assertEquals(StopReason.NONE, goal.stopReason(), "no stop");
+        });
+    }
+
+    private static void eatGoalEatsWhenHungry() {
+        SelfCheck.check("automation: auto eat selects the food and uses it once", () -> {
+            FakeWorld world = new FakeWorld().withFloor(4).withFood(6)
+                    .withHotbar(0, "minecraft:stone")
+                    .withHotbar(3, "minecraft:cooked_beef")
+                    .holdingSlot(0);
+            EatGoal goal = new EatGoal();
+            goal.reset(world);
+            List<Step> steps = new ArrayList<>();
+            goal.planSteps(world, new Budget(256), steps);
+            SelfCheck.assertEquals(3, steps.size(), "select, use, wait");
+            SelfCheck.assertEquals(StepKind.SELECT_SLOT, steps.get(0).kind(), "select first");
+            SelfCheck.assertEquals(3, steps.get(0).x(), "the slot with the beef");
+            SelfCheck.assertEquals(StepKind.USE_ITEM, steps.get(1).kind(), "then eat");
+            SelfCheck.assertEquals(StepKind.WAIT, steps.get(2).kind(), "then let it finish");
+            SelfCheck.assertTrue(steps.get(2).ticks() >= 32,
+                    "vanilla eating takes 32 ticks: " + steps.get(2).ticks());
+        });
+    }
+
+    /**
+     * The slot already in hand is used without a swap: selecting the same slot again is a no-op
+     * in game but shows up as an extra step, and worse, the earlier draft sent the use to the
+     * previously held slot when the selection happened on the same tick.
+     */
+    private static void eatGoalRefusesDebuffFood() {
+        SelfCheck.check("automation: auto eat never touches rotten flesh or pufferfish", () -> {
+            FakeWorld world = new FakeWorld().withFloor(4).withFood(2)
+                    .withHotbar(0, "minecraft:rotten_flesh")
+                    .withHotbar(1, "minecraft:pufferfish")
+                    .withHotbar(2, "minecraft:poisonous_potato");
+            EatGoal goal = new EatGoal();
+            goal.reset(world);
+            List<Step> steps = new ArrayList<>();
+            goal.planSteps(world, new Budget(256), steps);
+            SelfCheck.assertTrue(steps.isEmpty(), "nothing eaten");
+            // Hungry with only bad food is the same answer as hungry with none: stop and say
+            // why, instead of eating a debuff to hide the problem.
+            SelfCheck.assertEquals(StopReason.NO_TOOL, goal.stopReason(), "reports it");
+            SelfCheck.assertTrue(!EatGoal.edible("minecraft:rotten_flesh"), "flesh refused");
+            SelfCheck.assertTrue(!EatGoal.edible("minecraft:pufferfish"), "pufferfish refused");
+            SelfCheck.assertTrue(!EatGoal.edible("minecraft:cobblestone"), "stone is not food");
+            SelfCheck.assertTrue(!EatGoal.edible(null), "null is not food");
+            SelfCheck.assertTrue(EatGoal.edible("minecraft:golden_apple"), "golden apple is food");
+            SelfCheck.assertTrue(!EatGoal.edible("minecraft:POISONOUS_POTATO"),
+                    "a mod may hand over an upper-case id");
+            // The refusal table and the allow table must never contradict each other. The
+            // first version of this goal listed pufferfish in both and the answer depended on
+            // which check ran first -- a mutation proved the test could not see it, because
+            // deleting the refusal branch changed nothing while the lists were disjoint.
+            SelfCheck.assertTrue(!EatGoal.listsOverlap(),
+                    "allow and refuse lists must stay disjoint");
+        });
+    }
+
+    private static void eatGoalStopsWithNothingToEat() {
+        SelfCheck.check("automation: auto eat stops with NO_TOOL when the hotbar is empty", () -> {
+            FakeWorld world = new FakeWorld().withFloor(4).withFood(3);
+            EatGoal goal = new EatGoal();
+            goal.reset(world);
+            List<Step> steps = new ArrayList<>();
+            goal.planSteps(world, new Budget(256), steps);
+            SelfCheck.assertTrue(steps.isEmpty(), "no steps");
+            SelfCheck.assertEquals(StopReason.NO_TOOL, goal.stopReason(), "names the reason");
+            SelfCheck.assertTrue(goal.done(), "gives up instead of spinning");
+        });
+    }
+
+    // ------------------------------------------------------------------ tool select (A10)
+
+    private static void toolSelectPicksTheRightFamily() {
+        SelfCheck.check("automation: tool select answers in the block's own family", () -> {
+            // Stone wants a pickaxe even when a better-tier axe is in the next slot: tier only
+            // orders items inside one family, never across families.
+            FakeWorld world = new FakeWorld().withFloor(4)
+                    .withHotbar(0, "minecraft:netherite_axe")
+                    .withHotbar(1, "minecraft:iron_pickaxe")
+                    .withHotbar(2, "minecraft:stone_shovel");
+            SelfCheck.assertEquals(1,
+                    ToolSelect.bestSlotFor(world, "minecraft:stone"), "pickaxe for stone");
+            SelfCheck.assertEquals(0,
+                    ToolSelect.bestSlotFor(world, "minecraft:oak_log"), "axe for a log");
+            SelfCheck.assertEquals(2,
+                    ToolSelect.bestSlotFor(world, "minecraft:dirt"), "shovel for dirt");
+            // A hotbar with no tool of the wanted family answers -1, and the caller keeps its
+            // own behaviour (MineGoal reads breakTicks and decides for itself).
+            FakeWorld bare = new FakeWorld().withFloor(4)
+                    .withHotbar(0, "minecraft:bread")
+                    .withHotbar(1, "minecraft:sword");
+            SelfCheck.assertEquals(-1,
+                    ToolSelect.bestSlotFor(bare, "minecraft:stone"), "no pickaxe, no slot");
+            SelfCheck.assertTrue(ToolSelect.stepsToHoldTool(bare, "minecraft:stone").isEmpty(),
+                    "nothing to select when there is no tool");
+        });
+    }
+
+    private static void toolSelectPrefersTheBetterTier() {
+        SelfCheck.check("automation: tool select prefers the better tier and skips the swap", () -> {
+            FakeWorld world = new FakeWorld().withFloor(4)
+                    .withHotbar(0, "minecraft:wooden_pickaxe")
+                    .withHotbar(4, "minecraft:diamond_pickaxe")
+                    .withHotbar(5, "minecraft:stone_axe");
+            SelfCheck.assertEquals(4,
+                    ToolSelect.bestSlotFor(world, "minecraft:iron_ore"), "diamond wins");
+
+            // Already holding it: no SELECT_SLOT step, or the run shows a pointless flicker.
+            FakeWorld holding = new FakeWorld().withFloor(4)
+                    .withHotbar(0, "minecraft:wooden_pickaxe")
+                    .withHotbar(4, "minecraft:diamond_pickaxe")
+                    .holdingSlot(4);
+            SelfCheck.assertTrue(
+                    ToolSelect.stepsToHoldTool(holding, "minecraft:iron_ore").isEmpty(),
+                    "nothing to do when the best tool is already held");
+
+            // Holding something worse: exactly one step, to the best slot.
+            FakeWorld worse = new FakeWorld().withFloor(4)
+                    .withHotbar(0, "minecraft:wooden_pickaxe")
+                    .withHotbar(4, "minecraft:diamond_pickaxe")
+                    .holdingSlot(0);
+            List<Step> steps = ToolSelect.stepsToHoldTool(worse, "minecraft:iron_ore");
+            SelfCheck.assertEquals(1, steps.size(), "one step");
+            SelfCheck.assertEquals(StepKind.SELECT_SLOT, steps.get(0).kind(), "a selection");
+            SelfCheck.assertEquals(4, steps.get(0).x(), "the diamond slot");
+
+            // Golden tools are fast but fragile; they rank with wood, not above diamond.
+            FakeWorld gold = new FakeWorld().withFloor(4)
+                    .withHotbar(0, "minecraft:golden_pickaxe")
+                    .withHotbar(1, "minecraft:diamond_pickaxe");
+            SelfCheck.assertEquals(1,
+                    ToolSelect.bestSlotFor(gold, "minecraft:stone"), "diamond beats gold");
+        });
+    }
+
+    /**
+     * The bug A10 exists for: the right tool was in the hotbar but not in hand, so the block's
+     * break time looked infinite and the goal reported NO_TOOL. The plan must now select it.
+     */
+    private static void miningHoldsTheToolInsteadOfGivingUp() {
+        SelfCheck.check("automation: mining selects the tool it needs instead of NO_TOOL", () -> {
+            FakeWorld world = new FakeWorld().withFloor(4)
+                    .withBlock(1, 64, 0, "minecraft:iron_ore")
+                    .withBreakTicks(1, 64, 0, 15)
+                    .withHotbar(0, "minecraft:bread")
+                    .withHotbar(2, "minecraft:iron_pickaxe")
+                    .holdingSlot(0);
+            MineGoal goal = new MineGoal(List.of(new BlockPos(1, 64, 0)), true);
+            goal.reset(world);
+            List<Step> steps = new ArrayList<>();
+            goal.planSteps(world, new Budget(1024), steps);
+            SelfCheck.assertEquals(2, steps.size(), "select, then mine");
+            SelfCheck.assertEquals(StepKind.SELECT_SLOT, steps.get(0).kind(), "tool first");
+            SelfCheck.assertEquals(2, steps.get(0).x(), "the pickaxe slot");
+            SelfCheck.assertEquals(StepKind.MINE, steps.get(1).kind(), "then the block");
+            SelfCheck.assertTrue(!goal.done(), "still working, not stopped for a missing tool");
         });
     }
 

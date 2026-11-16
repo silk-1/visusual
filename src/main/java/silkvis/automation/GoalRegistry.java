@@ -42,6 +42,15 @@ public final class GoalRegistry {
                 target -> new silkvis.automation.goals.FarmGoal(List.of(target), 8.0));
         register("A21", "silkvis.automation.pickup", AutomationMode.MOVE,
                 target -> new silkvis.automation.goals.CollectGoal(16.0, true));
+        // No target: eating is about the player's own food level, so NO_TARGET is passed and
+        // the goal ignores it, like the two other targetless goals.
+        register("A09", "silkvis.automation.auto_eat", AutomationMode.FULL,
+                target -> new silkvis.automation.goals.EatGoal());
+        // Tool select is not a goal: it is a prerequisite every breaking goal calls. It is
+        // registered so the tab can show it and so the catalogue and registry stay in step,
+        // but the factory returns the mining goal it serves, on the target given.
+        register("A10", "silkvis.automation.tool_select", AutomationMode.FULL,
+                target -> new silkvis.automation.goals.MineGoal(List.of(target), true));
         // The danger source is the player's own position when the goal is created: emergency
         // exit means "get away from where I am standing now", not "from a stored coordinate".
         register("A22", "silkvis.automation.emergency_exit", AutomationMode.MOVE,

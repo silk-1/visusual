@@ -11,7 +11,7 @@
 
 | Requirement | Реализация | Evidence | Статус |
 |---|---|---|---|
-| 0.2 приоритеты P0→P1→P2 | `automation/AutomationCatalog.java`: 6 целей READY (A01, A03, A04, A19, A21, A22), остальные PLANNED; вкладка AUTOMATION в `client/SilkVisScreen.java` | `AutomationChecks` (catalogMatchesRegistry), `MiscChecks` | IMPLEMENTED_TESTED (selfCheck) |
+| 0.2 приоритеты P0→P1→P2 | `automation/AutomationCatalog.java`: 8 целей READY (A01, A03, A04, A09, A10, A19, A21, A22), остальные PLANNED; вкладка AUTOMATION в `client/SilkVisScreen.java` | `AutomationChecks` (catalogMatchesRegistry), `MiscChecks` | IMPLEMENTED_TESTED (selfCheck) |
 | 0.3 тема Graphite/Turquoise, RU/EN | `ui/ThemeTokens.java`, `ui/LangTable.java`, `assets/silkvis/lang/{en_us,ru_ru}.json` | сверка ключей 0 missing; **раунд 15**: RU по умолчанию (Авто) | IMPLEMENTED_NOT_TESTED |
 | 0.4/0.7 визуал доступен в соло и сети, координаты ≠ телепорт | `destinations/DestinationTarget.java`, `DestinationExecutor` | `DestinationChecks` (walk_only) | IMPLEMENTED_NOT_TESTED |
 | 0.5 все автоматизации выключены | `AutomationSettings.defaults()` = `OFF`, файл `automation.json` не создаётся до первого изменения; движок не тикает в `OFF` | `AutomationChecks` (settingsRoundTrip, engine…), `MiscChecks` | IMPLEMENTED_TESTED (selfCheck) |
@@ -90,7 +90,7 @@
 | CFG-03 validate→temp→atomic→backup, quarantine | `config/JsonConfigFile.java` | `CoreChecks` | IMPLEMENTED_NOT_TESTED |
 | CFG-04 finite/range, OptionalLimit | `config/Validators.java`, `core/OptionalLimit.java` | `CoreChecks`, `MiscChecks` | IMPLEMENTED_NOT_TESTED |
 | PERF-01…05 бюджеты/SOAK | `diagnostics/Timings.java`, presets | — | PLANNED |
-| AUTO-01…15, A01…A22 | `automation/` (движок, цели, A*), `client/AutomationExecutor.java`, `client/AutomationSnapshot.java` | `AutomationChecks` — 21 чек, `selfCheck` 92/92; ADR-0012 | IMPLEMENTED_TESTED (ядро) / IMPLEMENTED_NOT_TESTED (клиентский адаптер) |
+| AUTO-01…15, A01…A22 | `automation/` (движок, цели, A*), `client/AutomationExecutor.java`, `client/AutomationSnapshot.java` | `AutomationChecks` — 34 чека; ADR-0012 | IMPLEMENTED_TESTED (ядро) / IMPLEMENTED_NOT_TESTED (клиентский адаптер) |
 | DEST-01 слоты без defaults | `DestinationsConfig.defaultSlots` | `DestinationChecks` | IMPLEMENTED_NOT_TESTED |
 | DEST-02 tagged union | `DestinationTarget.java` | `DestinationChecks` | IMPLEMENTED_NOT_TESTED |
 | DEST-03 пример DTO | `DestinationChecks` (декодирование примера из ТЗ) | `DestinationChecks` | IMPLEMENTED_NOT_TESTED |

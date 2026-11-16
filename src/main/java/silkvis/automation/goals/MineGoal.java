@@ -6,6 +6,7 @@ import silkvis.automation.Budget;
 import silkvis.automation.Snapshot;
 import silkvis.automation.Step;
 import silkvis.automation.StopReason;
+import silkvis.automation.ToolSelect;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -83,6 +84,11 @@ public class MineGoal extends AbstractGoal {
             this.walkedTo = 1;
             return;
         }
+        // Hold the tool the block wants before asking the executor to break it. Without this
+        // the goal gave up as NO_TOOL whenever the right tool existed in the hotbar but was not
+        // the selected slot -- the block's break time is computed for the held item, so a
+        // pickaxe one slot away looked exactly like no pickaxe at all (A10).
+        steps.addAll(ToolSelect.stepsToHoldTool(world, world.blockId(next.x(), next.y(), next.z())));
         int ticks = world.breakTicks(next.x(), next.y(), next.z());
         if (ticks == Integer.MAX_VALUE) {
             stop(StopReason.NO_TOOL);

@@ -50,6 +50,7 @@ import silkvis.ui.widget.TextInputModel;
 import silkvis.ui.widget.TextInputWidget;
 import silkvis.ui.widget.ToggleWidget;
 import silkvis.ui.widget.Widget;
+import silkvis.ui.widget.WidgetDispatch;
 import silkvis.visual.VisualSettings;
 
 import java.util.ArrayList;
@@ -1265,15 +1266,15 @@ public final class SilkVisScreen extends Screen {
         double mouseX = click.x();
         double mouseY = click.y();
         int button = click.button();
-        for (Widget widget : settingsWidgets) {
-            if (widget.mouseReleased(mouseX, mouseY, button)) {
-                return true;
-            }
+        // WidgetDispatch: a button runs its action on release and that action may rebuild
+        // these lists (a settings pane recreates its controls when a value changes). The
+        // early return below hid the problem here, but the walk is the same one that crashed
+        // SoupSettingsScreen, so it is dispatched the same way instead of relying on luck.
+        if (WidgetDispatch.releaseFirst(settingsWidgets, mouseX, mouseY, button)) {
+            return true;
         }
-        for (Widget widget : chrome) {
-            if (widget.mouseReleased(mouseX, mouseY, button)) {
-                return true;
-            }
+        if (WidgetDispatch.releaseFirst(chrome, mouseX, mouseY, button)) {
+            return true;
         }
         return super.mouseReleased(click);
     }

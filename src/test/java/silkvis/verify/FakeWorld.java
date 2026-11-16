@@ -120,6 +120,20 @@ final class FakeWorld implements Snapshot, Movement.Grid {
         return this;
     }
 
+    /** Puts an item in a hotbar slot (0..8); null or blank means the slot is empty. */
+    FakeWorld withHotbar(int slot, String id) {
+        if (slot >= 0 && slot < this.hotbar.length) {
+            this.hotbar[slot] = id;
+        }
+        return this;
+    }
+
+    /** Selects the hotbar slot the player is holding. */
+    FakeWorld holdingSlot(int slot) {
+        this.selectedSlot = slot;
+        return this;
+    }
+
     FakeWorld inDimension(String id) {
         this.dimension = id;
         return this;

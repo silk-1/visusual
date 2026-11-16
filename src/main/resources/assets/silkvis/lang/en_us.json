@@ -792,5 +792,7 @@
   "key.silkvis.automation_go": "Automation: do the obvious thing",
   "silkvis.automation.selector.chosen": "Automation: started %s at %s",
   "silkvis.automation.selector.refused": "Automation: nothing to do (%s)",
-  "silkvis.automation.selector.none": "Automation: nothing to do"
+  "silkvis.automation.selector.none": "Automation: nothing to do",
+  "silkvis.automation.auto_eat.desc": "Eats safe food from the hotbar when hunger drops, instead of stopping the run. Refuses rotten flesh, spider eye, poisonous potato and pufferfish.",
+  "silkvis.automation.tool_select.desc": "Holds the best tool the block needs from the hotbar before breaking it. Tier only orders tools inside one family, so an axe never wins on stone."
 }
