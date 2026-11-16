@@ -29,6 +29,7 @@ public final class AutomationCatalog {
             "A01", // ore mining (MineGoal)
             "A03", // tree farm (TreeFarmGoal)
             "A04", // crop farm (FarmGoal)
+            "A09", // auto eat (EatGoal)
             "A19", // navigate to a point (GotoGoal)
             "A21", // pick up dropped items (CollectGoal)
             "A22"); // emergency exit (SafetyGoal)

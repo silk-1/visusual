@@ -15,6 +15,7 @@ import silkvis.automation.Step;
 import silkvis.automation.StepKind;
 import silkvis.automation.StopReason;
 import silkvis.automation.goals.CollectGoal;
+import silkvis.automation.goals.EatGoal;
 import silkvis.automation.goals.FarmGoal;
 import silkvis.automation.goals.GotoGoal;
 import silkvis.automation.goals.MineGoal;
@@ -50,6 +51,10 @@ final class AutomationChecks {
         collectGoalSkipsLavaItems();
         safetyGoalLeavesThePit();
         farmGoalHarvestsOnlyRipe();
+        eatGoalWaitsWhenFed();
+        eatGoalEatsWhenHungry();
+        eatGoalRefusesDebuffFood();
+        eatGoalStopsWithNothingToEat();
         engineRefusesLowMode();
         engineStopsOnLowHealth();
         engineBacksOffWhenPlayerDrives();
@@ -316,6 +321,95 @@ final class AutomationChecks {
             SelfCheck.assertEquals(StepKind.MINE, steps.get(0).kind(), "harvest the ripe one");
             SelfCheck.assertEquals(1, steps.get(0).x(), "the ripe crop, not the green one");
             SelfCheck.assertEquals(StepKind.USE_ITEM, steps.get(1).kind(), "replant right away");
+        });
+    }
+
+    // ------------------------------------------------------------------ eat (A09)
+
+    /**
+     * The goal is a standing order, not a job: fed means "do nothing this tick", never
+     * "finished". A goal that returned done here would end the automation the first time the
+     * player was full.
+     */
+    private static void eatGoalWaitsWhenFed() {
+        SelfCheck.check("automation: auto eat does nothing while fed", () -> {
+            FakeWorld world = new FakeWorld().withFloor(4).withFood(20)
+                    .withHotbar(0, "minecraft:bread");
+            EatGoal goal = new EatGoal();
+            goal.reset(world);
+            List<Step> steps = new ArrayList<>();
+            goal.planSteps(world, new Budget(256), steps);
+            SelfCheck.assertTrue(steps.isEmpty(), "no steps while fed");
+            SelfCheck.assertTrue(!goal.done(), "still standing by, not finished");
+            SelfCheck.assertEquals(StopReason.NONE, goal.stopReason(), "no stop");
+        });
+    }
+
+    private static void eatGoalEatsWhenHungry() {
+        SelfCheck.check("automation: auto eat selects the food and uses it once", () -> {
+            FakeWorld world = new FakeWorld().withFloor(4).withFood(6)
+                    .withHotbar(0, "minecraft:stone")
+                    .withHotbar(3, "minecraft:cooked_beef")
+                    .holdingSlot(0);
+            EatGoal goal = new EatGoal();
+            goal.reset(world);
+            List<Step> steps = new ArrayList<>();
+            goal.planSteps(world, new Budget(256), steps);
+            SelfCheck.assertEquals(3, steps.size(), "select, use, wait");
+            SelfCheck.assertEquals(StepKind.SELECT_SLOT, steps.get(0).kind(), "select first");
+            SelfCheck.assertEquals(3, steps.get(0).x(), "the slot with the beef");
+            SelfCheck.assertEquals(StepKind.USE_ITEM, steps.get(1).kind(), "then eat");
+            SelfCheck.assertEquals(StepKind.WAIT, steps.get(2).kind(), "then let it finish");
+            SelfCheck.assertTrue(steps.get(2).ticks() >= 32,
+                    "vanilla eating takes 32 ticks: " + steps.get(2).ticks());
+        });
+    }
+
+    /**
+     * The slot already in hand is used without a swap: selecting the same slot again is a no-op
+     * in game but shows up as an extra step, and worse, the earlier draft sent the use to the
+     * previously held slot when the selection happened on the same tick.
+     */
+    private static void eatGoalRefusesDebuffFood() {
+        SelfCheck.check("automation: auto eat never touches rotten flesh or pufferfish", () -> {
+            FakeWorld world = new FakeWorld().withFloor(4).withFood(2)
+                    .withHotbar(0, "minecraft:rotten_flesh")
+                    .withHotbar(1, "minecraft:pufferfish")
+                    .withHotbar(2, "minecraft:poisonous_potato");
+            EatGoal goal = new EatGoal();
+            goal.reset(world);
+            List<Step> steps = new ArrayList<>();
+            goal.planSteps(world, new Budget(256), steps);
+            SelfCheck.assertTrue(steps.isEmpty(), "nothing eaten");
+            // Hungry with only bad food is the same answer as hungry with none: stop and say
+            // why, instead of eating a debuff to hide the problem.
+            SelfCheck.assertEquals(StopReason.NO_TOOL, goal.stopReason(), "reports it");
+            SelfCheck.assertTrue(!EatGoal.edible("minecraft:rotten_flesh"), "flesh refused");
+            SelfCheck.assertTrue(!EatGoal.edible("minecraft:pufferfish"), "pufferfish refused");
+            SelfCheck.assertTrue(!EatGoal.edible("minecraft:cobblestone"), "stone is not food");
+            SelfCheck.assertTrue(!EatGoal.edible(null), "null is not food");
+            SelfCheck.assertTrue(EatGoal.edible("minecraft:golden_apple"), "golden apple is food");
+            SelfCheck.assertTrue(!EatGoal.edible("minecraft:POISONOUS_POTATO"),
+                    "a mod may hand over an upper-case id");
+            // The refusal table and the allow table must never contradict each other. The
+            // first version of this goal listed pufferfish in both and the answer depended on
+            // which check ran first -- a mutation proved the test could not see it, because
+            // deleting the refusal branch changed nothing while the lists were disjoint.
+            SelfCheck.assertTrue(!EatGoal.listsOverlap(),
+                    "allow and refuse lists must stay disjoint");
+        });
+    }
+
+    private static void eatGoalStopsWithNothingToEat() {
+        SelfCheck.check("automation: auto eat stops with NO_TOOL when the hotbar is empty", () -> {
+            FakeWorld world = new FakeWorld().withFloor(4).withFood(3);
+            EatGoal goal = new EatGoal();
+            goal.reset(world);
+            List<Step> steps = new ArrayList<>();
+            goal.planSteps(world, new Budget(256), steps);
+            SelfCheck.assertTrue(steps.isEmpty(), "no steps");
+            SelfCheck.assertEquals(StopReason.NO_TOOL, goal.stopReason(), "names the reason");
+            SelfCheck.assertTrue(goal.done(), "gives up instead of spinning");
         });
     }
 

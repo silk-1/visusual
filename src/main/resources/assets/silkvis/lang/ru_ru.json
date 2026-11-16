@@ -792,5 +792,6 @@
   "key.silkvis.automation_go": "Автоматизация: сделать очевидное",
   "silkvis.automation.selector.chosen": "Автоматизация: запущена %s в %s",
   "silkvis.automation.selector.refused": "Автоматизация: делать нечего (%s)",
-  "silkvis.automation.selector.none": "Автоматизация: делать нечего"
+  "silkvis.automation.selector.none": "Автоматизация: делать нечего",
+  "silkvis.automation.auto_eat.desc": "Съедает безопасную еду из хотбара при падении голода, вместо остановки задачи. Отказывается от гнилой плоти, паучьего глаза, ядовитого картофеля и иглобрюха."
 }
