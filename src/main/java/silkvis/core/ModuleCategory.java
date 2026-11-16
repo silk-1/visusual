@@ -11,7 +11,13 @@ public enum ModuleCategory {
     TOTEMS("totems"),
     INTEGRATIONS("integrations"),
     SETTINGS("settings"),
-    AUTOMATION_P2("automation");
+    AUTOMATION_P2("automation"),
+    /**
+     * Driver for the player's own Baritone install. A separate tab rather than a mode of the
+     * automation tab: the two are different engines with different rules, and the player must
+     * be able to see which one is in charge before pressing anything.
+     */
+    BARITONE("baritone");
 
     private final String id;
 

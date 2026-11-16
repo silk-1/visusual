@@ -11,6 +11,7 @@
 
 | Requirement | Реализация | Evidence | Статус |
 |---|---|---|---|
+| BARITONE — внешний движок | `client/baritone/BaritoneBridge.java` (рефлексия к публичному API), `automation/baritone/BaritoneTask.java`/`BaritoneStatus.java`, вкладка BARITONE в `client/SilkVisScreen.java` | `AutomationChecks` — 3 чека (список задач, статус, RU/EN); ADR-0013 | IMPLEMENTED_NOT_TESTED (в игре не проверено, Baritone в песочнице недоступен) |
 | 0.2 приоритеты P0→P1→P2 | `automation/AutomationCatalog.java`: 8 целей READY (A01, A03, A04, A09, A10, A19, A21, A22), остальные PLANNED; вкладка AUTOMATION в `client/SilkVisScreen.java` | `AutomationChecks` (catalogMatchesRegistry), `MiscChecks` | IMPLEMENTED_TESTED (selfCheck) |
 | 0.3 тема Graphite/Turquoise, RU/EN | `ui/ThemeTokens.java`, `ui/LangTable.java`, `assets/silkvis/lang/{en_us,ru_ru}.json` | сверка ключей 0 missing; **раунд 15**: RU по умолчанию (Авто) | IMPLEMENTED_NOT_TESTED |
 | 0.4/0.7 визуал доступен в соло и сети, координаты ≠ телепорт | `destinations/DestinationTarget.java`, `DestinationExecutor` | `DestinationChecks` (walk_only) | IMPLEMENTED_NOT_TESTED |

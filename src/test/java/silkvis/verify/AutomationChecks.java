@@ -15,6 +15,8 @@ import silkvis.automation.Step;
 import silkvis.automation.StepKind;
 import silkvis.automation.StopReason;
 import silkvis.automation.ToolSelect;
+import silkvis.automation.baritone.BaritoneStatus;
+import silkvis.automation.baritone.BaritoneTask;
 import silkvis.automation.goals.CollectGoal;
 import silkvis.automation.goals.EatGoal;
 import silkvis.automation.goals.FarmGoal;
@@ -73,7 +75,121 @@ final class AutomationChecks {
         catalogMatchesRegistry();
         engineUsesPlannedStepsOnly();
         settingsRoundTrip();
+        baritoneTaskListIsStable();
+        baritoneStatusNeverLies();
+        baritoneLangKeysExist();
     }
+
+    // ------------------------------------------------------------------ baritone (integration)
+
+    /**
+     * The task list is the tab's menu and its ids are config and log keys, so two things must
+     * hold: ids never repeat and never get renamed, and every task declares up front what the
+     * caller has to supply. A task that reports {@code Need.NONE} but needs a point would fail
+     * only once the player pressed it.
+     */
+    private static void baritoneTaskListIsStable() {
+        SelfCheck.check("automation: baritone task list is stable and self-describing", () -> {
+            java.util.Set<String> slugs = new java.util.HashSet<>();
+            for (BaritoneTask task : BaritoneTask.values()) {
+                SelfCheck.assertTrue(slugs.add(task.slug()),
+                        "slug must be unique: " + task.slug());
+                SelfCheck.assertTrue(task.titleKey().startsWith("silkvis.baritone."),
+                        "title key namespaced: " + task.titleKey());
+                SelfCheck.assertEquals(task, BaritoneTask.bySlug(task.slug()),
+                        "slug round-trips: " + task.slug());
+                SelfCheck.assertTrue(task.need() != null, "need is declared: " + task.slug());
+            }
+            SelfCheck.assertTrue(BaritoneTask.bySlug("nonsense") == null, "unknown slug is null");
+            SelfCheck.assertTrue(BaritoneTask.bySlug(null) == null, "null slug is null");
+            // Tasks that cannot work without an argument must say so, or the screen offers a
+            // button that fails silently.
+            SelfCheck.assertEquals(BaritoneTask.Need.POINT, BaritoneTask.GOTO.need(),
+                    "goto needs a point");
+            SelfCheck.assertEquals(BaritoneTask.Need.BLOCK_AND_COUNT, BaritoneTask.MINE.need(),
+                    "mine needs a block and a count");
+            SelfCheck.assertEquals(BaritoneTask.Need.TEXT, BaritoneTask.FOLLOW.need(),
+                    "follow needs a name");
+            SelfCheck.assertEquals(BaritoneTask.Need.NONE, BaritoneTask.STOP.need(),
+                    "stop needs nothing");
+        });
+    }
+
+    /**
+     * The HUD and the tab show {@link BaritoneStatus#describe()} verbatim, so it must always
+     * say something true: no nulls, no empty strings, and an unusable bridge must never look
+     * like an idle one.
+     */
+    private static void baritoneStatusNeverLies() {
+        SelfCheck.check("automation: baritone status always says something true", () -> {
+            BaritoneStatus missing = BaritoneStatus.missing();
+            SelfCheck.assertTrue(!missing.usable(), "missing is not usable");
+            SelfCheck.assertEquals(BaritoneStatus.Availability.MISSING, missing.availability(),
+                    "missing names itself");
+            SelfCheck.assertTrue(!missing.describe().isEmpty(), "missing describes itself");
+            SelfCheck.assertTrue(missing.describe().contains("not installed"),
+                    "missing says why: " + missing.describe());
+
+            BaritoneStatus broken = BaritoneStatus.broken("NoSuchMethodException: isPathing");
+            SelfCheck.assertTrue(!broken.usable(), "broken is not usable");
+            SelfCheck.assertTrue(broken.describe().contains("isPathing"),
+                    "broken keeps the reason: " + broken.describe());
+
+            BaritoneStatus idle = BaritoneStatus.ready(false, "");
+            SelfCheck.assertTrue(idle.usable(), "ready is usable");
+            SelfCheck.assertTrue(idle.describe().contains("idle"), "idle says idle");
+
+            BaritoneStatus working = BaritoneStatus.ready(true, "Mine");
+            SelfCheck.assertTrue(working.describe().contains("Mine"),
+                    "working names the process: " + working.describe());
+            // An unusable bridge must be distinguishable from an idle one in the status line,
+            // otherwise the player reads "idle" and presses buttons that cannot work.
+            SelfCheck.assertTrue(!missing.describe().equals(idle.describe()),
+                    "missing and idle are not the same line");
+        });
+    }
+
+    /**
+     * Every key the Baritone tab asks for must exist in both languages. The tab is built from
+     * {@link BaritoneTask#titleKey()} at run time, so a missing key shows the raw key to the
+     * player instead of a name -- and nothing else would catch it, because the screen is not
+     * exercised by the checks.
+     */
+    private static void baritoneLangKeysExist() {
+        SelfCheck.check("automation: baritone tab has RU and EN strings", () -> {
+            java.nio.file.Path en = java.nio.file.Path.of(
+                    "src/main/resources/assets/silkvis/lang/en_us.json");
+            java.nio.file.Path ru = java.nio.file.Path.of(
+                    "src/main/resources/assets/silkvis/lang/ru_ru.json");
+            // The checks run from the project root under Gradle; when the files are not there
+            // the check says so instead of passing silently on nothing.
+            SelfCheck.assertTrue(java.nio.file.Files.isRegularFile(en), "en_us.json exists");
+            SelfCheck.assertTrue(java.nio.file.Files.isRegularFile(ru), "ru_ru.json exists");
+
+            String enText = java.nio.file.Files.readString(en);
+            String ruText = java.nio.file.Files.readString(ru);
+
+            java.util.List<String> keys = new java.util.ArrayList<>();
+            for (BaritoneTask task : BaritoneTask.values()) {
+                keys.add(task.titleKey());
+            }
+            keys.add("silkvis.tab.baritone");
+            keys.add("silkvis.baritone.state");
+            keys.add("silkvis.baritone.tasks");
+            keys.add("silkvis.baritone.missing_help");
+            keys.add("silkvis.baritone.broken_help");
+            keys.add("silkvis.baritone.target_note");
+
+            for (String key : keys) {
+                SelfCheck.assertTrue(enText.contains("\"" + key + "\""),
+                        "EN has " + key);
+                SelfCheck.assertTrue(ruText.contains("\"" + key + "\""),
+                        "RU has " + key);
+            }
+        });
+    }
+
+    // ------------------------------------------------------------------ cost model
 
     // ------------------------------------------------------------------ cost model
 

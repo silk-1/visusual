@@ -794,5 +794,19 @@
   "silkvis.automation.selector.refused": "Автоматизация: делать нечего (%s)",
   "silkvis.automation.selector.none": "Автоматизация: делать нечего",
   "silkvis.automation.auto_eat.desc": "Съедает безопасную еду из хотбара при падении голода, вместо остановки задачи. Отказывается от гнилой плоти, паучьего глаза, ядовитого картофеля и иглобрюха.",
-  "silkvis.automation.tool_select.desc": "Берёт в руку лучший инструмент под блок из хотбара перед тем, как его ломать. Уровень сравнивается только внутри одного типа, поэтому топор никогда не «победит» на камне."
+  "silkvis.automation.tool_select.desc": "Берёт в руку лучший инструмент под блок из хотбара перед тем, как его ломать. Уровень сравнивается только внутри одного типа, поэтому топор никогда не «победит» на камне.",
+  "silkvis.tab.baritone": "BARITONE",
+  "silkvis.baritone.state": "Baritone",
+  "silkvis.baritone.tasks": "Задачи",
+  "silkvis.baritone.goto": "Идти в точку",
+  "silkvis.baritone.goto_break": "Идти, ломая путь",
+  "silkvis.baritone.mine": "Добывать блоки",
+  "silkvis.baritone.excavate": "Выкопать область",
+  "silkvis.baritone.collect": "Собрать дроп",
+  "silkvis.baritone.follow": "Следовать",
+  "silkvis.baritone.explore": "Исследовать",
+  "silkvis.baritone.stop": "Стоп",
+  "silkvis.baritone.missing_help": "Baritone не установлен. Положите jar Baritone для 1.21.10 в папку mods рядом с SilkVis и перезапустите игру. SilkVis его не содержит.",
+  "silkvis.baritone.broken_help": "Baritone установлен, но его API недоступно — обычно это несовпадение версий. Нужна сборка Baritone под Minecraft 1.21.10.",
+  "silkvis.baritone.target_note": "Задачам, которые работают с местом, нужна цель: сначала выберите блок в мире. «Стоп» работает всегда."
 }

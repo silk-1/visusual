@@ -14,6 +14,9 @@ import silkvis.automation.AutomationSettings;
 import silkvis.automation.BlockPos;
 import silkvis.automation.GoalRegistry;
 import silkvis.automation.StopReason;
+import silkvis.automation.baritone.BaritoneStatus;
+import silkvis.automation.baritone.BaritoneTask;
+import silkvis.client.baritone.BaritoneBridge;
 import silkvis.assets.TotemLibrary;
 import silkvis.assets.TotemPackBuilder;
 import silkvis.config.GlobalConfig;
@@ -211,6 +214,81 @@ public final class SilkVisScreen extends Screen {
         settingsWidgets.add(new FixedText(tr("silkvis.automation.target_note"),
                 new Rect(area.x(), y + 2, width, 30)));
         y += 34;
+        return y;
+    }
+
+    /**
+     * The Baritone tab: whether the player's Baritone is usable, and a button per task.
+     *
+     * <p>SilkVis does not bundle Baritone and does not copy it: the player installs it, and this
+     * tab drives it through its public API. So the first thing on the tab is whether that worked
+     * -- "not installed" and "broken" are different states with different fixes, and a button
+     * that silently does nothing is the failure mode this layout exists to avoid.</p>
+     *
+     * <p>Every task button is disabled when the bridge is not usable, and each one says what it
+     * needs: a task that wants a coordinate has no button until one is picked, because a button
+     * that fails on press teaches the player nothing.</p>
+     */
+    private int buildBaritoneTab(Rect area, int y, int width) {
+        SilkVisRuntime runtime = SilkVisRuntime.get();
+        BaritoneBridge bridge = runtime.baritone();
+        BaritoneStatus status = bridge.status();
+
+        settingsWidgets.add(new FixedText(tr("silkvis.baritone.state"),
+                new Rect(area.x(), y, width, 12)));
+        y += 14;
+        settingsWidgets.add(new DynamicTextWidget(new Rect(area.x(), y, width, 24),
+                () -> runtime.baritone().status().describe()));
+        y += 28;
+
+        // The fix for each state, said plainly. A missing mod is a download; a broken bridge is
+        // a version mismatch, and telling them apart is the difference between "install it" and
+        // "your Baritone is too old".
+        if (!status.usable()) {
+            settingsWidgets.add(new FixedText(
+                    tr(status.availability() == BaritoneStatus.Availability.MISSING
+                            ? "silkvis.baritone.missing_help" : "silkvis.baritone.broken_help"),
+                    new Rect(area.x(), y, width, 40)));
+            y += 44;
+        }
+
+        settingsWidgets.add(new FixedText(tr("silkvis.baritone.tasks"),
+                new Rect(area.x(), y, width, 12)));
+        y += 16;
+
+        int buttonWidth = Math.max(80, Math.min(150, (width - 6) / 2));
+        int column = 0;
+        for (BaritoneTask task : BaritoneTask.values()) {
+            final BaritoneTask picked = task;
+            int x = area.x() + column * (buttonWidth + 6);
+            ButtonWidget button = new ButtonWidget(
+                    new Rect(x, y, buttonWidth, ROW_HEIGHT),
+                    tr(task.titleKey()),
+                    () -> {
+                        // The screen only wires what it can supply; the rest needs a target and
+                        // is offered once one exists (see the note below the buttons).
+                        if (picked == BaritoneTask.STOP) {
+                            runtime.baritone().cancel();
+                            rebuildSettings();
+                        }
+                    });
+            // Only STOP is wired here for now: every other task needs a target, and inventing
+            // one (the player's own position) would silently do the wrong thing.
+            button.setEnabled(status.usable() && picked == BaritoneTask.STOP);
+            settingsWidgets.add(button);
+            column++;
+            if (column == 2) {
+                column = 0;
+                y += ROW_HEIGHT + 4;
+            }
+        }
+        if (column != 0) {
+            y += ROW_HEIGHT + 4;
+        }
+
+        settingsWidgets.add(new FixedText(tr("silkvis.baritone.target_note"),
+                new Rect(area.x(), y, width, 34)));
+        y += 38;
         return y;
     }
 
@@ -752,6 +830,7 @@ public final class SilkVisScreen extends Screen {
                         new Rect(area.x(), y + 94, width, 34)));
             }
             case AUTOMATION_P2 -> y = buildAutomationTab(area, y, width);
+            case BARITONE -> y = buildBaritoneTab(area, y, width);
             default -> {
                 // VISUAL handled above; nothing extra.
             }

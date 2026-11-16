@@ -82,6 +82,12 @@ public final class SilkVisRuntime implements AutomationHost {
     private final MainScreenModel screenModel;
     /** Automation: the engine and its own file, next to ui.json in the profile folder. */
     private final GoalRegistry automationGoals = new GoalRegistry();
+    /**
+     * Driver for the player's own Baritone install. Reflection-based, so nothing here fails to
+     * link when Baritone is absent: the tab simply reports that it is not installed.
+     */
+    private final silkvis.client.baritone.BaritoneBridge baritone =
+            new silkvis.client.baritone.BaritoneBridge();
     private final AutomationEngine automation;
     private AutomationFile automationFile;
     /** Steps are executed on the client thread only; set by the client entrypoint. */
@@ -870,6 +876,11 @@ public final class SilkVisRuntime implements AutomationHost {
      * same capture, and two captures would be two lists of entities per tick. Only this method
      * references the Minecraft adapter, and it is called from the tick loop, never from a screen.</p>
      */
+    /** The Baritone bridge; the automation tab and the HUD status widget read it. */
+    public silkvis.client.baritone.BaritoneBridge baritone() {
+        return this.baritone;
+    }
+
     public Snapshot automationSnapshot(MinecraftClient client) {
         if (client == null) {
             return null;

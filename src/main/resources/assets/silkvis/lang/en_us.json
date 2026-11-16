@@ -794,5 +794,19 @@
   "silkvis.automation.selector.refused": "Automation: nothing to do (%s)",
   "silkvis.automation.selector.none": "Automation: nothing to do",
   "silkvis.automation.auto_eat.desc": "Eats safe food from the hotbar when hunger drops, instead of stopping the run. Refuses rotten flesh, spider eye, poisonous potato and pufferfish.",
-  "silkvis.automation.tool_select.desc": "Holds the best tool the block needs from the hotbar before breaking it. Tier only orders tools inside one family, so an axe never wins on stone."
+  "silkvis.automation.tool_select.desc": "Holds the best tool the block needs from the hotbar before breaking it. Tier only orders tools inside one family, so an axe never wins on stone.",
+  "silkvis.tab.baritone": "BARITONE",
+  "silkvis.baritone.state": "Baritone",
+  "silkvis.baritone.tasks": "Tasks",
+  "silkvis.baritone.goto": "Walk to point",
+  "silkvis.baritone.goto_break": "Walk, break through",
+  "silkvis.baritone.mine": "Mine blocks",
+  "silkvis.baritone.excavate": "Dig out area",
+  "silkvis.baritone.collect": "Collect drops",
+  "silkvis.baritone.follow": "Follow",
+  "silkvis.baritone.explore": "Explore",
+  "silkvis.baritone.stop": "Stop",
+  "silkvis.baritone.missing_help": "Baritone is not installed. Put the Baritone jar for 1.21.10 into your mods folder next to SilkVis, then restart. SilkVis does not bundle it.",
+  "silkvis.baritone.broken_help": "Baritone is installed but its API could not be reached, which usually means a version mismatch. Use a Baritone build for Minecraft 1.21.10.",
+  "silkvis.baritone.target_note": "Tasks that work on a place need a target: pick a block in the world first. Stop always works."
 }
