@@ -226,9 +226,14 @@ public final class AutomationSnapshot implements Snapshot {
             return false;
         }
         BlockState state = this.world.getBlockState(pos);
-        // "Grown" is exactly what the crop itself reports; reading the age property by name
-        // would need the protected accessor and one table per crop family.
-        return net.minecraft.block.CropBlock.isMature(state);
+        // isMature is an instance method on the crop itself (the compiler said so, twice): the
+        // protected accessor cannot be read from outside and the class cannot be asked
+        // statically, so the block instance answers. Same instanceof pattern as the door test
+        // below, which compiles.
+        if (!(state.getBlock() instanceof net.minecraft.block.CropBlock crop)) {
+            return false;
+        }
+        return crop.isMature(state);
     }
 
     /** The live grid: answers only from loaded chunks and prices nothing. */
