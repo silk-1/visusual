@@ -70,7 +70,8 @@ import java.util.Map;
 public final class SoupVisualsClient {
     private static final SoupVisualsClient INSTANCE = new SoupVisualsClient();
     /** Search radius of the entity snapshot pass, in blocks. */
-    private static final double SCAN_RADIUS = 160.0;
+    private static final double SCAN_RADIUS = 64.0;
+    private static final int MAX_FRAME_ENTITIES = 48;
     /** The original's raycast reach for a friend's target: 5.3 while sprinting, else 3.3. */
     private static final float RAYCAST_SPRINTING = 5.3F;
     private static final float RAYCAST_DEFAULT = 3.3F;
@@ -257,7 +258,7 @@ public final class SoupVisualsClient {
         ClientPlayerEntity player = client.player;
         if (player == null || client.world == null) {
             this.totemWatch.clear();
-            this.world = null;
+            resetOnWorldChange(null);
             this.wasOnGround = true;
             return;
         }
@@ -270,7 +271,8 @@ public final class SoupVisualsClient {
                 (x, y, z, size) -> canSee(frustum, x, y, z, size));
         this.totemParticles.tick();
         this.hitBubbles.tick();
-        detectTotemPops(client, player, playerBox);
+        if (this.totemParticles.isEnabled()) detectTotemPops(client, player, playerBox);
+        else this.totemWatch.clear();
         detectJump(client, player);
         tickBatchTwo(client, player);
     }
@@ -289,6 +291,7 @@ public final class SoupVisualsClient {
         this.totemWatch.clear();
         this.wasOnGround = true;
         this.frameEntities = List.of();
+        this.previousPositions.clear();
     }
 
     /**
@@ -429,8 +432,17 @@ public final class SoupVisualsClient {
     /** Every living entity in the scan radius, minus the local player, as snapshots. */
     private List<EntitySnapshot> collectEntities(MinecraftClient client, ClientPlayerEntity player) {
         Box box = player.getBoundingBox().expand(SCAN_RADIUS);
-        List<EntitySnapshot> out = new ArrayList<>();
-        for (LivingEntity entity : client.world.getEntitiesByClass(LivingEntity.class, box, Entity::isAlive)) {
+        List<LivingEntity> nearest = new ArrayList<>(client.world.getEntitiesByClass(
+                LivingEntity.class, box, entity -> entity != player && entity.isAlive()));
+        nearest.sort(java.util.Comparator.comparingDouble(entity -> {
+            double dx = entity.getX() - player.getX();
+            double dy = entity.getY() - player.getY();
+            double dz = entity.getZ() - player.getZ();
+            return dx * dx + dy * dy + dz * dz;
+        }));
+        List<EntitySnapshot> out = new ArrayList<>(Math.min(nearest.size(), MAX_FRAME_ENTITIES));
+        for (LivingEntity entity : nearest) {
+            if (out.size() == MAX_FRAME_ENTITIES) break;
             if (entity == player) {
                 continue;
             }
@@ -445,9 +457,8 @@ public final class SoupVisualsClient {
                 || this.trails.isEnabled() || this.killEffect.isEnabled()
                 || this.friendsTargetRender.isEnabled();
         if (!anyBatchTwoEnabled) {
-            // Keep the previous-position cache warm anyway (see advancePreviousPositions);
-            // the entity scan is the same one the modules need, so this costs one pass.
-            advancePreviousPositions(collectEntities(client, player));
+            this.frameEntities = List.of();
+            this.previousPositions.clear();
             return;
         }
         float tickProgress = client.getRenderTickCounter().getTickProgress(false);
@@ -472,9 +483,8 @@ public final class SoupVisualsClient {
     /**
      * Remembers this tick's positions for the next snapshot pass.
      *
-     * <p>Called even when no module is enabled: if the cache only advanced while a module was
-     * on, the first frame after switching Trails on would compare against a position from
-     * minutes ago and draw a trail across the whole map.</p>
+     * <p>When consumers are disabled the cache is cleared. Newly observed entities start
+     * at their current position, avoiding trails from stale coordinates.</p>
      */
     private void advancePreviousPositions(List<EntitySnapshot> entities) {
         Map<Integer, EntitySnapshot> byId = byId(entities);
@@ -574,7 +584,7 @@ public final class SoupVisualsClient {
         int queued = SoupRender.pending();
         SoupRender.flush(matrices, context.consumers());
 
-        // One debug line per ~5 s while something is actually on. "Эффекты не работают" is
+        // One debug line per ~5 s while something is actually on. "Effects do not work" is
         // impossible to answer otherwise: it tells whether the module is enabled at all, how
         // many entities the pass saw, and whether quads were handed to the buffer.
         if (System.nanoTime() - this.lastDebugNanos > 5_000_000_000L) {
@@ -592,13 +602,10 @@ public final class SoupVisualsClient {
         }
     }
 
-    /** The tick pass already built the list; rebuild it only when nothing was collected. */
+    /** Empty is a valid tick snapshot; never repeat the world scan on each frame. */
     private List<EntitySnapshot> frameEntitiesFor(MinecraftClient client, ClientPlayerEntity player,
                                                   float tickProgress) {
-        if (!this.frameEntities.isEmpty()) {
-            return this.frameEntities;
-        }
-        return collectEntities(client, player);
+        return this.frameEntities;
     }
 
     /**
