@@ -58,21 +58,37 @@ final class SoupVisualsChecks2 {
                 ids.add(silkvis.visual.soup.setting.SoupSettingsFile.keyOf(module));
             }
             SelfCheck.assertEquals(2, ids.size(), "ids come from the module name");
-            modules.get(0).setEnabled(true);
-            ValueSetting first = SettingRepository
-                    .byConfigKey(modules.get(0).getRootSettings()).values().stream()
-                    .filter(setting -> setting instanceof ValueSetting)
-                    .map(setting -> (ValueSetting) setting)
-                    .findFirst().orElseThrow();
+            // The round trip needs a module that actually declares a numeric setting. Hitboxes
+            // has only selects, booleans and colours, so searching its tree for a ValueSetting
+            // found nothing and the check died on orElseThrow() before it asserted a single
+            // value; the module is picked by capability now, not by position.
+            //
+            // Searched from the end on purpose: two JumpCircles share one id, so load() builds
+            // its index with putAll and the LAST module wins that key. Restoring the earlier
+            // instance would mean asserting on an object the file never reaches.
+            int owner = -1;
+            ValueSetting first = null;
+            for (int i = modules.size() - 1; i >= 0 && first == null; i--) {
+                for (Setting setting
+                        : SettingRepository.byConfigKey(modules.get(i).getRootSettings()).values()) {
+                    if (setting instanceof ValueSetting value) {
+                        first = value;
+                        owner = i;
+                        break;
+                    }
+                }
+            }
+            assertTrue(first != null, "a module declares a numeric setting to round trip");
+            modules.get(owner).setEnabled(true);
             first.setValue(first.getMin());
             silkvis.visual.soup.setting.SoupSettingsFile.save(file, modules);
             assertTrue(java.nio.file.Files.isRegularFile(file), "file written");
 
-            modules.get(0).setEnabled(false);
+            modules.get(owner).setEnabled(false);
             first.setValue(first.getMax());
             assertTrue(silkvis.visual.soup.setting.SoupSettingsFile.load(file, modules),
                     "file loaded");
-            assertTrue(modules.get(0).isEnabled(), "module state restored");
+            assertTrue(modules.get(owner).isEnabled(), "module state restored");
             SelfCheck.assertEquals((double) first.getMin(), (double) first.getValue(), 1.0E-4,
                     "value restored");
             // Every module keeps its own key (checked above, before the file is damaged):
@@ -87,7 +103,7 @@ final class SoupVisualsChecks2 {
             java.nio.file.Files.writeString(file, "{ not json");
             assertTrue(!silkvis.visual.soup.setting.SoupSettingsFile.load(file, modules),
                     "broken file rejected");
-            assertTrue(modules.get(0).isEnabled(), "state kept after a broken file");
+            assertTrue(modules.get(owner).isEnabled(), "state kept after a broken file");
         });
     }
 
