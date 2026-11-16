@@ -264,9 +264,11 @@ final class CoreChecks {
             assertEquals(null, TotemDownloader.readBounded(endless), "cap enforced");
         });
 
-        check("nine navigation tabs stay inside the panel", () -> {
+        // Ten since the BARITONE tab: the count is asserted on purpose, because the nav column
+        // computes its rows from it and a tab added without checking the fit would clip.
+        check("ten navigation tabs stay inside the panel", () -> {
             int tabs = silkvis.ui.MainScreenModel.p1Tabs().size();
-            assertEquals(9, tabs, "tab count");
+            assertEquals(10, tabs, "tab count");
             for (int[] screen : new int[][]{{480, 270}, {640, 360}, {960, 620}}) {
                 silkvis.ui.MainScreenLayout layout =
                         silkvis.ui.MainScreenLayout.compute(screen[0], screen[1]);
