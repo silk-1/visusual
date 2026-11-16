@@ -359,7 +359,7 @@ public final class SoupSettingsScreen extends Screen {
     }
 
     private int addColor(Rect area, int y, int width, String label, ColorSetting color) {
-        int argb = color.getValue();
+        int argb = color.getColor();
         place(new ButtonWidget(new Rect(area.x(), y, width, CONTROL_HEIGHT),
                 label + "  #" + String.format("%06X", argb & 0xFFFFFF), null));
         return y + CONTROL_HEIGHT + 4;
@@ -375,12 +375,12 @@ public final class SoupSettingsScreen extends Screen {
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
         Painter painter = new VanillaPainter(context);
         ThemeTokens theme = this.runtime.theme();
-        painter.fill(new Rect(0, 0, this.width, this.height), theme.overlayScrim());
-        painter.fill(this.layout.panel(), theme.surface());
-        painter.stroke(this.layout.panel(), theme.border(), 1);
+        painter.fill(new Rect(0, 0, this.width, this.height), Color.argb(theme.background()));
+        painter.fill(this.layout.window(), Color.argb(theme.surface()));
+        painter.outline(this.layout.window(), Color.argb(theme.border()), 1);
 
         Rect list = moduleListArea();
-        painter.fill(list, theme.surfaceRaised());
+        painter.fill(list, Color.argb(theme.surfaceHover()));
         List<SoupModule> modules = visibleModules();
         this.listScroll.setContentHeight(modules.size() * MODULE_ROW);
         int listTop = list.y() + 4 - this.listScroll.offset();
@@ -392,23 +392,23 @@ public final class SoupSettingsScreen extends Screen {
             boolean hover = row.contains(mouseX, mouseY);
             boolean sel = modules.get(i) == this.selected;
             if (hover) this.hoveredModule = i;
-            if (sel) painter.fill(row, theme.accent().withAlpha(0.25f));
-            else if (hover) painter.fill(row, theme.surfaceRaised());
+            if (sel) painter.fill(row, Color.argb(theme.accent().withAlpha(0.25f)));
+            else if (hover) painter.fill(row, Color.argb(theme.surfaceHover()));
             String name = moduleName(modules.get(i));
             if (modules.get(i).isEnabled()) name = "\u25cf " + name;
             painter.text(name, row.x() + 6, row.y() + 5,
-                    sel || modules.get(i).isEnabled() ? theme.accent() : theme.textPrimary(), false);
+                    sel || modules.get(i).isEnabled() ? Color.argb(theme.accent()) : Color.argb(theme.textPrimary()), false);
         }
 
-        for (Widget widget : this.powerWidgets) widget.render(painter, theme, mouseX, mouseY);
+        for (Widget widget : this.powerWidgets) widget.render(painter, theme);
         Rect settings = this.layout.settings();
-        painter.fill(settings, theme.surfaceRaised());
+        painter.fill(settings, Color.argb(theme.surfaceHover()));
         for (Widget widget : this.settingWidgets) {
             Rect b = widget.bounds();
             if (b.bottom() < settings.y() + CONTENT_TOP || b.y() > settings.bottom()) continue;
-            widget.render(painter, theme, mouseX, mouseY);
+            widget.render(painter, theme);
         }
-        for (Widget widget : this.chrome) widget.render(painter, theme, mouseX, mouseY);
+        for (Widget widget : this.chrome) widget.render(painter, theme);
     }
 
     @Override
@@ -474,7 +474,7 @@ public final class SoupSettingsScreen extends Screen {
     @Override
     public boolean charTyped(CharInput input) {
         String typed = input == null ? "" : input.asString();
-        if (this.search != null && this.search.isFocused() && typed != null && !typed.isEmpty()) {
+        if (this.search != null && this.search.focused() && typed != null && !typed.isEmpty()) {
             for (int i = 0; i < typed.length(); i++) {
                 this.search.charTyped(typed.charAt(i));
             }
@@ -486,8 +486,8 @@ public final class SoupSettingsScreen extends Screen {
     @Override
     public boolean keyPressed(KeyInput input) {
         int key = input.key();
-        if (this.search != null && this.search.isFocused()) {
-            if (this.search.keyPressed(key, 0, 0)) return true;
+        if (this.search != null && this.search.focused()) {
+            if (this.search.keyPressed(key, input.modifiers())) return true;
         }
         if (key == Keys.ESCAPE) {
             this.close();
@@ -513,8 +513,8 @@ public final class SoupSettingsScreen extends Screen {
             this.text = text;
         }
         @Override
-        public void render(Painter painter, ThemeTokens theme, int mouseX, int mouseY) {
-            painter.text(this.text, bounds().x(), bounds().y() + 2, theme.textSecondary(), false);
+        public void render(Painter painter, ThemeTokens theme) {
+            painter.text(this.text, bounds().x(), bounds().y() + 2, Color.argb(theme.textSecondary()), false);
         }
     }
 }
