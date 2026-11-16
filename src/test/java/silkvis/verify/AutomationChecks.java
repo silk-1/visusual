@@ -132,8 +132,12 @@ final class AutomationChecks {
 
             BaritoneStatus broken = BaritoneStatus.broken("NoSuchMethodException: isPathing");
             SelfCheck.assertTrue(!broken.usable(), "broken is not usable");
-            SelfCheck.assertTrue(broken.describe().contains("isPathing"),
-                    "broken keeps the reason: " + broken.describe());
+            // The short line is shown in a one-line widget that clips, so the reason must NOT
+            // live there -- it lives in detail()/hint() and is shown in a wrapping block.
+            SelfCheck.assertTrue(broken.describe().length() <= 40,
+                    "describe stays short enough to fit: " + broken.describe());
+            SelfCheck.assertTrue(broken.hint().contains("isPathing"),
+                    "hint keeps the reason: " + broken.hint());
 
             BaritoneStatus idle = BaritoneStatus.ready(false, "");
             SelfCheck.assertTrue(idle.usable(), "ready is usable");
@@ -178,6 +182,7 @@ final class AutomationChecks {
             keys.add("silkvis.baritone.tasks");
             keys.add("silkvis.baritone.missing_help");
             keys.add("silkvis.baritone.broken_help");
+            keys.add("silkvis.baritone.reason");
             keys.add("silkvis.baritone.target_note");
 
             for (String key : keys) {

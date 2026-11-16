@@ -68,14 +68,35 @@ public final class BaritoneStatus {
         return this.availability == Availability.READY;
     }
 
-    /** One line for the HUD status widget; never null, never empty. */
+    /**
+     * One short line for the status widget; never null, never empty.
+     *
+     * <p>Deliberately short. The widget that shows it is a single line with an ellipsis, so
+     * putting the exception text here hid the reason behind "...baritone.api.pathi..." on a
+     * real screen. The full reason lives in {@link #detail()} and is shown in a wrapping block
+     * and written to the log.</p>
+     */
     public String describe() {
         return switch (this.availability) {
             case MISSING -> "baritone: not installed";
-            case BROKEN -> "baritone: unusable (" + this.detail + ")";
+            case BROKEN -> "baritone: unusable";
             case READY -> this.pathing
                     ? "baritone: " + (this.process.isEmpty() ? "working" : this.process)
                     : "baritone: idle";
         };
+    }
+
+    /**
+     * The first part of {@link #detail()} that names the missing piece -- a class or method --
+     * so the player sees what is wrong without decoding a stack trace.
+     */
+    public String hint() {
+        if (this.availability == Availability.MISSING) {
+            return "not installed";
+        }
+        if (this.availability == Availability.READY) {
+            return this.pathing ? this.process : "idle";
+        }
+        return this.detail;
     }
 }

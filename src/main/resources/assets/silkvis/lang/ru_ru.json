@@ -807,6 +807,7 @@
   "silkvis.baritone.explore": "Исследовать",
   "silkvis.baritone.stop": "Стоп",
   "silkvis.baritone.missing_help": "Baritone не установлен. Положите jar Baritone для 1.21.10 в папку mods рядом с SilkVis и перезапустите игру. SilkVis его не содержит.",
-  "silkvis.baritone.broken_help": "Baritone установлен, но его API недоступно — обычно это несовпадение версий. Нужна сборка Baritone под Minecraft 1.21.10.",
-  "silkvis.baritone.target_note": "Задачам, которые работают с местом, нужна цель: сначала выберите блок в мире. «Стоп» работает всегда."
+  "silkvis.baritone.broken_help": "Baritone установлен, но его API недоступно — обычно это несовпадение версий. Нужна сборка Baritone под Minecraft 1.21.10 и вариант baritone-api-fabric, а не standalone.",
+  "silkvis.baritone.target_note": "Задачам, которые работают с местом, нужна цель: сначала выберите блок в мире. «Стоп» работает всегда.",
+  "silkvis.baritone.reason": "Причина: "
 }

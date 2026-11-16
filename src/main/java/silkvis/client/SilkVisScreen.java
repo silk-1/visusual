@@ -245,11 +245,19 @@ public final class SilkVisScreen extends Screen {
         // a version mismatch, and telling them apart is the difference between "install it" and
         // "your Baritone is too old".
         if (!status.usable()) {
+            // The reason first, in its own wrapping block: "unusable" alone tells the player
+            // nothing, and the status row is a single line that would cut it off.
+            if (status.availability() == BaritoneStatus.Availability.BROKEN
+                    && !status.detail().isEmpty()) {
+                settingsWidgets.add(new FixedText(tr("silkvis.baritone.reason") + status.detail(),
+                        new Rect(area.x(), y, width, 46)));
+                y += 50;
+            }
             settingsWidgets.add(new FixedText(
                     tr(status.availability() == BaritoneStatus.Availability.MISSING
                             ? "silkvis.baritone.missing_help" : "silkvis.baritone.broken_help"),
-                    new Rect(area.x(), y, width, 40)));
-            y += 44;
+                    new Rect(area.x(), y, width, 46)));
+            y += 50;
         }
 
         settingsWidgets.add(new FixedText(tr("silkvis.baritone.tasks"),
