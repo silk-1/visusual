@@ -78,6 +78,7 @@ final class AutomationChecks {
         baritoneTaskListIsStable();
         baritoneStatusNeverLies();
         baritoneLangKeysExist();
+        baritoneCommandsMatchTheChatCommands();
     }
 
     // ------------------------------------------------------------------ baritone (integration)
@@ -184,6 +185,7 @@ final class AutomationChecks {
             keys.add("silkvis.baritone.broken_help");
             keys.add("silkvis.baritone.reason");
             keys.add("silkvis.baritone.target_note");
+            keys.add("silkvis.baritone.cancel");
 
             for (String key : keys) {
                 SelfCheck.assertTrue(enText.contains("\"" + key + "\""),
@@ -194,7 +196,54 @@ final class AutomationChecks {
         });
     }
 
-    // ------------------------------------------------------------------ cost model
+    /**
+     * Every task must produce a command Baritone actually knows.
+     *
+     * <p>This is the check that the first version lacked, and its absence cost a build and a
+     * test session: the typed API was used with {@code follow(String)}, which does not exist
+     * (the parameter is a {@code Predicate<Entity>}), so the bridge refused to start at all.
+     * The command names below are the labels read from Baritone's own default commands --
+     * goto, mine, thisway, explore, follow, cancel -- and a task that invents a name fails
+     * here instead of at the player's first click.</p>
+     */
+    private static void baritoneCommandsMatchTheChatCommands() {
+        SelfCheck.check("automation: every baritone task maps to a real chat command", () -> {
+            java.util.Set<String> known = java.util.Set.of(
+                    "goto", "mine", "thisway", "explore", "follow", "cancel");
+
+            for (BaritoneTask task : BaritoneTask.values()) {
+                // Fill in every argument so the command is built for real, not skipped.
+                String command = task.command(10, 70, -20, "Steve", "minecraft:iron_ore", 5);
+                SelfCheck.assertTrue(command != null && !command.isEmpty(),
+                        "task produces a command: " + task.slug());
+                String label = command.split(" ")[0];
+                SelfCheck.assertTrue(known.contains(label),
+                        task.slug() + " uses a known command, got '" + label + "'");
+            }
+
+            // Missing arguments must yield null, not a half-built command: the screen relies
+            // on that to keep the button disabled instead of sending "mine 0 null".
+            SelfCheck.assertTrue(BaritoneTask.MINE.command(0, 0, 0, null, "", 0) == null,
+                    "mine without a block yields nothing");
+            SelfCheck.assertTrue(BaritoneTask.FOLLOW.command(0, 0, 0, "", null, 0) == null,
+                    "follow without a name yields nothing");
+
+            // A target task must carry all three coordinates, and a point-free task must not
+            // smuggle them in where Baritone would read them as arguments.
+            SelfCheck.assertEquals("goto 10 70 -20",
+                    BaritoneTask.GOTO.command(10, 70, -20, null, null, 0), "goto carries the point");
+            SelfCheck.assertEquals("thisway",
+                    BaritoneTask.COLLECT.command(10, 70, -20, null, null, 5), "thisway is bare");
+            SelfCheck.assertEquals("cancel",
+                    BaritoneTask.STOP.command(0, 0, 0, null, null, 0), "stop cancels");
+
+            // Only tasks that need nothing from the player may have an enabled button.
+            SelfCheck.assertTrue(BaritoneTask.STOP.readyToRun(), "stop is always ready");
+            SelfCheck.assertTrue(BaritoneTask.EXPLORE.readyToRun(), "explore needs nothing");
+            SelfCheck.assertTrue(!BaritoneTask.MINE.readyToRun(), "mine needs a block");
+            SelfCheck.assertTrue(!BaritoneTask.FOLLOW.readyToRun(), "follow needs a name");
+        });
+    }
 
     // ------------------------------------------------------------------ cost model
 

@@ -808,6 +808,7 @@
   "silkvis.baritone.stop": "Stop",
   "silkvis.baritone.missing_help": "Baritone is not installed. Put the Baritone jar for 1.21.10 into your mods folder next to SilkVis, then restart. SilkVis does not bundle it.",
   "silkvis.baritone.broken_help": "Baritone is installed but its API could not be reached, which usually means a version mismatch: use a Baritone build for Minecraft 1.21.10 and the baritone-api-fabric jar, not the standalone one.",
-  "silkvis.baritone.target_note": "Tasks that work on a place need a target: pick a block in the world first. Stop always works.",
-  "silkvis.baritone.reason": "Reason: "
+  "silkvis.baritone.target_note": "Tasks need a block under the crosshair: look at a spot and press. Follow and Mine need a name, so they are off for now.",
+  "silkvis.baritone.reason": "Reason: ",
+  "silkvis.baritone.cancel": "Cancel"
 }
