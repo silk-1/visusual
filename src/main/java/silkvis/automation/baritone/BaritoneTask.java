@@ -98,7 +98,8 @@ public enum BaritoneTask {
      * crosshair or a typed name, and a button that fails on press teaches the player nothing.
      */
     public boolean readyToRun() {
-        return this == STOP || this == CANCEL || this == EXPLORE || this == COLLECT;
+        return this == STOP || this == CANCEL || this == EXPLORE || this == COLLECT
+                || this == MINE;
     }
 
     /** Maps a config/log slug back to the task, or {@code null} when it is unknown. */

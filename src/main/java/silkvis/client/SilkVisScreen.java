@@ -14,7 +14,9 @@ import silkvis.automation.AutomationSettings;
 import silkvis.automation.BlockPos;
 import silkvis.automation.GoalRegistry;
 import silkvis.automation.StopReason;
+import silkvis.automation.baritone.BaritoneSettings;
 import silkvis.automation.baritone.BaritoneStatus;
+import silkvis.automation.baritone.BlockSelection;
 import silkvis.automation.baritone.BaritoneTask;
 import silkvis.client.baritone.BaritoneBridge;
 import silkvis.assets.TotemLibrary;
@@ -86,6 +88,9 @@ public final class SilkVisScreen extends Screen {
     private TextInputWidget search;
     /** Link field of the Totems tab; kept across rebuilds so typing survives a scroll tick. */
     private TextInputModel totemUrlModel;
+    /** Block search box in the Baritone tab; kept across rebuilds so typing is not lost. */
+    private TextInputModel baritoneBlockQuery;
+    private static final int BLOCK_MATCH_LIMIT = 24;
     private long totemVersionSeen;
     private int hoveredRow = -1;
 
@@ -237,29 +242,126 @@ public final class SilkVisScreen extends Screen {
         settingsWidgets.add(new FixedText(tr("silkvis.baritone.state"),
                 new Rect(area.x(), y, width, 12)));
         y += 14;
-        settingsWidgets.add(new DynamicTextWidget(new Rect(area.x(), y, width, 24),
+        settingsWidgets.add(new DynamicTextWidget(new Rect(area.x(), y, width, 16),
                 () -> runtime.baritone().status().describe()));
-        y += 28;
+        y += 20;
 
-        // The fix for each state, said plainly. A missing mod is a download; a broken bridge is
-        // a version mismatch, and telling them apart is the difference between "install it" and
-        // "your Baritone is too old".
+        // The reason first, in its own wrapping block: "unusable" alone tells the player
+        // nothing, and the status row is a single line that would cut it off.
         if (!status.usable()) {
-            // The reason first, in its own wrapping block: "unusable" alone tells the player
-            // nothing, and the status row is a single line that would cut it off.
             if (status.availability() == BaritoneStatus.Availability.BROKEN
                     && !status.detail().isEmpty()) {
                 settingsWidgets.add(new FixedText(tr("silkvis.baritone.reason") + status.detail(),
-                        new Rect(area.x(), y, width, 46)));
-                y += 50;
+                        new Rect(area.x(), y, width, 34)));
+                y += 38;
             }
             settingsWidgets.add(new FixedText(
                     tr(status.availability() == BaritoneStatus.Availability.MISSING
                             ? "silkvis.baritone.missing_help" : "silkvis.baritone.broken_help"),
-                    new Rect(area.x(), y, width, 46)));
-            y += 50;
+                    new Rect(area.x(), y, width, 40)));
+            y += 44;
         }
 
+        y = baritoneBlockPicker(area, y, width, runtime, status);
+        y = baritoneTasks(area, y, width, runtime, status);
+        y = baritoneSettings(area, y, width, runtime, status);
+        return y;
+    }
+
+    /**
+     * The block picker: a search box, the matches, and the picked blocks as removable chips.
+     *
+     * <p>Picked blocks come first because they are the answer to the question the player came
+     * with. The list below is a filtered view of the registry, capped: a full block list is
+     * over a thousand lines and is not a list any more.</p>
+     */
+    private int baritoneBlockPicker(Rect area, int y, int width, SilkVisRuntime runtime,
+                                    BaritoneStatus status) {
+        BlockSelection selection = runtime.baritoneBlocks();
+        settingsWidgets.add(new FixedText(tr("silkvis.baritone.blocks.picked")
+                + " " + selection.size(), new Rect(area.x(), y, width, 12)));
+        y += 16;
+
+        // Chips: one click removes, which is the only operation a chip needs.
+        if (selection.isEmpty()) {
+            settingsWidgets.add(new FixedText(tr("silkvis.baritone.blocks.none"),
+                    new Rect(area.x(), y, width, 12)));
+            y += 16;
+        } else {
+            int chipWidth = Math.max(60, Math.min(130, (width - 6) / 3));
+            int column = 0;
+            for (String id : selection.ids()) {
+                final String picked = id;
+                ButtonWidget chip = new ButtonWidget(
+                        new Rect(area.x() + column * (chipWidth + 6), y, chipWidth, 18),
+                        BlockSelection.display(picked) + " \u00d7",
+                        () -> {
+                            runtime.baritoneBlocks().remove(picked);
+                            rebuildSettings();
+                        });
+                chip.style(ButtonWidget.Style.PRIMARY);
+                settingsWidgets.add(chip);
+                column++;
+                if (column == 3) {
+                    column = 0;
+                    y += 22;
+                }
+            }
+            if (column != 0) {
+                y += 22;
+            }
+        }
+
+        if (baritoneBlockQuery == null) {
+            baritoneBlockQuery = new TextInputModel(runtime.baritoneBlockQuery(), 64, v -> true);
+        }
+        settingsWidgets.add(new TextInputWidget(new Rect(area.x(), y, width, 20),
+                baritoneBlockQuery, tr("silkvis.baritone.blocks.search"),
+                value -> {
+                    runtime.setBaritoneBlockQuery(value);
+                    rebuildSettings();
+                }));
+        y += 24;
+
+        List<String> matches = BlockSelection.filter(runtime.blockIds(),
+                runtime.baritoneBlockQuery(), BLOCK_MATCH_LIMIT);
+        if (matches.isEmpty()) {
+            settingsWidgets.add(new FixedText(tr("silkvis.baritone.blocks.empty"),
+                    new Rect(area.x(), y, width, 12)));
+            y += 16;
+        } else {
+            int matchWidth = Math.max(80, Math.min(200, (width - 6) / 2));
+            int column = 0;
+            for (String id : matches) {
+                final String blockId = id;
+                boolean already = selection.contains(blockId);
+                ButtonWidget pick = new ButtonWidget(
+                        new Rect(area.x() + column * (matchWidth + 6), y, matchWidth, 18),
+                        (already ? "+ " : "") + BlockSelection.display(blockId),
+                        () -> {
+                            if (!runtime.baritoneBlocks().contains(blockId)) {
+                                runtime.baritoneBlocks().add(blockId);
+                                rebuildSettings();
+                            }
+                        });
+                pick.setEnabled(status.usable() && !already);
+                settingsWidgets.add(pick);
+                column++;
+                if (column == 2) {
+                    column = 0;
+                    y += 22;
+                }
+            }
+            if (column != 0) {
+                y += 22;
+            }
+        }
+        return y + 4;
+    }
+
+    /** Start/stop for every task; the ones needing a target are disabled and say so. */
+    private int baritoneTasks(Rect area, int y, int width, SilkVisRuntime runtime,
+                              BaritoneStatus status) {
         settingsWidgets.add(new FixedText(tr("silkvis.baritone.tasks"),
                 new Rect(area.x(), y, width, 12)));
         y += 16;
@@ -276,15 +378,24 @@ public final class SilkVisScreen extends Screen {
                         // The target is read at click time, not at build time: the player may
                         // have looked somewhere else since the screen was opened.
                         BlockPos target = runtime.automationTarget(MinecraftClient.getInstance());
-                        runtime.baritone().run(picked, target.x(), target.y(), target.z(),
-                                "", "", 0);
-                        runtime.log().log("BARITONE",
-                                picked.slug() + " -> " + runtime.baritone().failure());
+                        String mine = picked == BaritoneTask.MINE
+                                ? runtime.baritoneBlocks().mineCommand(BlockSelection.UNLIMITED)
+                                : null;
+                        if (picked == BaritoneTask.MINE && mine != null) {
+                            runtime.baritone().execute(mine);
+                        } else {
+                            runtime.baritone().run(picked, target.x(), target.y(), target.z(),
+                                    "", "", 0);
+                        }
+                        runtime.log().log("BARITONE", picked.slug() + " -> "
+                                + (runtime.baritone().failure().isEmpty()
+                                        ? "sent" : runtime.baritone().failure()));
                         rebuildSettings();
                     });
-            // Tasks that need a name (follow) or a block id (mine) have no source for it yet,
-            // so they stay disabled instead of failing on press.
-            button.setEnabled(status.usable() && picked.readyToRun());
+            // Mine needs a picked block; follow needs a name. Both stay off until they have one,
+            // because a button that fails on press teaches the player nothing.
+            button.setEnabled(status.usable() && picked.readyToRun()
+                    && (picked != BaritoneTask.MINE || !runtime.baritoneBlocks().isEmpty()));
             settingsWidgets.add(button);
             column++;
             if (column == 2) {
@@ -297,10 +408,44 @@ public final class SilkVisScreen extends Screen {
         }
 
         settingsWidgets.add(new FixedText(tr("silkvis.baritone.target_note"),
-                new Rect(area.x(), y, width, 34)));
-        y += 38;
+                new Rect(area.x(), y, width, 24)));
+        return y + 28;
+    }
+
+    /** Baritone's own settings, as toggles and sliders that send {@code set <name> <value>}. */
+    private int baritoneSettings(Rect area, int y, int width, SilkVisRuntime runtime,
+                                 BaritoneStatus status) {
+        settingsWidgets.add(new FixedText(tr("silkvis.baritone.settings"),
+                new Rect(area.x(), y, width, 12)));
+        y += 16;
+
+        for (BaritoneSettings.Spec spec : BaritoneSettings.specs()) {
+            if (spec.kind() == BaritoneSettings.Kind.BOOLEAN) {
+                boolean on = runtime.baritoneValues().isOn(spec.name());
+                ToggleWidget toggle = new ToggleWidget(
+                        new Rect(area.x(), y, width, 20),
+                        tr(spec.langKey()), null, on,
+                        value -> runtime.setBaritoneSetting(spec, spec.encode(value)));
+                toggle.setEnabled(status.usable());
+                settingsWidgets.add(toggle);
+                y += 22;
+            } else {
+                int value = runtime.baritoneValues().asInt(spec.name(), spec.min());
+                // Preview does nothing on purpose: a slider drag fires many times, and each
+                // commit would be a separate `set` command in Baritone's chat and its log.
+                SliderWidget slider = new SliderWidget(
+                        new Rect(area.x(), y, width, 20),
+                        tr(spec.langKey()), null, spec.min(), spec.max(), 1,
+                        value, v -> { },
+                        v -> runtime.setBaritoneSetting(spec, spec.encode((int) Math.round(v))));
+                slider.setEnabled(status.usable());
+                settingsWidgets.add(slider);
+                y += 22;
+            }
+        }
         return y;
     }
+
 
     private void applyAutomation(AutomationSettings next) {
         SilkVisRuntime.get().setAutomationSettings(next);

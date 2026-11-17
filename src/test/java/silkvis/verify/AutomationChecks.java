@@ -15,7 +15,9 @@ import silkvis.automation.Step;
 import silkvis.automation.StepKind;
 import silkvis.automation.StopReason;
 import silkvis.automation.ToolSelect;
+import silkvis.automation.baritone.BaritoneSettings;
 import silkvis.automation.baritone.BaritoneStatus;
+import silkvis.automation.baritone.BlockSelection;
 import silkvis.automation.baritone.BaritoneTask;
 import silkvis.automation.goals.CollectGoal;
 import silkvis.automation.goals.EatGoal;
@@ -78,7 +80,10 @@ final class AutomationChecks {
         baritoneTaskListIsStable();
         baritoneStatusNeverLies();
         baritoneLangKeysExist();
+        blockSearchFindsWhatThePlayerMeans();
         baritoneCommandsMatchTheChatCommands();
+        blockSelectionBuildsTheMineCommand();
+        baritoneSettingNamesAreReal();
     }
 
     // ------------------------------------------------------------------ baritone (integration)
@@ -240,8 +245,132 @@ final class AutomationChecks {
             // Only tasks that need nothing from the player may have an enabled button.
             SelfCheck.assertTrue(BaritoneTask.STOP.readyToRun(), "stop is always ready");
             SelfCheck.assertTrue(BaritoneTask.EXPLORE.readyToRun(), "explore needs nothing");
-            SelfCheck.assertTrue(!BaritoneTask.MINE.readyToRun(), "mine needs a block");
+            // MINE is startable now: the block picker supplies the ids, and the screen keeps
+            // the button disabled while the selection is empty. FOLLOW still needs a name.
+            SelfCheck.assertTrue(BaritoneTask.MINE.readyToRun(),
+                    "mine is startable once blocks are picked");
             SelfCheck.assertTrue(!BaritoneTask.FOLLOW.readyToRun(), "follow needs a name");
+        });
+    }
+
+    /**
+     * The block picker feeds {@code mine}, so the two must agree on shape: quantity first, then
+     * every id. Getting the order wrong is not a slow failure, it makes Baritone read the first
+     * block id as a count and mine nothing.
+     */
+    private static void blockSelectionBuildsTheMineCommand() {
+        SelfCheck.check("automation: picked blocks become a valid mine command", () -> {
+            BlockSelection selection = new BlockSelection();
+            SelfCheck.assertTrue(selection.mineCommand(0) == null,
+                    "nothing picked yields no command");
+
+            SelfCheck.assertTrue(selection.add("minecraft:iron_ore"), "first block added");
+            SelfCheck.assertTrue(!selection.add("minecraft:iron_ore"), "duplicate ignored");
+            SelfCheck.assertTrue(!selection.add("  "), "blank ignored");
+            selection.add("Minecraft:Gold_Ore");
+            SelfCheck.assertEquals(2, selection.size(), "two distinct blocks");
+            SelfCheck.assertTrue(selection.contains("minecraft:gold_ore"),
+                    "ids are normalised to lowercase");
+
+            SelfCheck.assertEquals("mine 0 minecraft:iron_ore minecraft:gold_ore",
+                    selection.mineCommand(0), "quantity first, then the picks in order");
+            SelfCheck.assertEquals("mine 64 minecraft:iron_ore minecraft:gold_ore",
+                    selection.mineCommand(64), "quantity is carried");
+
+            SelfCheck.assertTrue(selection.remove("minecraft:iron_ore"), "remove works");
+            SelfCheck.assertEquals("mine 0 minecraft:gold_ore", selection.mineCommand(0),
+                    "removal leaves the rest");
+            selection.clear();
+            SelfCheck.assertTrue(selection.isEmpty() && selection.mineCommand(0) == null,
+                    "clear empties the selection");
+        });
+    }
+
+    /**
+     * The search box and the short display form.
+     *
+     * <p>The filter is a plain substring match on purpose: a player typing "ore" expects every
+     * ore, and a player typing "minecraft:iron" expects the whole iron family. The limit is
+     * part of the contract -- a 1000-entry result is not a list.</p>
+     */
+    private static void blockSearchFindsWhatThePlayerMeans() {
+        SelfCheck.check("automation: block search is substring, capped and shortens ids", () -> {
+            java.util.List<String> all = java.util.List.of(
+                    "minecraft:stone", "minecraft:iron_ore", "minecraft:gold_ore",
+                    "minecraft:oak_log", "mekanism:osmium_ore");
+
+            SelfCheck.assertEquals(5, BlockSelection.filter(all, "", 10).size(), "blank shows all");
+            SelfCheck.assertEquals(3, BlockSelection.filter(all, "ore", 10).size(), "ore matches");
+            SelfCheck.assertEquals(1, BlockSelection.filter(all, "iron", 10).size(), "iron matches");
+            SelfCheck.assertEquals(1, BlockSelection.filter(all, "minecraft:iron", 10).size(),
+                    "namespace prefix is honoured");
+            // A bare namespace matches every entry in it: 4 of the 5, all but mekanism.
+            SelfCheck.assertEquals(4, BlockSelection.filter(all, "minecraft:", 10).size(),
+                    "namespace alone matches that whole namespace");
+            SelfCheck.assertEquals(1, BlockSelection.filter(all, "ore", 1).size(),
+                    "limit is respected");
+            SelfCheck.assertEquals(0, BlockSelection.filter(all, "diamond", 10).size(),
+                    "no match returns nothing");
+            SelfCheck.assertEquals(0, BlockSelection.filter(null, "x", 10).size(), "null safe");
+            SelfCheck.assertEquals(0, BlockSelection.filter(all, "x", 0).size(), "zero limit");
+
+            SelfCheck.assertEquals("stone", BlockSelection.display("minecraft:stone"),
+                    "minecraft prefix hidden");
+            SelfCheck.assertEquals("mekanism:osmium_ore",
+                    BlockSelection.display("mekanism:osmium_ore"), "other namespaces kept");
+            SelfCheck.assertEquals("minecraft:stone", BlockSelection.qualify("stone"),
+                    "short form is qualified");
+            SelfCheck.assertEquals("mekanism:osmium_ore",
+                    BlockSelection.qualify("Mekanism:Osmium_Ore"), "qualified stays qualified");
+        });
+    }
+
+    /**
+     * Every exposed setting must be a name Baritone actually has, and its command must be
+     * {@code set <name> <value>}. A typo here is invisible: Baritone accepts an unknown setting
+     * name with an error in chat and the screen would keep showing the wrong value.
+     */
+    private static void baritoneSettingNamesAreReal() {
+        SelfCheck.check("automation: baritone settings use real names and valid values", () -> {
+            // Names read from Baritone's Settings.java on the 1.21.10 branch.
+            java.util.Set<String> real = java.util.Set.of(
+                    "allowBreak", "allowPlace", "allowSprint", "allowParkour", "autoTool",
+                    "itemSaver", "freeLook", "renderPath", "blockReachDistance",
+                    "maxFallHeightNoWater");
+
+            SelfCheck.assertTrue(!BaritoneSettings.specs().isEmpty(), "settings are exposed");
+            for (BaritoneSettings.Spec spec : BaritoneSettings.specs()) {
+                SelfCheck.assertTrue(real.contains(spec.name()),
+                        "real Baritone setting: " + spec.name());
+                SelfCheck.assertTrue(spec.langKey().startsWith("silkvis.baritone.set."),
+                        "lang key namespaced: " + spec.langKey());
+                SelfCheck.assertEquals(spec, BaritoneSettings.byName(spec.name()),
+                        "lookup round-trips: " + spec.name());
+            }
+            SelfCheck.assertTrue(BaritoneSettings.byName("nonsense") == null,
+                    "unknown setting is null");
+
+            // Encoding: booleans are true/false, integers are clamped so a slider cannot send
+            // a value Baritone would reject.
+            BaritoneSettings.Spec bool = BaritoneSettings.byName("allowBreak");
+            SelfCheck.assertEquals("set allowBreak true",
+                    BaritoneSettings.command(bool, bool.encode(true)), "boolean on");
+            BaritoneSettings.Spec reach = BaritoneSettings.byName("blockReachDistance");
+            SelfCheck.assertEquals("set blockReachDistance 10",
+                    BaritoneSettings.command(reach, reach.encode(99)), "integer clamps high");
+            SelfCheck.assertEquals("set blockReachDistance 1",
+                    BaritoneSettings.command(reach, reach.encode(-5)), "integer clamps low");
+            SelfCheck.assertTrue(BaritoneSettings.command(null, "x") == null, "null spec safe");
+
+            // Stored values: what was sent is what is shown, and a bad number falls back.
+            BaritoneSettings.Values values = new BaritoneSettings.Values();
+            SelfCheck.assertTrue(!values.isOn("allowBreak"), "nothing known means off");
+            values.put("allowBreak", "true");
+            SelfCheck.assertTrue(values.isOn("allowBreak"), "true reads as on");
+            values.put("blockReachDistance", "7");
+            SelfCheck.assertEquals(7, values.asInt("blockReachDistance", 4), "stored int");
+            values.put("blockReachDistance", "not a number");
+            SelfCheck.assertEquals(4, values.asInt("blockReachDistance", 4), "bad int falls back");
         });
     }
 
