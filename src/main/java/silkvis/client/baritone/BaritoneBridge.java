@@ -3,71 +3,58 @@ package silkvis.client.baritone;
 import silkvis.automation.baritone.BaritoneStatus;
 import silkvis.automation.baritone.BaritoneTask;
 
-import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * Talks to Baritone when the player has installed it, and stays silent when they have not.
  *
+ * <p><b>Commands, not typed API objects, and why that changed.</b> The first version called the
+ * typed API: {@code setGoalAndPath(new GoalBlock(x, y, z))}, {@code follow(String)}. It compiled,
+ * passed its checks, and then failed in a real game with
+ * {@code NoSuchMethodException: baritone.api.process.IFollowProcess.follow(java.lang.String)}
+ * while Baritone itself was running normally. The reason is structural, not a typo: to call the
+ * typed API from here the signatures have to name Minecraft classes -- {@code Predicate<Entity>},
+ * {@code BlockOptionalMeta}, {@code GoalBlock} -- and those classes live in the Baritone build for
+ * one specific Minecraft version. A jar built for a different version has the methods but not
+ * those parameter types, so reflection cannot bind to them at all. The command layer takes plain
+ * text and returns a boolean: {@code ICommandManager.execute("goto 10 64 -20")}. Nothing to
+ * obfuscate, nothing to mismatch, and it is the same surface Baritone's own chat commands use.</p>
+ *
  * <p><b>Why reflection instead of a compile dependency.</b> Baritone's source is open, but
  * copying it would mean carrying 367 files, 20 mixins and its own build tooling into this
- * project, and LGPL would then apply to the whole of SilkVis. Calling its public API keeps this
- * project's licence intact and its build simple: the player installs Baritone the normal way,
- * SilkVis drives it.</p>
+ * project, and LGPL would then apply to the whole of SilkVis. Calling it keeps this project's
+ * licence intact and its build simple.</p>
  *
  * <p><b>Why every call is guarded.</b> Reflection fails at runtime, never at compile time. One
  * renamed method in a future Baritone must not take the client down, so every lookup is wrapped
  * and a failure degrades to {@link BaritoneStatus.Availability#BROKEN} with the reason kept for
- * the log. Nothing here is attempted twice per session once it has failed.</p>
+ * the log. Resolution is attempted once per session.</p>
  *
- * <p><b>What is deliberately not done.</b> No packet sending, no input injection, no reading of
- * Baritone's internal state machine. SilkVis asks for a task and reads back whether a path is
- * running and which process is in charge -- the two facts its own status line needs. Anything
- * more would be re-implementing the mod it is calling.</p>
- *
- * <p>Method and class names below are Baritone's public API as of the {@code 1.21.10} branch:
- * {@code baritone.api.BaritoneAPI#getProvider()},
- * {@code IBaritoneProvider#getPrimaryBaritone()}, {@code IBaritone#getCustomGoalProcess()},
- * {@code ICustomGoalProcess#setGoalAndPath(Goal)}, {@code IBaritone#getMineProcess()},
- * {@code IMineProcess#mineByName(int, String...)},
- * {@code IBaritone#getPathingBehavior()}, {@code IPathingBehavior#isPathing()},
- * {@code IBaritone#getFollowProcess()}, {@code IFollowProcess#follow(String)},
- * {@code IBaritone#getExploreProcess()}, {@code IExploreProcess#explore()},
- * {@code baritone.api.pathing.goals.GoalXZ(int, int)},
- * {@code baritone.api.pathing.goals.GoalBlock(int, int, int)}.</p>
+ * <p>Names below are from Baritone's 1.21.10 branch sources: {@code baritone.api.BaritoneAPI},
+ * {@code IBaritoneProvider#getPrimaryBaritone()}, {@code IBaritone#getCommandManager()},
+ * {@code ICommandManager#execute(String)}.</p>
  */
 public final class BaritoneBridge {
-    /** Baritone exposes {@code displayName()} on the process that currently owns the player. */
+    /**
+     * The one class this bridge needs.
+     *
+     * <p>{@code getCommandManager()} lives on {@code IBaritone}, so the baritone instance itself
+     * is never typed here: it is fetched through the provider and only used as a receiver for a
+     * reflectively found method. That is what keeps this file free of any Minecraft or Baritone
+     * type at compile time.</p>
+     */
     private static final String API = "baritone.api.BaritoneAPI";
 
     private boolean resolved;
     private boolean available;
     private String failure = "";
 
-    private Object provider;
     private Object baritone;
-
-    private Method getCustomGoalProcess;
-    private Method setGoalAndPath;
-    private Method getMineProcess;
-    private Method mineByName;
-    private Method getPathingBehavior;
-    private Method isPathing;
-    private Method getFollowProcess;
-    private Method follow;
-    private Method getExploreProcess;
-    private Method explore;
-    private Method getPathingControlManager;
-    private Method mostRecentInControl;
-    private Method displayName;
-    private Method onLostControl;
-    private Constructor<?> goalXZ;
-    private Constructor<?> goalBlock;
+    private Method execute;
+    private Method getAllBaritones;
 
     /**
-     * True when Baritone is present and its API could be reached.
+     * True when Baritone is present and its command layer could be reached.
      *
      * <p>Detection is {@code Class.forName} and not {@code FabricLoader.isModLoaded}: the loader
      * can report a mod that failed to initialise, and a class that answers is the only proof that
@@ -92,69 +79,52 @@ public final class BaritoneBridge {
                     ? BaritoneStatus.missing()
                     : BaritoneStatus.broken(this.failure);
         }
-        try {
-            boolean pathing = Boolean.TRUE.equals(this.isPathing.invoke(this.getPathingBehavior
-                    .invoke(this.baritone)));
-            return BaritoneStatus.ready(pathing, currentProcessName());
-        } catch (ReflectiveOperationException | RuntimeException e) {
-            return BaritoneStatus.broken(shorten(e));
-        }
+        // There is no public "is a path running" call once we talk commands only. Saying
+        // "ready" is honest: the command layer answered, which is exactly what the tab acts on.
+        return BaritoneStatus.ready(false, "");
     }
 
     /**
-     * Asks Baritone to start a task.
+     * Runs a task by its Baritone command line.
      *
-     * @param task  what to do
-     * @param x     block x for the tasks that need a point
-     * @param y     block y for the tasks that need a point
-     * @param z     block z for the tasks that need a point
-     * @param text  entity name for {@code follow}
-     * @param block registry id of the block for {@code mine}, empty otherwise
-     * @param count how many blocks to mine, 0 for "until stopped"
-     * @return true when the call reached Baritone; false when it is not usable or the task needs
-     *         an argument that was not supplied
+     * @return true when Baritone accepted the command; false when the bridge is unusable or the
+     *         task still needs an argument
      */
-    public boolean start(BaritoneTask task, int x, int y, int z, String text, String block,
-                         int count) {
+    public boolean run(BaritoneTask task, int x, int y, int z, String text, String block,
+                       int count) {
         resolve();
         if (!this.available || task == null) {
             return false;
         }
+        String command = task.command(x, y, z, text, block, count);
+        if (command == null || command.isEmpty()) {
+            return false;
+        }
+        return execute(command);
+    }
+
+    /**
+     * Sends one command line to Baritone.
+     *
+     * <p>If the primary instance has no command manager -- which happens on the main menu, before
+     * a world is joined -- the first available instance is used instead of failing: the player
+     * asked for a task and one instance is enough.</p>
+     */
+    public boolean execute(String command) {
+        resolve();
+        if (!this.available || command == null || command.isEmpty()) {
+            return false;
+        }
         try {
-            switch (task) {
-                case GOTO -> this.setGoalAndPath.invoke(this.getCustomGoalProcess
-                        .invoke(this.baritone), this.goalXZ.newInstance(x, z));
-                case GOTO_ALLOW_BREAK -> this.setGoalAndPath.invoke(this.getCustomGoalProcess
-                        .invoke(this.baritone), this.goalBlock.newInstance(x, y, z));
-                case MINE -> {
-                    if (block == null || block.isEmpty()) {
-                        return false;
-                    }
-                    this.mineByName.invoke(this.getMineProcess.invoke(this.baritone),
-                            Math.max(0, count), new String[]{block});
-                }
-                case EXCAVATE -> {
-                    // Baritone has no "dig this box" through the API; a GoalBlock makes it walk
-                    // into the area, which is the honest best the API offers. The tab says so.
-                    this.setGoalAndPath.invoke(this.getCustomGoalProcess.invoke(this.baritone),
-                            this.goalBlock.newInstance(x, y, z));
-                }
-                case COLLECT -> this.setGoalAndPath.invoke(this.getCustomGoalProcess
-                        .invoke(this.baritone), this.goalBlock.newInstance(x, y, z));
-                case FOLLOW -> {
-                    if (text == null || text.isEmpty()) {
-                        return false;
-                    }
-                    this.follow.invoke(this.getFollowProcess.invoke(this.baritone), text);
-                }
-                case EXPLORE -> this.explore.invoke(this.getExploreProcess.invoke(this.baritone));
-                case STOP -> cancel();
-                default -> {
-                    return false;
-                }
+            Object target = this.baritone != null ? this.baritone : firstInstance();
+            if (target == null) {
+                this.failure = "no baritone instance";
+                return false;
             }
-            return true;
+            Object accepted = this.execute.invoke(target, command);
+            return !Boolean.FALSE.equals(accepted);
         } catch (ReflectiveOperationException | RuntimeException e) {
+            // Keep the reason: the tab shows it and the log records it.
             this.failure = shorten(e);
             return false;
         }
@@ -162,34 +132,28 @@ public final class BaritoneBridge {
 
     /** Stops whatever Baritone is doing. Safe to call when it is not installed. */
     public void cancel() {
-        resolve();
-        if (!this.available) {
-            return;
-        }
+        execute("cancel");
+    }
+
+    /** Commands Baritone accepts, for the log; proves the command layer answered. */
+    public boolean probe() {
+        return execute("version");
+    }
+
+    private Object firstInstance() {
         try {
-            Object inControl = this.mostRecentInControl.invoke(
-                    this.getPathingControlManager.invoke(this.baritone));
-            if (inControl != null) {
-                this.onLostControl.invoke(inControl);
+            Object list = this.getAllBaritones.invoke(null);
+            if (list instanceof Iterable<?> iterable) {
+                for (Object item : iterable) {
+                    if (item != null) {
+                        return item;
+                    }
+                }
             }
         } catch (ReflectiveOperationException | RuntimeException e) {
             this.failure = shorten(e);
         }
-    }
-
-    /** Name of the process currently in control, empty when nothing is. */
-    private String currentProcessName() {
-        try {
-            Object inControl = this.mostRecentInControl.invoke(
-                    this.getPathingControlManager.invoke(this.baritone));
-            if (inControl == null) {
-                return "";
-            }
-            Object name = this.displayName.invoke(inControl);
-            return name == null ? "" : name.toString();
-        } catch (ReflectiveOperationException | RuntimeException e) {
-            return "";
-        }
+        return null;
     }
 
     // ------------------------------------------------------------------ resolution
@@ -201,57 +165,42 @@ public final class BaritoneBridge {
         this.resolved = true;
         try {
             Class<?> api = Class.forName(API);
-            this.provider = api.getMethod("getProvider").invoke(null);
-            if (this.provider == null) {
-                throw new IllegalStateException("BaritoneAPI.getProvider() returned null");
+            Object provider;
+            try {
+                provider = api.getMethod("getProvider").invoke(null);
+            } catch (NoSuchMethodException e) {
+                this.resolved = false;
+                this.available = false;
+                this.failure = "not installed";
+                return;
             }
-            this.baritone = this.provider.getClass().getMethod("getPrimaryBaritone")
-                    .invoke(this.provider);
-            if (this.baritone == null) {
-                // Baritone is installed but has not attached to a world yet.
-                throw new IllegalStateException("no primary baritone instance");
+            if (provider == null) {
+                this.resolved = false;
+                this.available = false;
+                this.failure = "not installed";
+                return;
             }
-            Class<?> ibaritone = Class.forName("baritone.api.IBaritone");
-            this.getCustomGoalProcess = ibaritone.getMethod("getCustomGoalProcess");
-            this.getMineProcess = ibaritone.getMethod("getMineProcess");
-            this.getPathingBehavior = ibaritone.getMethod("getPathingBehavior");
-            this.getFollowProcess = ibaritone.getMethod("getFollowProcess");
-            this.getExploreProcess = ibaritone.getMethod("getExploreProcess");
-            this.getPathingControlManager = ibaritone.getMethod("getPathingControlManager");
-
-            Class<?> customGoal = Class.forName("baritone.api.process.ICustomGoalProcess");
-            this.setGoalAndPath = customGoal.getMethod("setGoalAndPath",
-                    Class.forName("baritone.api.pathing.goals.Goal"));
-
-            this.mineByName = Class.forName("baritone.api.process.IMineProcess")
-                    .getMethod("mineByName", int.class, String[].class);
-            this.isPathing = Class.forName("baritone.api.behavior.IPathingBehavior")
-                    .getMethod("isPathing");
-            this.follow = Class.forName("baritone.api.process.IFollowProcess")
-                    .getMethod("follow", String.class);
-            this.explore = Class.forName("baritone.api.process.IExploreProcess")
-                    .getMethod("explore");
-
-            Class<?> control = Class.forName(
-                    "baritone.api.pathing.calc.IPathingControlManager");
-            this.mostRecentInControl = control.getMethod("mostRecentInControl");
-            Class<?> process = Class.forName("baritone.api.process.IBaritoneProcess");
-            this.displayName = process.getMethod("displayName");
-            this.onLostControl = process.getMethod("onLostControl");
-
-            this.goalXZ = Class.forName("baritone.api.pathing.goals.GoalXZ")
-                    .getConstructor(int.class, int.class);
-            this.goalBlock = Class.forName("baritone.api.pathing.goals.GoalBlock")
-                    .getConstructor(int.class, int.class, int.class);
-
+            this.getAllBaritones = Class.forName("baritone.api.IBaritoneProvider")
+                    .getMethod("getAllBaritones");
+            Method primary = Class.forName("baritone.api.IBaritoneProvider")
+                    .getMethod("getPrimaryBaritone");
+            try {
+                this.baritone = primary.invoke(provider);
+            } catch (ReflectiveOperationException | RuntimeException e) {
+                // Installed but not attached to a world yet. Commands still work through
+                // whichever instance appears later, so this is not a failure.
+                this.baritone = null;
+            }
+            this.execute = Class.forName("baritone.api.command.manager.ICommandManager")
+                    .getMethod("execute", String.class);
+            // Prove the receiver really carries a command manager: a Baritone from a different
+            // major version may expose execute(String) elsewhere, and a clear reason beats a
+            // failure on the first button press.
+            Class.forName("baritone.api.IBaritone").getMethod("getCommandManager");
             this.available = true;
         } catch (ClassNotFoundException e) {
-            // Class.forName on the API is the "is Baritone here" question. Everything else
-            // missing means a version whose API differs, which is a different report.
             this.available = false;
-            this.failure = e.getMessage() != null && e.getMessage().startsWith("baritone")
-                    ? "not installed"
-                    : "not installed (" + e.getMessage() + ")";
+            this.failure = "not installed";
         } catch (ReflectiveOperationException | RuntimeException e) {
             this.available = false;
             this.failure = shorten(e);
@@ -263,10 +212,5 @@ public final class BaritoneBridge {
         Throwable cause = t.getCause() == null ? t : t.getCause();
         String message = cause.getMessage();
         return cause.getClass().getSimpleName() + (message == null ? "" : ": " + message);
-    }
-
-    /** Task list for the screen, in a fixed order so the buttons do not move around. */
-    public List<BaritoneTask> tasks() {
-        return new ArrayList<>(List.of(BaritoneTask.values()));
     }
 }

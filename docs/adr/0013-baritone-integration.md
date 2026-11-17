@@ -62,6 +62,37 @@ Baritone: `BaritoneAPI.getProvider().getPrimaryBaritone()` и далее
 Кнопки задач, которым нужна цель, пока заблокированы — задача без координаты упала бы
 молча. «Стоп» работает всегда.
 
+## Почему команды, а не объекты API
+
+Первая версия вызывала типизированный API: `setGoalAndPath(new GoalBlock(...))`,
+`follow(String)`. Она скомпилировалась, прошла чеки и упала в игре:
+
+```
+NoSuchMethodException: baritone.api.process.IFollowProcess.follow(java.lang.String)
+```
+
+Причина структурная, не опечатка: чтобы вызвать типизированный API, в сигнатурах нужно
+назвать классы Minecraft — `Predicate<Entity>`, `BlockOptionalMeta`, `GoalBlock`. Эти классы
+принадлежат сборке Baritone под конкретную версию Minecraft. В jar для другой версии методы
+есть, а таких типов параметров нет, и рефлексия не может к ним привязаться.
+
+Поэтому мост работает через **команды**: `ICommandManager.execute("goto 10 64 -20")`.
+Там только `String` и `boolean` — нечего обфусцировать и нечему разъезжаться. Это тот же
+слой, которым пользуются чат-команды самого Baritone.
+
+| задача | команда |
+|---|---|
+| GOTO / EXCAVATE | `goto x y z` |
+| MINE | `mine <count> <block>` |
+| COLLECT | `thisway` |
+| FOLLOW | `follow players <name>` |
+| EXPLORE | `explore` |
+| STOP / CANCEL | `cancel` |
+
+Проверяется чеком `automation: every baritone task maps to a real chat command`: имена
+сверяются со списком команд из исходников Baritone, и выдуманная команда падает в чеке, а
+не у игрока при первом нажатии.
+
 ## Какой jar нужен игроку
 
 **`baritone-api-fabric`**, не `standalone`. У `api` публичный API сохранён, у `standalone`

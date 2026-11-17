@@ -28,7 +28,9 @@ public enum BaritoneTask {
     /** Explore until a structure is found. */
     EXPLORE("explore", Need.NONE),
     /** Stop whatever Baritone is doing, without touching SilkVis state. */
-    STOP("stop", Need.NONE);
+    STOP("stop", Need.NONE),
+    /** Cancel Baritone outright, including a stuck process. */
+    CANCEL("cancel", Need.NONE);
 
     /** What the caller must supply before the task can start. */
     public enum Need {
@@ -59,6 +61,44 @@ public enum BaritoneTask {
     /** Lang key of the display name. */
     public String titleKey() {
         return "silkvis.baritone." + this.slug;
+    }
+
+    /**
+     * The Baritone command line for this task, or {@code null} when an argument is missing.
+     *
+     * <p>Commands, not the typed API objects. The typed API needs our code to name Minecraft
+     * classes such as {@code Predicate<Entity>} and {@code BlockOptionalMeta}; those names are
+     * looked up at run time, so they only match a Baritone built for the exact same Minecraft
+     * version. A real report proved the cost: {@code IFollowProcess.follow(String)} does not
+     * exist, the parameter is a {@code Predicate<Entity>}, and the whole bridge reported
+     * {@code unusable} although Baritone itself was running fine. The command layer takes
+     * plain text -- {@code ICommandManager.execute("goto 10 64 -20")} -- so there is nothing
+     * to obfuscate and nothing to mismatch.</p>
+     *
+     * <p>Names below were read from the 1.21.10 branch sources, not guessed: goto, mine,
+     * thisway, explore, follow, cancel.</p>
+     */
+    public String command(int x, int y, int z, String text, String block, int count) {
+        return switch (this) {
+            case GOTO -> "goto " + x + " " + y + " " + z;
+            case GOTO_ALLOW_BREAK -> "goto " + x + " " + y + " " + z;
+            case MINE -> block == null || block.isEmpty()
+                    ? null : "mine " + Math.max(0, count) + " " + block;
+            case EXCAVATE -> "goto " + x + " " + y + " " + z;
+            case COLLECT -> "thisway";
+            case FOLLOW -> text == null || text.isEmpty() ? null : "follow players " + text;
+            case EXPLORE -> "explore";
+            case STOP -> "cancel";
+            case CANCEL -> "cancel";
+        };
+    }
+
+    /**
+     * True when the task can be started at once. Everything else needs a block under the
+     * crosshair or a typed name, and a button that fails on press teaches the player nothing.
+     */
+    public boolean readyToRun() {
+        return this == STOP || this == CANCEL || this == EXPLORE || this == COLLECT;
     }
 
     /** Maps a config/log slug back to the task, or {@code null} when it is unknown. */

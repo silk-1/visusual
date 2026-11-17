@@ -273,16 +273,18 @@ public final class SilkVisScreen extends Screen {
                     new Rect(x, y, buttonWidth, ROW_HEIGHT),
                     tr(task.titleKey()),
                     () -> {
-                        // The screen only wires what it can supply; the rest needs a target and
-                        // is offered once one exists (see the note below the buttons).
-                        if (picked == BaritoneTask.STOP) {
-                            runtime.baritone().cancel();
-                            rebuildSettings();
-                        }
+                        // The target is read at click time, not at build time: the player may
+                        // have looked somewhere else since the screen was opened.
+                        BlockPos target = runtime.automationTarget(MinecraftClient.getInstance());
+                        runtime.baritone().run(picked, target.x(), target.y(), target.z(),
+                                "", "", 0);
+                        runtime.log().log("BARITONE",
+                                picked.slug() + " -> " + runtime.baritone().failure());
+                        rebuildSettings();
                     });
-            // Only STOP is wired here for now: every other task needs a target, and inventing
-            // one (the player's own position) would silently do the wrong thing.
-            button.setEnabled(status.usable() && picked == BaritoneTask.STOP);
+            // Tasks that need a name (follow) or a block id (mine) have no source for it yet,
+            // so they stay disabled instead of failing on press.
+            button.setEnabled(status.usable() && picked.readyToRun());
             settingsWidgets.add(button);
             column++;
             if (column == 2) {

@@ -24,6 +24,7 @@
 | `0.1.20-v4` | `arena/8e5ee6e5-visusual` | A09 авто-еда, A10 выбор инструмента; версия видна в логе сборки |
 | `0.1.20-v5` | `arena/8e5ee6e5-visusual` | Интеграция с Baritone: вкладка BARITONE, вызов API через рефлексию, ADR-0013 |
 | `0.1.20-v6` | `arena/8e5ee6e5-visusual` | Причина отказа Baritone видна на вкладке и пишется в лог; фикс чека на 10 вкладок |
+| `0.1.20-v7` | `arena/130e26d0-visusual` | Baritone через команды (`goto`/`mine`/`thisway`/`explore`/`follow`/`cancel`) вместо типизированного API — фикс `NoSuchMethodException` |
 
 ## Как добавить запись
 
