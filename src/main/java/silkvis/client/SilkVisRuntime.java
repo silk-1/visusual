@@ -88,6 +88,13 @@ public final class SilkVisRuntime implements AutomationHost {
      */
     private final silkvis.client.baritone.BaritoneBridge baritone =
             new silkvis.client.baritone.BaritoneBridge();
+    /**
+     * Ores and limit chosen on the Baritone tab. Held here, not in the screen, so closing and
+     * reopening the window does not lose a selection the player just made. Nothing is selected
+     * by default and no command is sent until Start is pressed (rule: off by default).
+     */
+    private final silkvis.automation.baritone.BaritoneMinePlan baritoneMine =
+            new silkvis.automation.baritone.BaritoneMinePlan();
     private final AutomationEngine automation;
     private AutomationFile automationFile;
     /** Steps are executed on the client thread only; set by the client entrypoint. */
@@ -879,6 +886,11 @@ public final class SilkVisRuntime implements AutomationHost {
     /** The Baritone bridge; the automation tab and the HUD status widget read it. */
     public silkvis.client.baritone.BaritoneBridge baritone() {
         return this.baritone;
+    }
+
+    /** The Mine page's selection; survives closing the window, cleared only by the player. */
+    public silkvis.automation.baritone.BaritoneMinePlan baritoneMine() {
+        return this.baritoneMine;
     }
 
     public Snapshot automationSnapshot(MinecraftClient client) {

@@ -76,17 +76,26 @@ public enum BaritoneTask {
      * to obfuscate and nothing to mismatch.</p>
      *
      * <p>Names below were read from the 1.21.10 branch sources, not guessed: goto, mine,
-     * thisway, explore, follow, cancel.</p>
+     * thisway, explore, follow, cancel. The argument shapes were read the same way, from each
+     * command's own help text:</p>
+     *
+     * <ul>
+     *   <li>{@code mine <blocks...>} and {@code mine <n> <blocks...>} -- so a zero count is
+     *       omitted instead of being sent as {@code mine 0 ...}, which Baritone would happily
+     *       read as "mine zero blocks".</li>
+     *   <li>{@code follow player <name>} -- the group is {@code player}, singular, and the name
+     *       follows it. {@code follow players <name>} is not a usage the command accepts.</li>
+     * </ul>
      */
     public String command(int x, int y, int z, String text, String block, int count) {
         return switch (this) {
             case GOTO -> "goto " + x + " " + y + " " + z;
             case GOTO_ALLOW_BREAK -> "goto " + x + " " + y + " " + z;
             case MINE -> block == null || block.isEmpty()
-                    ? null : "mine " + Math.max(0, count) + " " + block;
+                    ? null : (count > 0 ? "mine " + count + " " + block : "mine " + block);
             case EXCAVATE -> "goto " + x + " " + y + " " + z;
             case COLLECT -> "thisway";
-            case FOLLOW -> text == null || text.isEmpty() ? null : "follow players " + text;
+            case FOLLOW -> text == null || text.isEmpty() ? null : "follow player " + text;
             case EXPLORE -> "explore";
             case STOP -> "cancel";
             case CANCEL -> "cancel";

@@ -14,9 +14,10 @@ import silkvis.automation.AutomationSettings;
 import silkvis.automation.BlockPos;
 import silkvis.automation.GoalRegistry;
 import silkvis.automation.StopReason;
+import silkvis.automation.baritone.BaritoneMinePlan;
+import silkvis.automation.baritone.BaritoneOre;
 import silkvis.automation.baritone.BaritoneStatus;
 import silkvis.automation.baritone.BaritoneTask;
-import silkvis.client.baritone.BaritoneBridge;
 import silkvis.assets.TotemLibrary;
 import silkvis.assets.TotemPackBuilder;
 import silkvis.config.GlobalConfig;
@@ -88,6 +89,24 @@ public final class SilkVisScreen extends Screen {
     private TextInputModel totemUrlModel;
     private long totemVersionSeen;
     private int hoveredRow = -1;
+
+    /**
+     * Which page of the Baritone tab is open. The tab is a menu, not a list: page one is the
+     * five tasks, and only "mine" and "follow" need a page of their own.
+     */
+    private enum BaritonePage {
+        TASKS,
+        MINE,
+        FOLLOW
+    }
+
+    private BaritonePage baritonePage = BaritonePage.TASKS;
+    /** The follow name, kept across rebuilds so a scroll tick does not eat what was typed. */
+    private TextInputModel baritoneNameModel;
+    /** Last command the tab sent, so a press Baritone ignored is visible instead of silent. */
+    private String baritoneLastCommand = "";
+    private boolean baritoneLastAccepted = true;
+    private String baritoneLastFailure = "";
 
     public SilkVisScreen() {
         super(Text.translatable("silkvis.screen.title"));
@@ -218,21 +237,20 @@ public final class SilkVisScreen extends Screen {
     }
 
     /**
-     * The Baritone tab: whether the player's Baritone is usable, and a button per task.
+     * The Baritone tab, page one: what the player wants done.
      *
-     * <p>SilkVis does not bundle Baritone and does not copy it: the player installs it, and this
-     * tab drives it through its public API. So the first thing on the tab is whether that worked
-     * -- "not installed" and "broken" are different states with different fixes, and a button
-     * that silently does nothing is the failure mode this layout exists to avoid.</p>
+     * <p>Tasks come first and the block list does not live here. The previous layout offered one
+     * button per enum constant, which put "dig out an area" next to "cancel" and gave the tab no
+     * shape at all; a player looking for "mine diamonds" read a wall of buttons and stopped. So
+     * the tab is a five-item menu -- mine, walk, follow, explore, stop -- and the one task that
+     * needs a list of its own (mine) opens a second page with the ores on it.</p>
      *
-     * <p>Every task button is disabled when the bridge is not usable, and each one says what it
-     * needs: a task that wants a coordinate has no button until one is picked, because a button
-     * that fails on press teaches the player nothing.</p>
+     * <p>Status first, always: "not installed" and "unusable" are different problems with
+     * different fixes, and a button that silently does nothing is the failure this layout exists
+     * to avoid.</p>
      */
     private int buildBaritoneTab(Rect area, int y, int width) {
-        SilkVisRuntime runtime = SilkVisRuntime.get();
-        BaritoneBridge bridge = runtime.baritone();
-        BaritoneStatus status = bridge.status();
+        BaritoneStatus status = runtime.baritone().status();
 
         settingsWidgets.add(new FixedText(tr("silkvis.baritone.state"),
                 new Rect(area.x(), y, width, 12)));
@@ -241,12 +259,10 @@ public final class SilkVisScreen extends Screen {
                 () -> runtime.baritone().status().describe()));
         y += 28;
 
-        // The fix for each state, said plainly. A missing mod is a download; a broken bridge is
+        // The fix for each state, said plainly: a missing mod is a download, a broken bridge is
         // a version mismatch, and telling them apart is the difference between "install it" and
         // "your Baritone is too old".
         if (!status.usable()) {
-            // The reason first, in its own wrapping block: "unusable" alone tells the player
-            // nothing, and the status row is a single line that would cut it off.
             if (status.availability() == BaritoneStatus.Availability.BROKEN
                     && !status.detail().isEmpty()) {
                 settingsWidgets.add(new FixedText(tr("silkvis.baritone.reason") + status.detail(),
@@ -260,46 +276,257 @@ public final class SilkVisScreen extends Screen {
             y += 50;
         }
 
+        y = switch (this.baritonePage) {
+            case MINE -> buildBaritoneMinePage(area, y, width, status);
+            case FOLLOW -> buildBaritoneFollowPage(area, y, width, status);
+            default -> buildBaritoneTaskPage(area, y, width, status);
+        };
+
+        // The last command, always visible: when a press does nothing, the player needs to see
+        // what was actually sent and what Baritone answered, not guess.
+        settingsWidgets.add(new DynamicTextWidget(new Rect(area.x(), y, width, 24),
+                this::baritoneLastCommandLine));
+        y += 28;
+        return y;
+    }
+
+    /** The five tasks, in the order a player looks for them. */
+    private int buildBaritoneTaskPage(Rect area, int y, int width, BaritoneStatus status) {
         settingsWidgets.add(new FixedText(tr("silkvis.baritone.tasks"),
                 new Rect(area.x(), y, width, 12)));
         y += 16;
 
-        int buttonWidth = Math.max(80, Math.min(150, (width - 6) / 2));
-        int column = 0;
-        for (BaritoneTask task : BaritoneTask.values()) {
-            final BaritoneTask picked = task;
-            int x = area.x() + column * (buttonWidth + 6);
-            ButtonWidget button = new ButtonWidget(
-                    new Rect(x, y, buttonWidth, ROW_HEIGHT),
-                    tr(task.titleKey()),
-                    () -> {
-                        // The target is read at click time, not at build time: the player may
-                        // have looked somewhere else since the screen was opened.
-                        BlockPos target = runtime.automationTarget(MinecraftClient.getInstance());
-                        runtime.baritone().run(picked, target.x(), target.y(), target.z(),
-                                "", "", 0);
-                        runtime.log().log("BARITONE",
-                                picked.slug() + " -> " + runtime.baritone().failure());
-                        rebuildSettings();
-                    });
-            // Tasks that need a name (follow) or a block id (mine) have no source for it yet,
-            // so they stay disabled instead of failing on press.
-            button.setEnabled(status.usable() && picked.readyToRun());
-            settingsWidgets.add(button);
-            column++;
-            if (column == 2) {
-                column = 0;
-                y += ROW_HEIGHT + 4;
-            }
-        }
-        if (column != 0) {
-            y += ROW_HEIGHT + 4;
-        }
+        int columnWidth = Math.max(70, Math.min(170, (width - 6) / 2));
+        int secondX = area.x() + columnWidth + 6;
 
-        settingsWidgets.add(new FixedText(tr("silkvis.baritone.target_note"),
-                new Rect(area.x(), y, width, 34)));
-        y += 38;
+        // Mine is the only task with a page of its own, so it is the one accent button here.
+        ButtonWidget mine = new ButtonWidget(new Rect(area.x(), y, columnWidth, ROW_HEIGHT),
+                tr("silkvis.baritone.menu.mine"), () -> openBaritonePage(BaritonePage.MINE))
+                .style(ButtonWidget.Style.PRIMARY);
+        mine.setEnabled(status.usable());
+        settingsWidgets.add(mine);
+
+        // The target is read at click time, not at build time: the player may have looked
+        // somewhere else since the screen was opened.
+        ButtonWidget walk = new ButtonWidget(new Rect(secondX, y, columnWidth, ROW_HEIGHT),
+                tr("silkvis.baritone.menu.goto"), () -> {
+            BlockPos target = runtime.automationTarget(MinecraftClient.getInstance());
+            sendBaritone(BaritoneTask.GOTO.command(target.x(), target.y(), target.z(), "", "", 0));
+        });
+        walk.setEnabled(status.usable());
+        settingsWidgets.add(walk);
+        y += ROW_HEIGHT + 6;
+
+        ButtonWidget follow = new ButtonWidget(new Rect(area.x(), y, columnWidth, ROW_HEIGHT),
+                tr("silkvis.baritone.menu.follow"), () -> openBaritonePage(BaritonePage.FOLLOW));
+        follow.setEnabled(status.usable());
+        settingsWidgets.add(follow);
+
+        ButtonWidget explore = new ButtonWidget(new Rect(secondX, y, columnWidth, ROW_HEIGHT),
+                tr("silkvis.baritone.menu.explore"),
+                () -> sendBaritone(BaritoneTask.EXPLORE.command(0, 0, 0, "", "", 0)));
+        explore.setEnabled(status.usable());
+        settingsWidgets.add(explore);
+        y += ROW_HEIGHT + 6;
+
+        ButtonWidget stop = new ButtonWidget(new Rect(area.x(), y, columnWidth, ROW_HEIGHT),
+                tr("silkvis.baritone.menu.stop"),
+                () -> sendBaritone(BaritoneTask.STOP.command(0, 0, 0, "", "", 0)))
+                .style(ButtonWidget.Style.DANGER);
+        stop.setEnabled(status.usable());
+        settingsWidgets.add(stop);
+        y += ROW_HEIGHT + 8;
+
+        settingsWidgets.add(new FixedText(tr("silkvis.baritone.menu.note"),
+                new Rect(area.x(), y, width, 38)));
+        y += 42;
+
+        // One press that proves the bridge without typing in chat: Baritone answers "version"
+        // in its own chat line, and the tab shows whether the call was accepted at all.
+        ButtonWidget probe = new ButtonWidget(
+                new Rect(area.x(), y, Math.min(width, 170), ROW_HEIGHT),
+                tr("silkvis.baritone.probe"), () -> sendBaritone("version"));
+        probe.setEnabled(status.usable());
+        settingsWidgets.add(probe);
+        y += ROW_HEIGHT + 8;
         return y;
+    }
+
+    /** The ore page: a multiselect grid, a limit, and one Start that sends the command. */
+    private int buildBaritoneMinePage(Rect area, int y, int width, BaritoneStatus status) {
+        BaritoneMinePlan plan = runtime.baritoneMine();
+
+        settingsWidgets.add(new ButtonWidget(
+                new Rect(area.x(), y, Math.min(width, 150), ROW_HEIGHT),
+                tr("silkvis.baritone.mine.back"), () -> openBaritonePage(BaritonePage.TASKS)));
+        y += ROW_HEIGHT + 6;
+        settingsWidgets.add(new FixedText(tr("silkvis.baritone.mine.help"),
+                new Rect(area.x(), y, width, 38)));
+        y += 42;
+
+        BaritoneOre[] ores = BaritoneOre.values();
+        int columnWidth = Math.max(70, Math.min(190, (width - 6) / 2));
+        for (int i = 0; i < ores.length; i++) {
+            BaritoneOre ore = ores[i];
+            boolean picked = plan.selected(ore);
+            Rect bounds = new Rect(area.x() + (i % 2) * (columnWidth + 6),
+                    y + (i / 2) * (ROW_HEIGHT + 4), columnWidth, ROW_HEIGHT);
+            // ASCII markers, not a check mark: the sources stay ASCII and the names live in the
+            // language files. The mark is a second signal next to the accent fill, so the state
+            // survives a colour-blind player and a low-contrast theme.
+            ButtonWidget button = new ButtonWidget(bounds,
+                    (picked ? "[x] " : "[ ] ") + tr(ore.langKey()), () -> {
+                runtime.baritoneMine().toggle(ore);
+                rebuildSettings();
+            });
+            if (picked) {
+                button.style(ButtonWidget.Style.PRIMARY);
+            }
+            settingsWidgets.add(button);
+        }
+        y += ((ores.length + 1) / 2) * (ROW_HEIGHT + 4) + 4;
+
+        settingsWidgets.add(new FixedText(baritoneLimitLine(),
+                new Rect(area.x(), y, width, 12)));
+        y += 16;
+        int stepWidth = 54;
+        ButtonWidget less = new ButtonWidget(new Rect(area.x(), y, stepWidth, ROW_HEIGHT), "-16",
+                () -> {
+                    runtime.baritoneMine().bumpLimit(-1);
+                    rebuildSettings();
+                });
+        settingsWidgets.add(less);
+        ButtonWidget more = new ButtonWidget(
+                new Rect(area.x() + stepWidth + 6, y, stepWidth, ROW_HEIGHT), "+16", () -> {
+            runtime.baritoneMine().bumpLimit(1);
+            rebuildSettings();
+        });
+        settingsWidgets.add(more);
+        ButtonWidget more4 = new ButtonWidget(
+                new Rect(area.x() + 2 * (stepWidth + 6), y, stepWidth, ROW_HEIGHT), "+64", () -> {
+            runtime.baritoneMine().bumpLimit(4);
+            rebuildSettings();
+        });
+        settingsWidgets.add(more4);
+        y += ROW_HEIGHT + 10;
+
+        String command = plan.command();
+        ButtonWidget start = new ButtonWidget(
+                new Rect(area.x(), y, Math.min(width, 160), ROW_HEIGHT),
+                tr("silkvis.baritone.mine.start"),
+                () -> sendBaritone(runtime.baritoneMine().command()))
+                .style(ButtonWidget.Style.PRIMARY);
+        // Two reasons to be off, and the line below says which one applies.
+        start.setEnabled(status.usable() && command != null);
+        settingsWidgets.add(start);
+        y += ROW_HEIGHT + 8;
+
+        settingsWidgets.add(new FixedText(command == null
+                ? tr("silkvis.baritone.mine.none")
+                : tr("silkvis.baritone.mine.command") + command,
+                new Rect(area.x(), y, width, 30)));
+        y += 34;
+        return y;
+    }
+
+    /** The follow page: Baritone needs a name and the tab cannot guess one. */
+    private int buildBaritoneFollowPage(Rect area, int y, int width, BaritoneStatus status) {
+        if (this.baritoneNameModel == null) {
+            // A Minecraft name has no spaces in it; anything else is the player's business.
+            this.baritoneNameModel = new TextInputModel("", 16,
+                    value -> value.isBlank() || !value.contains(" "));
+        }
+        settingsWidgets.add(new ButtonWidget(
+                new Rect(area.x(), y, Math.min(width, 150), ROW_HEIGHT),
+                tr("silkvis.baritone.follow.back"), () -> openBaritonePage(BaritonePage.TASKS)));
+        y += ROW_HEIGHT + 6;
+        settingsWidgets.add(new FixedText(tr("silkvis.baritone.follow.help"),
+                new Rect(area.x(), y, width, 38)));
+        y += 42;
+
+        TextInputWidget name = new TextInputWidget(
+                new Rect(area.x(), y, Math.min(width, 200), ROW_HEIGHT), this.baritoneNameModel,
+                tr("silkvis.baritone.follow.hint"), value -> rebuildSettings());
+        settingsWidgets.add(name);
+        y += ROW_HEIGHT + 8;
+
+        // The name is read at click time, not at build time: the field's own widget does not
+        // rebuild the pane on every keystroke, so a button gated on the text it was built with
+        // would stay off while the player typed a perfectly good name.
+        ButtonWidget start = new ButtonWidget(
+                new Rect(area.x(), y, Math.min(width, 160), ROW_HEIGHT),
+                tr("silkvis.baritone.follow.start"),
+                () -> startFollow(this.baritoneNameModel.text()))
+                .style(ButtonWidget.Style.PRIMARY);
+        start.setEnabled(status.usable());
+        settingsWidgets.add(start);
+        y += ROW_HEIGHT + 8;
+        if (this.baritoneNameModel.text().trim().isEmpty()) {
+            settingsWidgets.add(new FixedText(tr("silkvis.baritone.follow.empty"),
+                    new Rect(area.x(), y, width, 24)));
+            y += 28;
+        }
+        return y;
+    }
+
+    /**
+     * Starts a follow for the typed name.
+     *
+     * <p>An empty field sends nothing: the hint under the button already says why, and a
+     * half-built {@code follow player} would only be rejected by Baritone with a message the
+     * player cannot act on.</p>
+     */
+    private void startFollow(String typed) {
+        String name = typed == null ? "" : typed.trim();
+        if (name.isEmpty()) {
+            rebuildSettings();
+            return;
+        }
+        sendBaritone(BaritoneTask.FOLLOW.command(0, 0, 0, name, "", 0));
+    }
+
+    /** Switches the Baritone tab page and puts the pane back to the top of the new page. */
+    private void openBaritonePage(BaritonePage page) {
+        this.baritonePage = page == null ? BaritonePage.TASKS : page;
+        this.settingsScroll.setOffset(0);
+        rebuildSettings();
+    }
+
+    /**
+     * Sends one command through the bridge and records what happened.
+     *
+     * <p>The log line carries Baritone's answer and the tab shows the same thing, because "I
+     * pressed Start and nothing happened" cannot be diagnosed without it.</p>
+     */
+    private void sendBaritone(String command) {
+        if (command == null || command.isEmpty()) {
+            return;
+        }
+        this.baritoneLastCommand = command;
+        this.baritoneLastAccepted = runtime.baritone().execute(command);
+        this.baritoneLastFailure = this.baritoneLastAccepted ? "" : runtime.baritone().failure();
+        runtime.log().log("BARITONE", command
+                + (this.baritoneLastAccepted ? "" : " -> " + this.baritoneLastFailure));
+        rebuildSettings();
+    }
+
+    /** "Last command: mine diamond_ore ..." plus the reason when a press was refused. */
+    private String baritoneLastCommandLine() {
+        if (this.baritoneLastCommand.isEmpty()) {
+            return tr("silkvis.baritone.last.none");
+        }
+        String line = tr("silkvis.baritone.last") + this.baritoneLastCommand;
+        if (!this.baritoneLastAccepted && !this.baritoneLastFailure.isEmpty()) {
+            line = line + " (" + this.baritoneLastFailure + ")";
+        }
+        return line;
+    }
+
+    /** "Limit: 64" or "Limit: no limit"; never a number the buttons cannot reach again. */
+    private String baritoneLimitLine() {
+        int limit = runtime.baritoneMine().limit();
+        return tr("silkvis.baritone.mine.limit")
+                + (limit > 0 ? Integer.toString(limit) : tr("silkvis.baritone.mine.no_limit"));
     }
 
     private void applyAutomation(AutomationSettings next) {
@@ -391,6 +618,11 @@ public final class SilkVisScreen extends Screen {
             ButtonWidget button = new ButtonWidget(row, tr(tab.langKey()), () -> {
                 runtime.screenModel().select(tab);
                 settingsScroll.setOffset(0);
+                // Leaving the Baritone tab returns it to the task menu: a player who comes back
+                // to "mine" must land on the menu, not inside the page they used last time.
+                if (tab != ModuleCategory.BARITONE) {
+                    this.baritonePage = BaritonePage.TASKS;
+                }
                 rebuildSettings();
             });
             if (runtime.screenModel().selectedCategory() == tab) {

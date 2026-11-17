@@ -15,6 +15,8 @@ import silkvis.automation.Step;
 import silkvis.automation.StepKind;
 import silkvis.automation.StopReason;
 import silkvis.automation.ToolSelect;
+import silkvis.automation.baritone.BaritoneMinePlan;
+import silkvis.automation.baritone.BaritoneOre;
 import silkvis.automation.baritone.BaritoneStatus;
 import silkvis.automation.baritone.BaritoneTask;
 import silkvis.automation.goals.CollectGoal;
@@ -79,6 +81,7 @@ final class AutomationChecks {
         baritoneStatusNeverLies();
         baritoneLangKeysExist();
         baritoneCommandsMatchTheChatCommands();
+        baritoneMinePageBuildsTheChatCommand();
     }
 
     // ------------------------------------------------------------------ baritone (integration)
@@ -186,6 +189,33 @@ final class AutomationChecks {
             keys.add("silkvis.baritone.reason");
             keys.add("silkvis.baritone.target_note");
             keys.add("silkvis.baritone.cancel");
+            // The task menu, the two sub-pages and the status line of the ore page.
+            keys.add("silkvis.baritone.menu.mine");
+            keys.add("silkvis.baritone.menu.goto");
+            keys.add("silkvis.baritone.menu.follow");
+            keys.add("silkvis.baritone.menu.explore");
+            keys.add("silkvis.baritone.menu.stop");
+            keys.add("silkvis.baritone.menu.note");
+            keys.add("silkvis.baritone.probe");
+            keys.add("silkvis.baritone.last");
+            keys.add("silkvis.baritone.last.none");
+            keys.add("silkvis.baritone.mine.back");
+            keys.add("silkvis.baritone.mine.help");
+            keys.add("silkvis.baritone.mine.limit");
+            keys.add("silkvis.baritone.mine.no_limit");
+            keys.add("silkvis.baritone.mine.start");
+            keys.add("silkvis.baritone.mine.none");
+            keys.add("silkvis.baritone.mine.command");
+            keys.add("silkvis.baritone.follow.back");
+            keys.add("silkvis.baritone.follow.help");
+            keys.add("silkvis.baritone.follow.hint");
+            keys.add("silkvis.baritone.follow.start");
+            keys.add("silkvis.baritone.follow.empty");
+            // Every ore button names itself from its own key, so a missing row would show the
+            // player a raw key instead of a name -- and nothing else would catch it.
+            for (BaritoneOre ore : BaritoneOre.values()) {
+                keys.add(ore.langKey());
+            }
 
             for (String key : keys) {
                 SelfCheck.assertTrue(enText.contains("\"" + key + "\""),
@@ -242,6 +272,49 @@ final class AutomationChecks {
             SelfCheck.assertTrue(BaritoneTask.EXPLORE.readyToRun(), "explore needs nothing");
             SelfCheck.assertTrue(!BaritoneTask.MINE.readyToRun(), "mine needs a block");
             SelfCheck.assertTrue(!BaritoneTask.FOLLOW.readyToRun(), "follow needs a name");
+        });
+    }
+
+    /**
+     * The ore page must build the line its own help promises: {@code mine diamond_ore
+     * coal_ore} with no limit and {@code mine 64 ...} with one.
+     *
+     * <p>This is the check the earlier tab lacked in effect: the bridge was wired, but nothing
+     * put the selected ores into an argument list, so "Mine" could only be a disabled button. The
+     * expected strings below are the two usage lines from Baritone's own MineCommand help.</p>
+     */
+    private static void baritoneMinePageBuildsTheChatCommand() {
+        SelfCheck.check("automation: the ore page builds the mine command", () -> {
+            BaritoneMinePlan plan = new BaritoneMinePlan();
+            SelfCheck.assertTrue(plan.command() == null, "an empty pick sends nothing");
+            SelfCheck.assertTrue(!plan.selected(BaritoneOre.DIAMOND),
+                    "nothing is picked before the player picks it");
+
+            plan.toggle(BaritoneOre.DIAMOND);
+            SelfCheck.assertTrue(plan.selected(BaritoneOre.DIAMOND), "toggle picks an ore");
+            SelfCheck.assertEquals("mine diamond_ore deepslate_diamond_ore", plan.command(),
+                    "no limit means no count argument");
+
+            plan.toggle(BaritoneOre.COAL);
+            SelfCheck.assertTrue(
+                    plan.command().startsWith("mine diamond_ore deepslate_diamond_ore coal_ore"),
+                    "picks are joined in menu order: " + plan.command());
+
+            plan.setLimit(100);
+            SelfCheck.assertEquals(96, plan.limit(), "the limit snaps to the button step");
+            SelfCheck.assertTrue(plan.command().startsWith("mine 96 "),
+                    "a limit goes before the blocks: " + plan.command());
+
+            plan.bumpLimit(-100);
+            SelfCheck.assertEquals(0, plan.limit(), "minus stops at zero");
+            plan.bumpLimit(100);
+            SelfCheck.assertEquals(BaritoneMinePlan.MAX_LIMIT, plan.limit(),
+                    "plus stops at the ceiling");
+
+            plan.toggle(BaritoneOre.DIAMOND);
+            plan.toggle(BaritoneOre.COAL);
+            SelfCheck.assertTrue(plan.command() == null,
+                    "unpicking everything disables Start again");
         });
     }
 
