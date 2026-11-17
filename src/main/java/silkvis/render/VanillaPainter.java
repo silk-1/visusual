@@ -3,6 +3,11 @@ package silkvis.render;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
+import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
+import net.minecraft.item.Items;
+import net.minecraft.registry.Registries;
+import net.minecraft.util.Identifier;
 import silkvis.ui.Painter;
 import silkvis.ui.Rect;
 
@@ -70,5 +75,37 @@ public final class VanillaPainter implements Painter {
     @Override
     public void popClip() {
         context.disableScissor();
+    }
+
+    /** Cleared after the first failure, so one unsupported call cannot spam the log. */
+    private static boolean itemIconsSupported = true;
+
+    /**
+     * An item icon, so a menu can show the ore a player is picking instead of its name only.
+     *
+     * <p>Two version-sensitive calls live here and nowhere else: the registry lookup and
+     * {@code DrawContext#drawItem(ItemStack, int, int)}. Both are wrapped, and a failure turns
+     * icons off for the session instead of throwing into the render loop: the caller has already
+     * drawn a plate and the name, so the menu stays readable without pictures.</p>
+     */
+    @Override
+    public void itemIcon(String itemId, Rect rect) {
+        if (!itemIconsSupported || itemId == null || itemId.isEmpty() || rect == null) {
+            return;
+        }
+        try {
+            Identifier id = itemId.indexOf(':') >= 0
+                    ? Identifier.tryParse(itemId) : Identifier.of("minecraft", itemId);
+            if (id == null) {
+                return;
+            }
+            Item item = Registries.ITEM.get(id);
+            if (item == null || item == Items.AIR) {
+                return;
+            }
+            context.drawItem(new ItemStack(item), rect.x(), rect.y());
+        } catch (RuntimeException | LinkageError e) {
+            itemIconsSupported = false;
+        }
     }
 }

@@ -15,8 +15,9 @@ import silkvis.automation.Step;
 import silkvis.automation.StepKind;
 import silkvis.automation.StopReason;
 import silkvis.automation.ToolSelect;
-import silkvis.automation.baritone.BaritoneMinePlan;
-import silkvis.automation.baritone.BaritoneOre;
+import silkvis.automation.baritone.BaritoneAction;
+import silkvis.automation.baritone.BaritoneBlock;
+import silkvis.automation.baritone.BaritoneParams;
 import silkvis.automation.baritone.BaritoneStatus;
 import silkvis.automation.baritone.BaritoneTask;
 import silkvis.automation.goals.CollectGoal;
@@ -81,7 +82,7 @@ final class AutomationChecks {
         baritoneStatusNeverLies();
         baritoneLangKeysExist();
         baritoneCommandsMatchTheChatCommands();
-        baritoneMinePageBuildsTheChatCommand();
+        baritoneMenuCatalogueBuildsRealCommands();
     }
 
     // ------------------------------------------------------------------ baritone (integration)
@@ -211,11 +212,40 @@ final class AutomationChecks {
             keys.add("silkvis.baritone.follow.hint");
             keys.add("silkvis.baritone.follow.start");
             keys.add("silkvis.baritone.follow.empty");
-            // Every ore button names itself from its own key, so a missing row would show the
-            // player a raw key instead of a name -- and nothing else would catch it.
-            for (BaritoneOre ore : BaritoneOre.values()) {
-                keys.add(ore.langKey());
+            // Every tile names itself from its own key, so a missing row would show the player a
+            // raw key instead of a name -- and nothing else would catch it.
+            for (BaritoneBlock block : BaritoneBlock.values()) {
+                keys.add(block.langKey());
             }
+            for (BaritoneAction.Category category : BaritoneAction.Category.values()) {
+                keys.add(category.langKey());
+            }
+            for (BaritoneAction action : BaritoneAction.values()) {
+                keys.add(action.titleKey());
+                keys.add(action.noteKey());
+            }
+            keys.add("silkvis.baritone.group.ore");
+            keys.add("silkvis.baritone.group.block");
+            keys.add("silkvis.baritone.back");
+            keys.add("silkvis.baritone.start");
+            keys.add("silkvis.baritone.command");
+            keys.add("silkvis.baritone.incomplete");
+            keys.add("silkvis.baritone.point");
+            keys.add("silkvis.baritone.point.hint");
+            keys.add("silkvis.baritone.number");
+            keys.add("silkvis.baritone.tunnel.height");
+            keys.add("silkvis.baritone.tunnel.width");
+            keys.add("silkvis.baritone.tunnel.depth");
+            keys.add("silkvis.baritone.text.hint");
+            keys.add("silkvis.baritone.text.help");
+            keys.add("silkvis.baritone.checks");
+            keys.add("silkvis.baritone.checks.help");
+            keys.add("silkvis.baritone.check.api");
+            keys.add("silkvis.baritone.check.provider");
+            keys.add("silkvis.baritone.check.primary");
+            keys.add("silkvis.baritone.check.manager");
+            keys.add("silkvis.baritone.check.execute");
+            keys.add("silkvis.baritone.check.last");
 
             for (String key : keys) {
                 SelfCheck.assertTrue(enText.contains("\"" + key + "\""),
@@ -276,46 +306,80 @@ final class AutomationChecks {
     }
 
     /**
-     * The ore page must build the line its own help promises: {@code mine diamond_ore
-     * coal_ore} with no limit and {@code mine 64 ...} with one.
+     * Every tile of the visual menu must build a command Baritone actually accepts.
      *
-     * <p>This is the check the earlier tab lacked in effect: the bridge was wired, but nothing
-     * put the selected ores into an argument list, so "Mine" could only be a disabled button. The
-     * expected strings below are the two usage lines from Baritone's own MineCommand help.</p>
+     * <p>This is the check that keeps the menu honest: a tile is one command line, and the
+     * expected shapes below are copied from Baritone's own help text (goto, thisway, tunnel,
+     * mine, farm, sel, build, find, pause/resume/cancel). Two of them exist because the first
+     * version got them wrong: {@code thisway} takes a required distance, and {@code mine} takes
+     * an optional count that must be omitted rather than sent as zero.</p>
      */
-    private static void baritoneMinePageBuildsTheChatCommand() {
-        SelfCheck.check("automation: the ore page builds the mine command", () -> {
-            BaritoneMinePlan plan = new BaritoneMinePlan();
-            SelfCheck.assertTrue(plan.command() == null, "an empty pick sends nothing");
-            SelfCheck.assertTrue(!plan.selected(BaritoneOre.DIAMOND),
-                    "nothing is picked before the player picks it");
+    private static void baritoneMenuCatalogueBuildsRealCommands() {
+        SelfCheck.check("automation: the baritone menu builds real commands", () -> {
+            java.util.Set<String> known = java.util.Set.of(
+                    "goto", "thisway", "tunnel", "follow", "surface", "invert", "mine", "farm",
+                    "pickup", "sel", "build", "explore", "find", "pause", "resume", "cancel");
 
-            plan.toggle(BaritoneOre.DIAMOND);
-            SelfCheck.assertTrue(plan.selected(BaritoneOre.DIAMOND), "toggle picks an ore");
-            SelfCheck.assertEquals("mine diamond_ore deepslate_diamond_ore", plan.command(),
-                    "no limit means no count argument");
+            // Every tile must produce something with a command word Baritone knows, once its
+            // inputs are filled in.
+            for (BaritoneAction action : BaritoneAction.values()) {
+                BaritoneParams params = BaritoneParams.forAction(action);
+                fill(params, action);
+                String command = action.command(params);
+                SelfCheck.assertTrue(command != null && !command.isEmpty(),
+                        "tile builds a command: " + action.id());
+                String word = command.split(" ")[0];
+                SelfCheck.assertTrue(known.contains(word),
+                        action.id() + " uses a known command, got '" + word + "'");
+                SelfCheck.assertTrue(action.titleKey().startsWith("silkvis.baritone.action."),
+                        "title key namespaced: " + action.titleKey());
+                SelfCheck.assertTrue(action.noteKey().length()
+                                > "silkvis.baritone.action.".length() + 1,
+                        "note key names a per-action key: " + action.noteKey());
+            }
 
-            plan.toggle(BaritoneOre.COAL);
-            SelfCheck.assertTrue(
-                    plan.command().startsWith("mine diamond_ore deepslate_diamond_ore coal_ore"),
-                    "picks are joined in menu order: " + plan.command());
+            // A point action without a point is not ready: the button must stay off instead of
+            // sending "goto null null null".
+            SelfCheck.assertTrue(!BaritoneAction.GOTO.ready(new BaritoneParams()),
+                    "goto without a point is not ready");
 
-            plan.setLimit(100);
-            SelfCheck.assertEquals(96, plan.limit(), "the limit snaps to the button step");
-            SelfCheck.assertTrue(plan.command().startsWith("mine 96 "),
-                    "a limit goes before the blocks: " + plan.command());
+            // Mine: no limit means no count argument, limit goes before the blocks.
+            BaritoneParams mine = BaritoneParams.forAction(BaritoneAction.MINE);
+            mine.toggle(BaritoneBlock.DIAMOND);
+            SelfCheck.assertEquals("mine diamond_ore deepslate_diamond_ore",
+                    BaritoneAction.MINE.command(mine), "no limit means no count argument");
+            mine.toggle(BaritoneBlock.COAL);
+            SelfCheck.assertTrue(BaritoneAction.MINE.command(mine)
+                            .startsWith("mine diamond_ore deepslate_diamond_ore coal_ore"),
+                    "picks are joined in menu order: " + BaritoneAction.MINE.command(mine));
+            mine.bumpNumber(1, 16, 0, 512);
+            SelfCheck.assertTrue(BaritoneAction.MINE.command(mine).startsWith("mine 16 "),
+                    "a limit goes before the blocks: " + BaritoneAction.MINE.command(mine));
 
-            plan.bumpLimit(-100);
-            SelfCheck.assertEquals(0, plan.limit(), "minus stops at zero");
-            plan.bumpLimit(100);
-            SelfCheck.assertEquals(BaritoneMinePlan.MAX_LIMIT, plan.limit(),
-                    "plus stops at the ceiling");
+            // Farm with no range is complete; thisway with no distance is not.
+            SelfCheck.assertEquals("farm",
+                    BaritoneAction.FARM.command(BaritoneParams.forAction(BaritoneAction.FARM)),
+                    "a bare farm farms everything in reach");
+            SelfCheck.assertTrue(!BaritoneAction.THISWAY.ready(new BaritoneParams()),
+                    "thisway without a distance is not ready");
 
-            plan.toggle(BaritoneOre.DIAMOND);
-            plan.toggle(BaritoneOre.COAL);
-            SelfCheck.assertTrue(plan.command() == null,
-                    "unpicking everything disables Start again");
+            // Tunnel sends all three numbers, as the command requires.
+            SelfCheck.assertEquals("tunnel 2 1 1",
+                    BaritoneAction.TUNNEL.command(BaritoneParams.forAction(BaritoneAction.TUNNEL)),
+                    "tunnel carries height, width and depth");
         });
+    }
+
+    /** Fills whatever one action needs, so its command can be built for real. */
+    private static void fill(BaritoneParams params, BaritoneAction action) {
+        params.setPoint(new BlockPos(10, 70, -20));
+        params.toggle(BaritoneBlock.DIAMOND);
+        params.setNumber(Math.max(action.numberMin(), action.defaults().length > 0
+                ? action.defaults()[0] : 1));
+        if (params.number() <= 0) {
+            params.setNumber(1);
+        }
+        params.setText("home");
     }
 
     // ------------------------------------------------------------------ cost model

@@ -30,6 +30,18 @@ public interface Painter {
     }
 
     /**
+     * Optional item icon at its native 16x16 size. Same contract as {@link #texture}: the
+     * default draws nothing, so a painter without an item renderer still produces a usable
+     * control -- the caller puts a plate of the theme colour behind it.
+     *
+     * <p>An icon is decoration, never information: every place that draws one also writes the
+     * name next to it.</p>
+     */
+    default void itemIcon(String itemId, Rect rect) {
+        // intentionally empty
+    }
+
+    /**
      * Rounded rectangle built from horizontal runs (UI-02). The theme already carries
      * {@code radiusPanel}/{@code radiusControl}, but vanilla {@code fill} draws square
      * corners only, so the radius was never visible.

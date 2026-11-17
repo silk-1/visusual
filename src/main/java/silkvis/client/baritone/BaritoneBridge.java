@@ -4,6 +4,8 @@ import silkvis.automation.baritone.BaritoneStatus;
 import silkvis.automation.baritone.BaritoneTask;
 
 import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Talks to Baritone when the player has installed it, and stays silent when they have not.
@@ -174,6 +176,95 @@ public final class BaritoneBridge {
             this.available = false;
             this.failure = shorten(e);
         }
+    }
+
+    /** One line of the diagnostics page: what was checked, whether it worked, and the detail. */
+    public record Check(String labelKey, boolean ok, String detail) {
+    }
+
+    /**
+     * What the bridge actually managed to reach, step by step.
+     *
+     * <p>Why this exists: "Baritone is installed but the buttons do nothing" is not answerable
+     * from one status word. The bridge walks a chain of reflective lookups, and any single link
+     * can fail on a version mismatch; the page shows which one, so the fix is a jar swap instead
+     * of a guess. Every check is done again here rather than read from the cached resolve, so the
+     * answer reflects the moment the page was opened.</p>
+     */
+    public List<Check> diagnostics() {
+        List<Check> out = new ArrayList<>();
+
+        Class<?> api = null;
+        String apiDetail = "";
+        try {
+            api = Class.forName(API);
+        } catch (ClassNotFoundException | LinkageError e) {
+            apiDetail = e.getClass().getSimpleName();
+        }
+        out.add(new Check("silkvis.baritone.check.api", api != null, apiDetail));
+
+        Object provider = null;
+        String providerDetail = "";
+        if (api == null) {
+            providerDetail = "skipped: no api class";
+        } else {
+            try {
+                provider = api.getMethod("getProvider").invoke(null);
+                if (provider == null) {
+                    providerDetail = "getProvider() returned null";
+                }
+            } catch (ReflectiveOperationException | RuntimeException e) {
+                providerDetail = shorten(e);
+            }
+        }
+        out.add(new Check("silkvis.baritone.check.provider", provider != null, providerDetail));
+
+        Object primary = null;
+        String primaryDetail = "";
+        if (provider == null) {
+            primaryDetail = "skipped: no provider";
+        } else {
+            try {
+                primary = Class.forName("baritone.api.IBaritoneProvider")
+                        .getMethod("getPrimaryBaritone").invoke(provider);
+                if (primary == null) {
+                    primaryDetail = "no instance yet (join a world)";
+                }
+            } catch (ReflectiveOperationException | RuntimeException e) {
+                primaryDetail = shorten(e);
+            }
+        }
+        out.add(new Check("silkvis.baritone.check.primary", primary != null, primaryDetail));
+
+        boolean managerOk = false;
+        String managerDetail = "";
+        if (primary == null) {
+            managerDetail = "skipped: no instance";
+        } else {
+            try {
+                managerOk = Class.forName("baritone.api.IBaritone")
+                        .getMethod("getCommandManager").invoke(primary) != null;
+                if (!managerOk) {
+                    managerDetail = "getCommandManager() returned null";
+                }
+            } catch (ReflectiveOperationException | RuntimeException e) {
+                managerDetail = shorten(e);
+            }
+        }
+        out.add(new Check("silkvis.baritone.check.manager", managerOk, managerDetail));
+
+        boolean executeOk = false;
+        String executeDetail = "";
+        try {
+            executeOk = Class.forName("baritone.api.command.manager.ICommandManager")
+                    .getMethod("execute", String.class) != null;
+        } catch (ClassNotFoundException | NoSuchMethodException | LinkageError e) {
+            executeDetail = e.getClass().getSimpleName();
+        }
+        out.add(new Check("silkvis.baritone.check.execute", executeOk, executeDetail));
+
+        out.add(new Check("silkvis.baritone.check.last", this.failure.isEmpty(), this.failure));
+        return out;
     }
 
     private static String shorten(Throwable t) {
