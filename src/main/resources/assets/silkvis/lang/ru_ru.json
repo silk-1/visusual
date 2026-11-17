@@ -861,8 +861,6 @@
   "silkvis.baritone.start": "Начать",
   "silkvis.baritone.command": "Команда: ",
   "silkvis.baritone.incomplete": "Заполните то, что нужно этой задаче.",
-  "silkvis.baritone.point": "Точка: ",
-  "silkvis.baritone.point.hint": "Берётся из блока под прицелом, а если смотрите в пустоту — у ваших ног. Перечитывается при нажатии «Начать».",
   "silkvis.baritone.number": "Значение: ",
   "silkvis.baritone.tunnel.height": "Высота: ",
   "silkvis.baritone.tunnel.width": "Ширина: ",
@@ -903,5 +901,11 @@
   "silkvis.baritone.action.follow": "Следовать за игроком",
   "silkvis.baritone.action.follow.note": "Baritone идёт за игроком с этим ником. Ник не проверяется, поэтому опечатка приведёт в никуда.",
   "silkvis.baritone.follow.hint": "Ник игрока",
-  "silkvis.baritone.build": "Сборка: "
+  "silkvis.baritone.build": "Сборка: ",
+  "silkvis.baritone.coords": "Координаты",
+  "silkvis.baritone.coord.x": "X",
+  "silkvis.baritone.coord.y": "Y",
+  "silkvis.baritone.coord.z": "Z",
+  "silkvis.baritone.coords.crosshair": "Взять из прицела",
+  "silkvis.baritone.coords.hint": "Впишите числа или возьмите блок под прицелом. Поля заполняются целью прицела при открытии, так что вариант «наведись и иди» остаётся в одно нажатие."
 }

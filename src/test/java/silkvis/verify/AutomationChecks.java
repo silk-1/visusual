@@ -217,8 +217,12 @@ final class AutomationChecks {
             keys.add("silkvis.baritone.start");
             keys.add("silkvis.baritone.command");
             keys.add("silkvis.baritone.incomplete");
-            keys.add("silkvis.baritone.point");
-            keys.add("silkvis.baritone.point.hint");
+            keys.add("silkvis.baritone.coords");
+            keys.add("silkvis.baritone.coord.x");
+            keys.add("silkvis.baritone.coord.y");
+            keys.add("silkvis.baritone.coord.z");
+            keys.add("silkvis.baritone.coords.crosshair");
+            keys.add("silkvis.baritone.coords.hint");
             keys.add("silkvis.baritone.number");
             keys.add("silkvis.baritone.tunnel.height");
             keys.add("silkvis.baritone.tunnel.width");

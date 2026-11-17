@@ -861,8 +861,6 @@
   "silkvis.baritone.start": "Start",
   "silkvis.baritone.command": "Command: ",
   "silkvis.baritone.incomplete": "Fill in what this action needs to be able to start.",
-  "silkvis.baritone.point": "Point: ",
-  "silkvis.baritone.point.hint": "Taken from the block under the crosshair, or from your feet when you look at nothing. Read again when you press Start.",
   "silkvis.baritone.number": "Value: ",
   "silkvis.baritone.tunnel.height": "Height: ",
   "silkvis.baritone.tunnel.width": "Width: ",
@@ -903,5 +901,11 @@
   "silkvis.baritone.action.follow": "Follow a player",
   "silkvis.baritone.action.follow.note": "Baritone follows the player with this exact name. The name is not looked up, so a typo follows nobody.",
   "silkvis.baritone.follow.hint": "Player name",
-  "silkvis.baritone.build": "Build: "
+  "silkvis.baritone.build": "Build: ",
+  "silkvis.baritone.coords": "Coordinates",
+  "silkvis.baritone.coord.x": "X",
+  "silkvis.baritone.coord.y": "Y",
+  "silkvis.baritone.coord.z": "Z",
+  "silkvis.baritone.coords.crosshair": "Take from the crosshair",
+  "silkvis.baritone.coords.hint": "Type the numbers, or take the block you are looking at. The fields start with the crosshair target, so the aimed case is still one press."
 }

@@ -108,6 +108,9 @@ public final class SilkVisScreen extends Screen {
     /** Text fields of the forms; kept across rebuilds so a scroll tick keeps what was typed. */
     private final EnumMap<BaritoneAction, TextInputModel> baritoneTexts =
             new EnumMap<>(BaritoneAction.class);
+    /** Coordinate fields of the point actions, three per action. */
+    private final EnumMap<BaritoneAction, TextInputModel[]> baritoneCoords =
+            new EnumMap<>(BaritoneAction.class);
     /** Last command the tab sent, so a press Baritone ignored is visible instead of silent. */
     private String baritoneLastCommand = "";
     private boolean baritoneLastAccepted = true;
@@ -346,11 +349,15 @@ public final class SilkVisScreen extends Screen {
             return buildBaritoneMenuPage(area, y, width, status);
         }
         BaritoneParams params = runtime.baritoneForm(action);
-        // A text form's field is the source of truth while it is open: the widget commits only on
-        // Enter, so the parameters are refreshed from it here and again on press.
+        // The inputs are the source of truth while the form is open: a text field commits only
+        // on Enter, so both are pulled into the parameters before anything is drawn.
         if (action.arg() == BaritoneAction.Arg.TEXT) {
             params.setText(baritoneTextModel(action).text());
         }
+        if (action.arg() == BaritoneAction.Arg.POINT) {
+            params.setPoint(typedPoint(action));
+        }
+        String command = action.command(params);
 
         settingsWidgets.add(new ButtonWidget(
                 new Rect(area.x(), y, Math.min(width, 120), ROW_HEIGHT),
@@ -364,18 +371,14 @@ public final class SilkVisScreen extends Screen {
         settingsWidgets.add(new FixedText(tr(action.noteKey()), new Rect(area.x(), y, width, 48)));
         y += 52;
 
+        // Start is offered twice on purpose: the ore grid is eleven rows tall, and a player who
+        // has to scroll to find the button reads it as "there is no button at all" (owner
+        // report: "кнопки начать нет").
+        y = addBaritoneStart(area, y, width, action, command, status, true);
+        y += 4;
+
         switch (action.arg()) {
-            case POINT -> {
-                BlockPos target = runtime.automationTarget(MinecraftClient.getInstance());
-                params.setPoint(target);
-                settingsWidgets.add(new FixedText(tr("silkvis.baritone.point") + " "
-                                + target.x() + " " + target.y() + " " + target.z(),
-                        new Rect(area.x(), y, width, 12)));
-                y += 16;
-                settingsWidgets.add(new FixedText(tr("silkvis.baritone.point.hint"),
-                        new Rect(area.x(), y, width, 28)));
-                y += 32;
-            }
+            case POINT -> y = addBaritoneCoords(area, y, width, action);
             case SINGLE_BLOCK, BLOCKS, BLOCKS_AND_COUNT -> y = addBaritoneBlocks(area, y, width,
                     action, params, action.arg() != BaritoneAction.Arg.SINGLE_BLOCK);
             case NUMBER -> y = addBaritoneNumber(area, y, width, action, params);
@@ -393,22 +396,124 @@ public final class SilkVisScreen extends Screen {
             }
         }
 
-        String command = action.command(params);
+        // The second Start, after the inputs: the natural place once the form is filled.
+        y = addBaritoneStart(area, y, width, action, command, status, false);
+        return y;
+    }
+
+    /**
+     * The Start button and the command it would send.
+     *
+     * @param first true for the copy above the inputs, which only shows the command when it is
+     *              complete; the copy below always explains what is missing
+     */
+    private int addBaritoneStart(Rect area, int y, int width, BaritoneAction action,
+                                 String command, BaritoneStatus status, boolean first) {
         ButtonWidget start = new ButtonWidget(
                 new Rect(area.x(), y, Math.min(width, 160), ROW_HEIGHT),
                 tr("silkvis.baritone.start"), () -> startBaritoneAction(action))
                 .style(ButtonWidget.Style.PRIMARY);
-        // Two reasons to be off, and the line below says which one applies.
+        // Two reasons to be off, and the line under the button says which one applies.
         start.setEnabled(status.usable() && command != null);
         settingsWidgets.add(start);
-        y += ROW_HEIGHT + 8;
+        y += ROW_HEIGHT + 6;
 
-        settingsWidgets.add(new FixedText(command == null
-                ? tr("silkvis.baritone.incomplete")
-                : tr("silkvis.baritone.command") + command,
+        String line;
+        if (command == null) {
+            line = first ? "" : tr("silkvis.baritone.incomplete");
+        } else {
+            // The preview belongs to the top copy only; the bottom one sits right under the
+            // inputs the player just filled and does not need to repeat the line.
+            line = first ? tr("silkvis.baritone.command") + command : "";
+        }
+        if (!line.isEmpty()) {
+            settingsWidgets.add(new FixedText(line, new Rect(area.x(), y, width, 30)));
+            y += 34;
+        }
+        return y;
+    }
+
+    /**
+     * Coordinate fields for the point actions.
+     *
+     * <p>Why fields and not only the crosshair: "walk to a point" is used for coordinates read
+     * off a map, a friend's message or an earlier session, and those cannot be aimed at. The
+     * fields start with the crosshair target, so the aimed case is still one press, and the
+     * button under them refills from the crosshair at any time.</p>
+     */
+    private int addBaritoneCoords(Rect area, int y, int width, BaritoneAction action) {
+        TextInputModel[] models = baritoneCoordModels(action);
+        settingsWidgets.add(new FixedText(tr("silkvis.baritone.coords"),
+                new Rect(area.x(), y, width, 12)));
+        y += 15;
+        int fieldWidth = Math.max(50, (width - 12) / 3);
+        for (int i = 0; i < models.length; i++) {
+            Rect field = new Rect(area.x() + i * (fieldWidth + 6), y, fieldWidth, ROW_HEIGHT);
+            settingsWidgets.add(new TextInputWidget(field, models[i],
+                    tr(COORD_KEYS[Math.min(i, COORD_KEYS.length - 1)]), value -> rebuildSettings()));
+        }
+        y += ROW_HEIGHT + 6;
+        settingsWidgets.add(new ButtonWidget(
+                new Rect(area.x(), y, Math.min(width, 180), ROW_HEIGHT),
+                tr("silkvis.baritone.coords.crosshair"), () -> {
+            BlockPos target = runtime.automationTarget(MinecraftClient.getInstance());
+            TextInputModel[] fields = baritoneCoordModels(action);
+            fields[0].setText(Integer.toString(target.x()));
+            fields[1].setText(Integer.toString(target.y()));
+            fields[2].setText(Integer.toString(target.z()));
+            rebuildSettings();
+        }));
+        y += ROW_HEIGHT + 8;
+        settingsWidgets.add(new FixedText(tr("silkvis.baritone.coords.hint"),
                 new Rect(area.x(), y, width, 30)));
         y += 34;
         return y;
+    }
+
+    /** Placeholders of the three coordinate fields; technical labels, same in every language. */
+    private static final String[] COORD_KEYS = {
+            "silkvis.baritone.coord.x", "silkvis.baritone.coord.y", "silkvis.baritone.coord.z"
+    };
+
+    /** The three coordinate fields of one action, created prefilled with the crosshair target. */
+    private TextInputModel[] baritoneCoordModels(BaritoneAction action) {
+        TextInputModel[] models = this.baritoneCoords.get(action);
+        if (models == null) {
+            BlockPos start = runtime.automationTarget(MinecraftClient.getInstance());
+            models = new TextInputModel[]{coordModel(start.x()), coordModel(start.y()),
+                    coordModel(start.z())};
+            this.baritoneCoords.put(action, models);
+        }
+        return models;
+    }
+
+    /** One coordinate field: digits with an optional minus, at most nine of them. */
+    private static TextInputModel coordModel(int value) {
+        return new TextInputModel(Integer.toString(value), 9,
+                text -> text.isBlank() || text.matches("-?\\d{1,9}"));
+    }
+
+    /** The point typed into the fields, or null when one of them is not a number. */
+    private BlockPos typedPoint(BaritoneAction action) {
+        TextInputModel[] models = baritoneCoordModels(action);
+        Integer x = parseIntOrNull(models[0].text());
+        Integer y = parseIntOrNull(models[1].text());
+        Integer z = parseIntOrNull(models[2].text());
+        if (x == null || y == null || z == null) {
+            return null;
+        }
+        return new BlockPos(x, y, z);
+    }
+
+    private static Integer parseIntOrNull(String text) {
+        if (text == null || text.isBlank()) {
+            return null;
+        }
+        try {
+            return Integer.valueOf(text.trim());
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     /**
@@ -583,7 +688,7 @@ public final class SilkVisScreen extends Screen {
     private void startBaritoneAction(BaritoneAction action) {
         BaritoneParams params = runtime.baritoneForm(action);
         if (action.arg() == BaritoneAction.Arg.POINT) {
-            params.setPoint(runtime.automationTarget(MinecraftClient.getInstance()));
+            params.setPoint(typedPoint(action));
         }
         if (action.arg() == BaritoneAction.Arg.TEXT) {
             params.setText(baritoneTextModel(action).text());
@@ -1172,11 +1277,17 @@ public final class SilkVisScreen extends Screen {
         }
         // Real content height, so the wheel has somewhere to go. Without it the pane
         // reported an empty content and refused to scroll while clipping its controls.
-        int contentBottom = contentTop - settingsScroll.offset();
+        //
+        // The widgets are already shifted up by the current offset, so the height has to add
+        // that offset back: without it the content shrank as the player scrolled, maxOffset
+        // collapsed behind the cursor and the bottom of every long page (the ore grid of the
+        // Baritone tab, with its Start button) could never be reached.
+        int contentBottom = contentTop;
         for (Widget widget : settingsWidgets) {
             contentBottom = Math.max(contentBottom, widget.bounds().bottom());
         }
-        settingsScroll.setContentHeight(Math.max(0, contentBottom - contentTop + 8));
+        settingsScroll.setContentHeight(
+                Math.max(0, contentBottom + settingsScroll.offset() - contentTop + 8));
         focus.setScope(collectFocusable());
     }
 
