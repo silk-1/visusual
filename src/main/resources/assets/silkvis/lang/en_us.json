@@ -902,5 +902,6 @@
   "silkvis.baritone.block.clay": "Clay",
   "silkvis.baritone.action.follow": "Follow a player",
   "silkvis.baritone.action.follow.note": "Baritone follows the player with this exact name. The name is not looked up, so a typo follows nobody.",
-  "silkvis.baritone.follow.hint": "Player name"
+  "silkvis.baritone.follow.hint": "Player name",
+  "silkvis.baritone.build": "Build: "
 }

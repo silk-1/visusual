@@ -482,6 +482,25 @@ public final class SilkVisRuntime implements AutomationHost {
      * are on, and where their config lives. Logged at start-up, because "the fix did nothing"
      * is almost always the previous jar still sitting in {@code mods/} after a failed build.
      */
+    /**
+     * Version of the jar that is actually running, from Fabric's own metadata.
+     *
+     * <p>Why this exists: "I installed the new build and nothing changed" is almost always an
+     * older jar still sitting in {@code mods/}. The version has to be readable from the place
+     * the change would show up -- the screen and {@code latest.log} -- or settling it needs a
+     * file manager and a guess.</p>
+     */
+    public String versionLabel() {
+        try {
+            return net.fabricmc.loader.api.FabricLoader.getInstance()
+                    .getModContainer("silkvis")
+                    .map(container -> container.getMetadata().getVersion().getFriendlyString())
+                    .orElse("dev");
+        } catch (RuntimeException | LinkageError e) {
+            return "dev";
+        }
+    }
+
     public void logStartupSummary() {
         int soupOn = 0;
         for (silkvis.visual.soup.module.SoupModule module : SoupVisualsClient.get().modules()) {
@@ -489,7 +508,8 @@ public final class SilkVisRuntime implements AutomationHost {
                 soupOn++;
             }
         }
-        String summary = "modules=" + modules.all().size()
+        String summary = "version=" + versionLabel()
+                + " modules=" + modules.all().size()
                 + " soupvisuals=" + soupOn + "/" + SoupVisualsClient.get().modules().size()
                 + " soupfile=" + paths.soupFile();
         log.event("STARTUP", summary);

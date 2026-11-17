@@ -902,5 +902,6 @@
   "silkvis.baritone.block.clay": "Глина",
   "silkvis.baritone.action.follow": "Следовать за игроком",
   "silkvis.baritone.action.follow.note": "Baritone идёт за игроком с этим ником. Ник не проверяется, поэтому опечатка приведёт в никуда.",
-  "silkvis.baritone.follow.hint": "Ник игрока"
+  "silkvis.baritone.follow.hint": "Ник игрока",
+  "silkvis.baritone.build": "Сборка: "
 }

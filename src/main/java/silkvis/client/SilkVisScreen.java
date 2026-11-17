@@ -257,6 +257,13 @@ public final class SilkVisScreen extends Screen {
     private int buildBaritoneTab(Rect area, int y, int width) {
         BaritoneStatus status = runtime.baritone().status();
 
+        // The running build, first line of the tab. Every report about this tab starts with
+        // "I installed it and nothing changed", and a screenshot that shows the version answers
+        // it without a round trip.
+        settingsWidgets.add(new FixedText(tr("silkvis.baritone.build") + runtime.versionLabel(),
+                new Rect(area.x(), y, width, 12)));
+        y += 16;
+
         settingsWidgets.add(new FixedText(tr("silkvis.baritone.state"),
                 new Rect(area.x(), y, width, 12)));
         y += 14;
