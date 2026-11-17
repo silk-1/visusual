@@ -26,6 +26,16 @@ its own licence and is **not** relicensed; the original authors keep their copyr
 If a redistribution of this repository is planned outside the project owner's control, the
 permission above has to be confirmed with the author again - the SOUP-1.0 terms apply.
 
+## Baritone (automation engine, not bundled)
+
+* Source: <https://github.com/cabaletta/baritone>, branch `1.21.10`
+* Licence: **LGPL-3.0**
+* **No code from Baritone is included in this repository.** SilkVis calls its public API at
+  runtime through reflection; the player installs Baritone themselves.
+* Calling a separately distributed LGPL library does not make this project a derivative work
+  of it, so SilkVis keeps its own licence. See `docs/adr/0013-baritone-integration.md`.
+* If Baritone is not installed, SilkVis loads and works normally; the BARITONE tab says so.
+
 ## Notes on other third-party material
 
 The original jar's `CREDITS.md` mentions `meteor-client` (GPL-3.0) for "Better Glow &

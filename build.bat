@@ -59,6 +59,13 @@ if not exist "%~dp0gradlew.bat" (
   exit /b 1
 )
 
+rem Name of the build being made, read from gradle.properties so it can never drift from what
+rem the jar actually contains. Without this line a pasted log says nothing about which build it
+rem came from, and "the fix did nothing" is usually "an older jar was still in mods".
+set "SV_VERSION=unknown"
+for /f "tokens=1,* delims==" %%A in ('findstr /b /c:"mod_version=" "%~dp0gradle.properties"') do set "SV_VERSION=%%B"
+
+echo [SilkVis] BUILD %SV_VERSION%
 echo [SilkVis] START %DATE% %TIME%
 if "%~1"=="" (
   call "%~dp0gradlew.bat" clean build

@@ -105,6 +105,17 @@ public final class SilkVisClient implements ClientModInitializer {
         runtime.integrations().probe("sodium", () -> FabricLoader.getInstance().isModLoaded("sodium"));
         runtime.integrations().probe("iris", () -> FabricLoader.getInstance().isModLoaded("iris"));
         runtime.integrations().probe("baritone", () -> FabricLoader.getInstance().isModLoaded("baritone"));
+        // Resolve the Baritone bridge once at startup and say the outcome in the log.
+        // Reflection failures are otherwise invisible: the tab can only show a short line,
+        // and reading a reason off a screenshot is not a bug report.
+        {
+            silkvis.client.baritone.BaritoneBridge baritone = runtime.baritone();
+            if (baritone.available()) {
+                runtime.log().log("BARITONE", "bridge ready: " + baritone.status().describe());
+            } else {
+                runtime.log().log("BARITONE", "bridge unavailable: " + baritone.failure());
+            }
+        }
 
         openMenu = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                 "key.silkvis.open_menu", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_RIGHT_SHIFT, CATEGORY));
