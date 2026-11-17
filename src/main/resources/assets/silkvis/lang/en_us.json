@@ -810,5 +810,20 @@
   "silkvis.baritone.broken_help": "Baritone is installed but its API could not be reached, which usually means a version mismatch: use a Baritone build for Minecraft 1.21.10 and the baritone-api-fabric jar, not the standalone one.",
   "silkvis.baritone.target_note": "Tasks need a block under the crosshair: look at a spot and press. Follow and Mine need a name, so they are off for now.",
   "silkvis.baritone.reason": "Reason: ",
-  "silkvis.baritone.cancel": "Cancel"
+  "silkvis.baritone.cancel": "Cancel",
+  "silkvis.baritone.blocks.picked": "Picked blocks:",
+  "silkvis.baritone.blocks.none": "Nothing picked yet. Search below and click a block.",
+  "silkvis.baritone.blocks.search": "Search blocks",
+  "silkvis.baritone.blocks.empty": "No block matches that search.",
+  "silkvis.baritone.settings": "Baritone settings",
+  "silkvis.baritone.set.allowBreak": "May break blocks",
+  "silkvis.baritone.set.allowPlace": "May place blocks",
+  "silkvis.baritone.set.allowSprint": "May sprint",
+  "silkvis.baritone.set.allowParkour": "May parkour (jump gaps)",
+  "silkvis.baritone.set.autoTool": "Switch to the right tool",
+  "silkvis.baritone.set.itemSaver": "Item saver (slower, fewer breaks)",
+  "silkvis.baritone.set.freeLook": "Free look (does not turn the camera)",
+  "silkvis.baritone.set.renderPath": "Draw the path",
+  "silkvis.baritone.set.blockReachDistance": "Block reach",
+  "silkvis.baritone.set.maxFallHeightNoWater": "Max fall without water"
 }

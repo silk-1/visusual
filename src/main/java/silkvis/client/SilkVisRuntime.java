@@ -88,6 +88,16 @@ public final class SilkVisRuntime implements AutomationHost {
      */
     private final silkvis.client.baritone.BaritoneBridge baritone =
             new silkvis.client.baritone.BaritoneBridge();
+    /** Values as the player last set them; Baritone owns the real state. */
+    private final silkvis.automation.baritone.BaritoneSettings.Values baritoneValues =
+            new silkvis.automation.baritone.BaritoneSettings.Values();
+    /** Blocks picked in the Baritone tab, in pick order. */
+    private final silkvis.automation.baritone.BlockSelection baritoneBlocks =
+            new silkvis.automation.baritone.BlockSelection();
+    /** Cached block ids; see {@link #blockIds()}. */
+    private java.util.List<String> blockIds;
+    /** What the player typed into the block search box. */
+    private String baritoneBlockQuery = "";
     private final AutomationEngine automation;
     private AutomationFile automationFile;
     /** Steps are executed on the client thread only; set by the client entrypoint. */
@@ -879,6 +889,71 @@ public final class SilkVisRuntime implements AutomationHost {
     /** The Baritone bridge; the automation tab and the HUD status widget read it. */
     public silkvis.client.baritone.BaritoneBridge baritone() {
         return this.baritone;
+    }
+
+    /** Baritone setting values as last sent, so the screen can show them. */
+    public silkvis.automation.baritone.BaritoneSettings.Values baritoneValues() {
+        return this.baritoneValues;
+    }
+
+    /** The blocks picked for "mine blocks". */
+    public silkvis.automation.baritone.BlockSelection baritoneBlocks() {
+        return this.baritoneBlocks;
+    }
+
+    /** The block search text; kept here so a rebuild does not clear the box. */
+    public String baritoneBlockQuery() {
+        return this.baritoneBlockQuery;
+    }
+
+    /** Records the search text. */
+    public void setBaritoneBlockQuery(String value) {
+        this.baritoneBlockQuery = value == null ? "" : value;
+    }
+
+    /**
+     * Every block id the game knows, in registry order, for the block picker.
+     *
+     * <p>Built on first use and cached: the registry does not change while the game runs, and
+     * the picker re-filters on every keystroke, so rebuilding a 1000-entry list per keypress
+     * would be the only slow part of an otherwise instant box.</p>
+     */
+    public java.util.List<String> blockIds() {
+        if (this.blockIds == null) {
+            java.util.List<String> ids = new java.util.ArrayList<>();
+            try {
+                for (net.minecraft.block.Block block
+                        : net.minecraft.registry.Registries.BLOCK) {
+                    ids.add(net.minecraft.registry.Registries.BLOCK.getId(block).toString());
+                }
+            } catch (RuntimeException e) {
+                // A registry read must never take the menu down; an empty list shows as
+                // "nothing found" and the rest of the tab still works.
+                this.log.log("BARITONE", "block registry unavailable: " + e);
+            }
+            this.blockIds = ids;
+        }
+        return this.blockIds;
+    }
+
+    /**
+     * Sends one Baritone setting and remembers it.
+     *
+     * <p>The value is recorded only when the bridge accepted the command: showing a value the
+     * mod refused would make the screen disagree with the game.</p>
+     */
+    public boolean setBaritoneSetting(silkvis.automation.baritone.BaritoneSettings.Spec spec,
+                                      String value) {
+        String command = silkvis.automation.baritone.BaritoneSettings.command(spec, value);
+        if (command == null) {
+            return false;
+        }
+        boolean accepted = this.baritone.execute(command);
+        if (accepted) {
+            this.baritoneValues.put(spec.name(), value);
+        }
+        this.log.log("BARITONE", command + (accepted ? "" : " -> rejected"));
+        return accepted;
     }
 
     public Snapshot automationSnapshot(MinecraftClient client) {

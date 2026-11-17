@@ -810,5 +810,20 @@
   "silkvis.baritone.broken_help": "Baritone установлен, но его API недоступно — обычно это несовпадение версий. Нужна сборка Baritone под Minecraft 1.21.10 и вариант baritone-api-fabric, а не standalone.",
   "silkvis.baritone.target_note": "Задачам нужен блок под прицелом: посмотрите на место и нажмите. «Следовать» и «Добывать» требуют имени, поэтому пока выключены.",
   "silkvis.baritone.reason": "Причина: ",
-  "silkvis.baritone.cancel": "Отменить"
+  "silkvis.baritone.cancel": "Отменить",
+  "silkvis.baritone.blocks.picked": "Выбранные блоки:",
+  "silkvis.baritone.blocks.none": "Ничего не выбрано. Найдите блок ниже и нажмите на него.",
+  "silkvis.baritone.blocks.search": "Поиск блоков",
+  "silkvis.baritone.blocks.empty": "Ни один блок не подходит под запрос.",
+  "silkvis.baritone.settings": "Настройки Baritone",
+  "silkvis.baritone.set.allowBreak": "Может ломать блоки",
+  "silkvis.baritone.set.allowPlace": "Может ставить блоки",
+  "silkvis.baritone.set.allowSprint": "Может бежать",
+  "silkvis.baritone.set.allowParkour": "Паркур (прыжки через провалы)",
+  "silkvis.baritone.set.autoTool": "Переключать инструмент",
+  "silkvis.baritone.set.itemSaver": "Экономить инструмент (медленнее)",
+  "silkvis.baritone.set.freeLook": "Свободный взгляд (не поворачивает камеру)",
+  "silkvis.baritone.set.renderPath": "Рисовать путь",
+  "silkvis.baritone.set.blockReachDistance": "Дальность до блока",
+  "silkvis.baritone.set.maxFallHeightNoWater": "Макс. падение без воды"
 }
