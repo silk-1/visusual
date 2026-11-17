@@ -190,28 +190,15 @@ final class AutomationChecks {
             keys.add("silkvis.baritone.reason");
             keys.add("silkvis.baritone.target_note");
             keys.add("silkvis.baritone.cancel");
-            // The task menu, the two sub-pages and the status line of the ore page.
-            keys.add("silkvis.baritone.menu.mine");
-            keys.add("silkvis.baritone.menu.goto");
-            keys.add("silkvis.baritone.menu.follow");
-            keys.add("silkvis.baritone.menu.explore");
-            keys.add("silkvis.baritone.menu.stop");
-            keys.add("silkvis.baritone.menu.note");
+            // The fixed chrome of the catalogue: status lines, the two button pairs and the
+            // diagnostics page. Everything that comes from an enum is added by the loops below,
+            // so a key removed from the language files fails here instead of leaking a raw key
+            // into the UI.
+            keys.add("silkvis.baritone.build");
             keys.add("silkvis.baritone.probe");
             keys.add("silkvis.baritone.last");
             keys.add("silkvis.baritone.last.none");
-            keys.add("silkvis.baritone.mine.back");
-            keys.add("silkvis.baritone.mine.help");
-            keys.add("silkvis.baritone.mine.limit");
-            keys.add("silkvis.baritone.mine.no_limit");
-            keys.add("silkvis.baritone.mine.start");
-            keys.add("silkvis.baritone.mine.none");
-            keys.add("silkvis.baritone.mine.command");
-            keys.add("silkvis.baritone.follow.back");
-            keys.add("silkvis.baritone.follow.help");
             keys.add("silkvis.baritone.follow.hint");
-            keys.add("silkvis.baritone.follow.start");
-            keys.add("silkvis.baritone.follow.empty");
             // Every tile names itself from its own key, so a missing row would show the player a
             // raw key instead of a name -- and nothing else would catch it.
             for (BaritoneBlock block : BaritoneBlock.values()) {

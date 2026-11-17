@@ -478,11 +478,6 @@ public final class SilkVisRuntime implements AutomationHost {
     }
 
     /**
-     * One line with what this build actually loaded: the module count, how many ported modules
-     * are on, and where their config lives. Logged at start-up, because "the fix did nothing"
-     * is almost always the previous jar still sitting in {@code mods/} after a failed build.
-     */
-    /**
      * Version of the jar that is actually running, from Fabric's own metadata.
      *
      * <p>Why this exists: "I installed the new build and nothing changed" is almost always an
@@ -501,6 +496,11 @@ public final class SilkVisRuntime implements AutomationHost {
         }
     }
 
+    /**
+     * One line with what this build actually loaded: the module count, how many ported modules
+     * are on, and where their config lives. Logged at start-up, because "the fix did nothing"
+     * is almost always the previous jar still sitting in {@code mods/} after a failed build.
+     */
     public void logStartupSummary() {
         int soupOn = 0;
         for (silkvis.visual.soup.module.SoupModule module : SoupVisualsClient.get().modules()) {
@@ -898,13 +898,6 @@ public final class SilkVisRuntime implements AutomationHost {
         return this.automationGoals;
     }
 
-    /**
-     * Reads the game into the planner's snapshot, or returns null when there is nothing to read.
-     *
-     * <p>Deliberately here and not in the client entrypoint: {@code AutomationSelector} needs the
-     * same capture, and two captures would be two lists of entities per tick. Only this method
-     * references the Minecraft adapter, and it is called from the tick loop, never from a screen.</p>
-     */
     /** The Baritone bridge; the automation tab and the HUD status widget read it. */
     public silkvis.client.baritone.BaritoneBridge baritone() {
         return this.baritone;
